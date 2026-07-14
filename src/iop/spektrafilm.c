@@ -137,6 +137,7 @@ typedef struct dt_iop_spektrafilm_params_t
   float grain_amount;       // $MIN: 0.0 $MAX: 2.0 $DEFAULT: 1.0 $DESCRIPTION: "grain"
   float grain_size;         // $MIN: 0.2 $MAX: 4.0 $DEFAULT: 1.0 $DESCRIPTION: "grain size"
   float film_format_mm;     // $MIN: 8.0 $MAX: 130.0 $DEFAULT: 36.0 $DESCRIPTION: "film format"
+  float output_luminance_boost; // $MIN: 0.5 $MAX: 4.0 $DEFAULT: 1.0 $DESCRIPTION: "pre-compression boost"
 } dt_iop_spektrafilm_params_t;
 
 /* one discovered profile: stock (= file base name), display name, stage */
@@ -158,7 +159,7 @@ typedef struct dt_iop_spektrafilm_gui_data_t
   GtkWidget *halation_on, *halation_amount, *halation_scale;
   GtkWidget *boost_ev, *boost_range, *protect_ev;
   GtkWidget *diffusion_on, *diffusion_strength, *diffusion_scale, *diffusion_warmth;
-  GtkWidget *grain_on, *grain_amount, *grain_size, *film_format_mm;
+  GtkWidget *grain_on, *grain_amount, *grain_size, *film_format_mm, *output_luminance_boost;
   sf_prof_entry_t entries[SF_MAX_PROFILES];
   int n_entries;
   int film_entry[SF_MAX_PROFILES], n_films;   /* indices into entries[] */
@@ -486,6 +487,7 @@ static sf_sim_t *_ensure_sim(dt_iop_spektrafilm_data_t *d,
   key = _mix64(key, &p->couplers_amount, sizeof p->couplers_amount);
   key = _mix64(key, &p->scan_film, sizeof p->scan_film);
   key = _mix64(key, &p->quality, sizeof p->quality);
+  key = _mix64(key, &p->output_luminance_boost, sizeof p->output_luminance_boost);
   key = _mix64(key, m_in, sizeof m_in);
   key = _mix64(key, m_out, sizeof m_out);
 
@@ -590,6 +592,7 @@ static sf_sim_t *_ensure_sim(dt_iop_spektrafilm_data_t *d,
     sp.couplers_active = (p->couplers_amount > 0.0f);
     sp.couplers_amount = p->couplers_amount;
     sp.scan_film = p->scan_film;
+    sp.out_luminance_boost = p->output_luminance_boost;
     sp.lut_steps = _quality_steps(p->quality);
     if(p->print_contrast != 1.0f)
     {
@@ -1225,7 +1228,7 @@ int process_cl(dt_iop_module_t *self, dt_dev_pixelpipe_iop_t *piece, cl_mem dev_
       CLARG(sz_cl), CLARG(sn_cl), CLARG(sm_cl), CLARG(steps), CLARG(g->scan_lo[0]),
       CLARG(g->scan_lo[1]), CLARG(g->scan_lo[2]), CLARG(g->scan_hi[0]), CLARG(g->scan_hi[1]),
       CLARG(g->scan_hi[2]), CLARG(mats_cl), CLARG(cm_cl), CLARG(g->cmax_nl), CLARG(g->cmax_nh),
-      CLARG(g->out_compress), CLARG(g->scan_bw_on), CLARG(g->scan_bw_m),
+      CLARG(g->out_compress), CLARG(g->out_luminance_boost), CLARG(g->scan_bw_on), CLARG(g->scan_bw_m),
       CLARG(g->scan_bw_q));
   SF_CL_STEP("scan");
 
@@ -1533,6 +1536,11 @@ void gui_init(dt_iop_module_t *self)
   dt_bauhaus_slider_set_format(g->film_format_mm, _(" mm"));
   gtk_widget_set_tooltip_text(g->film_format_mm,
                               _("physical film width; sets the scale of grain and halation"));
+  g->output_luminance_boost = dt_bauhaus_slider_from_params(self, "output_luminance_boost");
+  gtk_widget_set_tooltip_text(g->output_luminance_boost,
+                              _("pre-compression boost: multiplies XYZ luminance before the"
+                                " OkLCh gamut compressor, pushing the histogram right while"
+                                " preserving the film's natural shoulder rolloff"));
   self->widget = sf_main_box;
 }
 
