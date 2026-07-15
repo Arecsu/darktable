@@ -94,7 +94,6 @@ DT_MODULE_INTROSPECTION(1, dt_iop_spektrafilm_params_t)
 #define SF_GRAIN_BLUR_FACTOR 0.8f
 #define SF_GRAIN_SIZE_MIN 0.05f
 #define SF_HALO_SIGMAS 4.0f
-#define SF_DIFFUSION_BLOOM_LAMBDA_MAX_UM 950.0f
 /* DIR coupler inhibitor diffusion; spektrafilm params_schema
    dir_couplers.diffusion_size_um default (a plain gaussian in the reference) */
 
@@ -109,6 +108,14 @@ typedef enum dt_iop_spektrafilm_quality_t
   DT_SPEKTRAFILM_Q_HIGH = 2,     // $DESCRIPTION: "high (49³ table)"
   DT_SPEKTRAFILM_Q_EXACT = 3,    // $DESCRIPTION: "exact spectral (very slow)"
 } dt_iop_spektrafilm_quality_t;
+
+typedef enum dt_iop_spektrafilm_diffusion_family_t
+{
+  DT_SPEKTRAFILM_DF_GLIMMERGLASS = 0,    // $DESCRIPTION: "Glimmerglass"
+  DT_SPEKTRAFILM_DF_BLACK_PRO_MIST = 1,  // $DESCRIPTION: "Black Pro-Mist"
+  DT_SPEKTRAFILM_DF_PRO_MIST = 2,         // $DESCRIPTION: "Pro-Mist"
+  DT_SPEKTRAFILM_DF_CINE_BLOOM = 3,       // $DESCRIPTION: "CineBloom"
+} dt_iop_spektrafilm_diffusion_family_t;
 
 typedef struct dt_iop_spektrafilm_params_t
 {
@@ -133,6 +140,12 @@ typedef struct dt_iop_spektrafilm_params_t
   float diffusion_strength; // $MIN: 0.0 $MAX: 2.0 $DEFAULT: 0.5 $DESCRIPTION: "diffusion strength"
   float diffusion_scale;    // $MIN: 0.2 $MAX: 4.0 $DEFAULT: 1.0 $DESCRIPTION: "diffusion size"
   float diffusion_warmth;   // $MIN: -1.5 $MAX: 1.5 $DEFAULT: 0.0 $DESCRIPTION: "diffusion halo warmth"
+  dt_iop_spektrafilm_diffusion_family_t diffusion_family; // $DEFAULT: DT_SPEKTRAFILM_DF_BLACK_PRO_MIST $DESCRIPTION: "diffusion family"
+  gboolean print_diffusion_on;    // $DEFAULT: FALSE $DESCRIPTION: "enable print diffusion"
+  float print_diffusion_strength; // $MIN: 0.0 $MAX: 2.0 $DEFAULT: 0.5 $DESCRIPTION: "print diffusion strength"
+  float print_diffusion_scale;    // $MIN: 0.2 $MAX: 4.0 $DEFAULT: 1.0 $DESCRIPTION: "print diffusion size"
+  float print_diffusion_warmth;   // $MIN: -1.5 $MAX: 1.5 $DEFAULT: 0.0 $DESCRIPTION: "print diffusion halo warmth"
+  dt_iop_spektrafilm_diffusion_family_t print_diffusion_family; // $DEFAULT: DT_SPEKTRAFILM_DF_BLACK_PRO_MIST $DESCRIPTION: "print diffusion family"
   gboolean grain_on;        // $DEFAULT: TRUE $DESCRIPTION: "enable grain"
   float grain_amount;       // $MIN: 0.0 $MAX: 2.0 $DEFAULT: 1.0 $DESCRIPTION: "grain"
   float grain_size;         // $MIN: 0.2 $MAX: 4.0 $DEFAULT: 1.0 $DESCRIPTION: "grain size"
@@ -158,7 +171,8 @@ typedef struct dt_iop_spektrafilm_gui_data_t
   GtkWidget *couplers_amount, *scan_film, *quality;
   GtkWidget *halation_on, *halation_amount, *halation_scale;
   GtkWidget *boost_ev, *boost_range, *protect_ev;
-  GtkWidget *diffusion_on, *diffusion_strength, *diffusion_scale, *diffusion_warmth;
+  GtkWidget *diffusion_on, *diffusion_family, *diffusion_strength, *diffusion_scale, *diffusion_warmth;
+  GtkWidget *print_diffusion_on, *print_diffusion_family, *print_diffusion_strength, *print_diffusion_scale, *print_diffusion_warmth;
   GtkWidget *grain_on, *grain_amount, *grain_size, *film_format_mm, *output_luminance_boost;
   sf_prof_entry_t entries[SF_MAX_PROFILES];
   int n_entries;
@@ -646,9 +660,15 @@ static float _max_halo_sigma(const dt_iop_spektrafilm_params_t *p, float pixel_u
   const float hal = (p->halation_on && p->halation_amount > 0.0f)
                         ? SF_HALATION_FIRST_SIGMA_UM * SF_HALATION_PSF_SIGMAS * inv_um
                         : 0.0f;
-  const float diff = p->diffusion_on ? SF_DIFFUSION_BLOOM_LAMBDA_MAX_UM * 1.41421356f
-                                           * p->diffusion_scale * inv_um
-                                     : 0.0f;
+  const float diff_film = p->diffusion_on
+                              ? sf_diffusion_family_max_bloom_um((sf_diffusion_family_t)p->diffusion_family) * 1.41421356f
+                                    * p->diffusion_scale * inv_um
+                              : 0.0f;
+  const float diff_print = p->print_diffusion_on
+                               ? sf_diffusion_family_max_bloom_um((sf_diffusion_family_t)p->print_diffusion_family) * 1.41421356f
+                                     * p->print_diffusion_scale * inv_um
+                               : 0.0f;
+  const float diff = fmaxf(diff_film, diff_print);
   const float grain = (p->grain_on && p->grain_amount > 0.0f)
                           ? SF_GRAIN_BLUR_FACTOR * SF_GRAIN_REF_UM
                                 * fmaxf(p->grain_size, SF_GRAIN_SIZE_MIN) * inv_um
@@ -767,7 +787,8 @@ void process(dt_iop_module_t *self, dt_dev_pixelpipe_iop_t *piece, const void *c
   sf_boost_highlights(plane, w, h, d->p.boost_ev, d->p.boost_range, d->p.protect_ev);
   if(d->p.diffusion_on)
     sf_diffusion_filter(plane, w, h, (double)pixel_um, d->p.diffusion_strength,
-                        d->p.diffusion_scale, d->p.diffusion_warmth);
+                        d->p.diffusion_scale, d->p.diffusion_warmth,
+                        (sf_diffusion_family_t)d->p.diffusion_family);
   if(d->p.halation_on && d->p.halation_amount > 0.0f)
     sf_halation(plane, w, h, (double)pixel_um, d->p.halation_amount, d->p.halation_scale);
 
@@ -858,6 +879,10 @@ void process(dt_iop_module_t *self, dt_dev_pixelpipe_iop_t *piece, const void *c
   if(!d->p.scan_film)
   {
     sf_sim_print_expose(sim, plane, plane, npix, 3, 3);
+    if(d->p.print_diffusion_on)
+      sf_diffusion_filter(plane, w, h, (double)pixel_um, d->p.print_diffusion_strength,
+                          d->p.print_diffusion_scale, d->p.print_diffusion_warmth,
+                          (sf_diffusion_family_t)d->p.print_diffusion_family);
     sf_sim_print_develop(sim, plane, plane, npix, 3, 3);
   }
 
@@ -1033,7 +1058,8 @@ int process_cl(dt_iop_module_t *self, dt_dev_pixelpipe_iop_t *piece, cl_mem dev_
   if(d->p.diffusion_on)
   {
     sf_diffusion_plan_t plan;
-    if(sf_diffusion_build_plan(d->p.diffusion_strength, d->p.diffusion_warmth, &plan)
+    if(sf_diffusion_build_plan_for_family(d->p.diffusion_strength, d->p.diffusion_warmth,
+                                           (sf_diffusion_family_t)d->p.diffusion_family, &plan)
        && plan.p_s > 0.0f)
     {
       const float dsc = fmaxf(d->p.diffusion_scale, 1e-6f);
@@ -1215,6 +1241,40 @@ int process_cl(dt_iop_module_t *self, dt_dev_pixelpipe_iop_t *piece, cl_mem dev_
         CLARG(steps), CLARG(g->enl_lo[0]), CLARG(g->enl_lo[1]), CLARG(g->enl_lo[2]),
         CLARG(g->enl_hi[0]), CLARG(g->enl_hi[1]), CLARG(g->enl_hi[2]), CLARG(g->print_exposure));
     SF_CL_STEP("print_expose");
+    if(d->p.print_diffusion_on)
+    {
+      sf_diffusion_plan_t pplan;
+      if(sf_diffusion_build_plan_for_family(d->p.print_diffusion_strength,
+                                              d->p.print_diffusion_warmth,
+                                              (sf_diffusion_family_t)d->p.print_diffusion_family,
+                                              &pplan)
+         && pplan.p_s > 0.0f)
+      {
+        const float pdsc = fmaxf(d->p.print_diffusion_scale, 1e-6f);
+        for(int j = 0; j < pplan.n; j++)
+        {
+          const float sigma = fmaxf(pplan.sigma_um[j] * pdsc / pixel_um, 1e-3f);
+          err = dt_opencl_enqueue_copy_buffer_to_buffer(devid, plane, tmpa, 0, 0, npix * f * 4);
+          if(err != CL_SUCCESS) break;
+          err = dt_gaussian_mean_blur_cl(devid, tmpa, w, h, 4, sigma);
+          if(err != CL_SUCCESS) break;
+          const int reset = (j == 0);
+          const float wr = pplan.wr[j], wg = pplan.wg[j], wb = pplan.wb[j];
+          err = dt_opencl_enqueue_kernel_2d_args(devid, gd->kernel_diffusion_accum, w, h,
+                                                  CLARG(tmpa), CLARG(acc), CLARG(w), CLARG(h),
+                                                  CLARG(wr), CLARG(wg), CLARG(wb), CLARG(reset));
+          if(err != CL_SUCCESS) break;
+        }
+        if(err == CL_SUCCESS)
+        {
+          const float ps = pplan.p_s;
+          err = dt_opencl_enqueue_kernel_2d_args(devid, gd->kernel_diffusion_mix, w, h,
+                                                  CLARG(plane), CLARG(acc), CLARG(w), CLARG(h),
+                                                  CLARG(ps));
+        }
+        SF_CL_STEP("print_diffusion");
+      }
+    }
     err = dt_opencl_enqueue_kernel_2d_args(devid, gd->kernel_print_develop, w, h, CLARG(plane),
                                            CLARG(plane2), CLARG(w), CLARG(h), CLARG(pc_cl),
                                            CLARG(g->le0), CLARG(g->le_step));
@@ -1337,6 +1397,11 @@ static void _update_print_sensitivity(dt_iop_module_t *self)
   gtk_widget_set_sensitive(g->print_contrast, printing);
   gtk_widget_set_sensitive(g->filter_m, printing);
   gtk_widget_set_sensitive(g->filter_y, printing);
+  gtk_widget_set_sensitive(g->print_diffusion_on, printing);
+  gtk_widget_set_sensitive(g->print_diffusion_family, printing);
+  gtk_widget_set_sensitive(g->print_diffusion_strength, printing);
+  gtk_widget_set_sensitive(g->print_diffusion_scale, printing);
+  gtk_widget_set_sensitive(g->print_diffusion_warmth, printing);
   /* toggle_from_params checkboxes keep showing their tick even when made
      insensitive -- GTK just dims the whole widget, so a checked-but-grayed
      box can read as "this is still on" when it has no effect at all (no
@@ -1348,6 +1413,8 @@ static void _update_print_sensitivity(dt_iop_module_t *self)
   DT_ENTER_GUI_UPDATE();
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->print_auto_exposure),
                                printing && p->print_auto_exposure);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->print_diffusion_on),
+                               printing && p->print_diffusion_on);
   DT_LEAVE_GUI_UPDATE();
 }
 
@@ -1428,6 +1495,7 @@ void gui_update(dt_iop_module_t *self)
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->print_auto_exposure), p->print_auto_exposure);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->halation_on), p->halation_on);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->diffusion_on), p->diffusion_on);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->print_diffusion_on), p->print_diffusion_on);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->grain_on), p->grain_on);
   _update_print_sensitivity(self);
 }
@@ -1519,14 +1587,32 @@ void gui_init(dt_iop_module_t *self)
                               _("protect tones below this many stops over mid-grey from the boost"));
   dt_gui_box_add(self->widget, dt_ui_section_label_new(C_("section", "diffusion")));
   g->diffusion_on = dt_bauhaus_toggle_from_params(self, "diffusion_on");
+  g->diffusion_family = dt_bauhaus_combobox_from_params(self, "diffusion_family");
+  gtk_widget_set_tooltip_text(g->diffusion_family,
+                              _("diffusion filter family (Tiffen-style presets)"));
   g->diffusion_strength = dt_bauhaus_slider_from_params(self, "diffusion_strength");
   gtk_widget_set_tooltip_text(g->diffusion_strength,
-                              _("diffusion (Black Pro-Mist) filter strength"));
+                              _("diffusion filter strength"));
   g->diffusion_scale = dt_bauhaus_slider_from_params(self, "diffusion_scale");
   gtk_widget_set_tooltip_text(g->diffusion_scale, _("diffusion halo/bloom size"));
   g->diffusion_warmth = dt_bauhaus_slider_from_params(self, "diffusion_warmth");
   gtk_widget_set_tooltip_text(g->diffusion_warmth,
                               _("diffusion halo warmth: >0 warm outer halo, <0 cool"));
+
+  dt_gui_box_add(self->widget, dt_ui_section_label_new(C_("section", "print diffusion")));
+  g->print_diffusion_on = dt_bauhaus_toggle_from_params(self, "print_diffusion_on");
+  g->print_diffusion_family = dt_bauhaus_combobox_from_params(self, "print_diffusion_family");
+  gtk_widget_set_tooltip_text(g->print_diffusion_family,
+                              _("print diffusion filter family"));
+  g->print_diffusion_strength = dt_bauhaus_slider_from_params(self, "print_diffusion_strength");
+  gtk_widget_set_tooltip_text(g->print_diffusion_strength,
+                              _("print diffusion filter strength"));
+  g->print_diffusion_scale = dt_bauhaus_slider_from_params(self, "print_diffusion_scale");
+  gtk_widget_set_tooltip_text(g->print_diffusion_scale, _("print diffusion halo/bloom size"));
+  g->print_diffusion_warmth = dt_bauhaus_slider_from_params(self, "print_diffusion_warmth");
+  gtk_widget_set_tooltip_text(g->print_diffusion_warmth,
+                              _("print diffusion halo warmth: >0 warm outer halo, <0 cool"));
+
   dt_gui_box_add(self->widget, dt_ui_section_label_new(C_("section", "settings")));
   g->quality = dt_bauhaus_combobox_from_params(self, "quality");
   gtk_widget_set_tooltip_text(g->quality,

@@ -34,8 +34,20 @@ void sf_blur_plane3(float *buf, int w, int h, float sigma, float *plane);
 void sf_halation(float *raw, int w, int h, double pixel_um, float amount, float spatial_scale);
 void sf_boost_highlights(float *raw, int w, int h, float boost_ev, float boost_range,
                          float protect_ev);
+
+/* Diffusion filter family presets (matched to the spektrafilm OFX plugin).
+   reference: https://github.com/chaert-s/spektrafilm-ofx SpektraVulkanRenderer.cpp diffusionShape() */
+typedef enum sf_diffusion_family_t
+{
+  SF_DIFF_FAMILY_GLIMMERGLASS = 0,
+  SF_DIFF_FAMILY_BLACK_PRO_MIST = 1,
+  SF_DIFF_FAMILY_PRO_MIST = 2,
+  SF_DIFF_FAMILY_CINE_BLOOM = 3,
+  SF_DIFF_FAMILY_COUNT
+} sf_diffusion_family_t;
+
 void sf_diffusion_filter(float *raw, int w, int h, double pixel_um, float strength,
-                         float spatial_scale, float halo_warmth);
+                         float spatial_scale, float halo_warmth, sf_diffusion_family_t family);
 
 /* Diffusion-filter Gaussian bank, built host-side and consumed by the GPU path
    (the CPU path builds it internally). Each entry is one Gaussian blur of the
@@ -52,10 +64,16 @@ typedef struct sf_diffusion_plan_t
   float p_s;                          /* scatter fraction */
 } sf_diffusion_plan_t;
 
-/* Fill `plan` for the given strength/warmth. Returns 0 and sets plan->p_s=0 when
-   the filter is a no-op. spatial_scale/pixel are applied by the caller (sigma_px
-   = sigma_um * spatial_scale / pixel_um). */
-int sf_diffusion_build_plan(float strength, float halo_warmth, sf_diffusion_plan_t *plan);
+/* Fill `plan` for the given strength/warmth/family. Returns 0 and sets
+   plan->p_s=0 when the filter is a no-op. spatial_scale/pixel are applied by
+   the caller (sigma_px = sigma_um * spatial_scale / pixel_um). */
+int sf_diffusion_build_plan_for_family(float strength, float halo_warmth,
+                                        sf_diffusion_family_t family,
+                                        sf_diffusion_plan_t *plan);
+
+/* Max bloom lambda (um) for a given family — used to pad the ROI for the
+   widest diffusion component. */
+float sf_diffusion_family_max_bloom_um(sf_diffusion_family_t family);
 
 
 /* Whole-file reader for the bundle loader (bundle.json and the .cube LUTs are
