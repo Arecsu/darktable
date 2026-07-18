@@ -55,6 +55,7 @@
  */
 
 #include "bauhaus/bauhaus.h"
+#include "bauhaus/search_dropdown.h"
 #include "common/darktable.h"
 #include "common/file_location.h"
 #include "control/control.h"
@@ -758,6 +759,36 @@ static void sf_pack_dir(char *dst, size_t dstsz)
   snprintf(dst, dstsz, "%s/spektrafilm", cfg);
 }
 
+/* natural (human) string compare: embedded numbers compared numerically
+   so "Vision3 50D" < "Vision3 200T" < "Vision3 500T" */
+static int sf_nat_cmp(const char *a, const char *b)
+{
+  for(;;)
+  {
+    if(*a == 0) return *b == 0 ? 0 : -1;
+    if(*b == 0) return 1;
+    int da = (unsigned)*a - '0' < 10u;
+    int db = (unsigned)*b - '0' < 10u;
+    if(da && db)
+    {
+      unsigned long va = 0, vb = 0;
+      while((unsigned)*a - '0' < 10u) { va = va * 10 + (*a - '0'); a++; }
+      while((unsigned)*b - '0' < 10u) { vb = vb * 10 + (*b - '0'); b++; }
+      if(va != vb) return va < vb ? -1 : 1;
+      /* numeric equal: continue (e.g. "X10Y" vs "X010Y") */
+    }
+    else if(da != db)
+      return da ? -1 : 1; /* digit sorts before non-digit */
+    else
+    {
+      int ca = g_ascii_tolower(*a);
+      int cb = g_ascii_tolower(*b);
+      if(ca != cb) return ca < cb ? -1 : 1;
+      a++; b++;
+    }
+  }
+}
+
 /* scan <config>/spektrafilm/profiles/ (all .json files); reads only the info header of
    each profile (stock / name / stage / target_print) */
 static int sf_scan_profiles(sf_prof_entry_t *out, int maxn)
@@ -803,10 +834,11 @@ static int sf_scan_profiles(sf_prof_entry_t *out, int maxn)
     n++;
   }
   g_dir_close(gd);
-  /* stable alphabetical order by display name */
+  /* natural order by display name (numbers compared numerically,
+     so "50D" < "200T" instead of lexicographic "200T" < "50D") */
   for(int i = 0; i < n; i++)
     for(int j = i + 1; j < n; j++)
-      if(g_ascii_strcasecmp(out[j].name, out[i].name) < 0)
+      if(sf_nat_cmp(out[j].name, out[i].name) < 0)
       {
         sf_prof_entry_t t = out[i];
         out[i] = out[j];
@@ -1869,7 +1901,7 @@ static void _film_changed(GtkWidget *w, dt_iop_module_t *self)
   if(darktable.gui->reset) return;
   dt_iop_spektrafilm_gui_data_t *g = (dt_iop_spektrafilm_gui_data_t *)self->gui_data;
   dt_iop_spektrafilm_params_t *p = (dt_iop_spektrafilm_params_t *)self->params;
-  const int fi = GPOINTER_TO_INT(dt_bauhaus_combobox_get_data(g->film));
+  const int fi = GPOINTER_TO_INT(dt_search_dropdown_get_data(g->film));
   if(fi < 0) return;
   const sf_prof_entry_t *e = &g->entries[fi];
   p->film_hash = e->hash;
@@ -1911,7 +1943,7 @@ static void _film_changed(GtkWidget *w, dt_iop_module_t *self)
       if(!strcmp(g->entries[g->paper_entry[k]].stock, e->target_print))
       {
         ++darktable.gui->reset;
-        dt_bauhaus_combobox_set_from_value(g->paper, g->paper_entry[k]);
+        dt_search_dropdown_set_by_data(g->paper, GINT_TO_POINTER(g->paper_entry[k]));
         --darktable.gui->reset;
         break;
       }
@@ -1923,7 +1955,7 @@ static void _paper_changed(GtkWidget *w, dt_iop_module_t *self)
   if(darktable.gui->reset) return;
   dt_iop_spektrafilm_gui_data_t *g = (dt_iop_spektrafilm_gui_data_t *)self->gui_data;
   dt_iop_spektrafilm_params_t *p = (dt_iop_spektrafilm_params_t *)self->params;
-  const int pi = GPOINTER_TO_INT(dt_bauhaus_combobox_get_data(g->paper));
+  const int pi = GPOINTER_TO_INT(dt_search_dropdown_get_data(g->paper));
   if(pi < 0) return;
   p->paper_hash = g->entries[pi].hash;
   dt_dev_add_history_item(darktable.develop, self, TRUE);
@@ -1988,12 +2020,11 @@ void gui_update(dt_iop_module_t *self)
   dt_iop_spektrafilm_params_t *p = (dt_iop_spektrafilm_params_t *)self->params;
 
   _rescan(self);
-  dt_bauhaus_combobox_clear(g->film);
-  if(g->n_films == 0)
-    dt_bauhaus_combobox_add(g->film, _("(no profiles found)"));
-  else
+  /* ── film stock dropdown ── */
+  dt_search_dropdown_clear(g->film);
+  if(g->n_films > 0)
   {
-    static const struct { int pos; int bw; const char *label; } film_groups[] = {
+    static const struct { int pos; int bw; const char *label; } groups[] = {
       { 0, 0, N_("negative color") },
       { 1, 0, N_("positive color") },
       { 0, 1, N_("negative monochrome") },
@@ -2005,26 +2036,29 @@ void gui_update(dt_iop_module_t *self)
       for(int f = 0; f < g->n_films; f++)
       {
         const sf_prof_entry_t *e = &g->entries[g->film_entry[f]];
-        if(e->positive != film_groups[gi].pos || e->bw != film_groups[gi].bw)
-          continue;
-        if(first)
-        {
-          dt_bauhaus_combobox_add_section(g->film, _(film_groups[gi].label));
-          first = FALSE;
-        }
-        dt_bauhaus_combobox_add_full(g->film, e->name,
-                                     DT_BAUHAUS_COMBOBOX_ALIGN_RIGHT,
-                                     GINT_TO_POINTER(g->film_entry[f]),
-                                     NULL, TRUE);
+        if(e->positive != groups[gi].pos || e->bw != groups[gi].bw) continue;
+        if(first) { dt_search_dropdown_add_section(g->film, _(groups[gi].label)); first = FALSE; }
+        const char *desc = NULL;
+        /* TODO: load from profile metadata; hardcoded demo */
+        if(!strcmp(e->stock, "kodak_portra_400"))
+          desc = "Negative, still, ISO 400\nWarm midtones, clean shadows, soft shoulder\n"
+                 "Fine uniform grain\nSubtle warm halation\nModerate balanced contrast";
+        else if(!strcmp(e->stock, "fujifilm_c200"))
+          desc = "Negative, still, ISO 200\nCool midtones, red-sensitive shadows, blue-shifted highs\n"
+                 "Fine uniform grain\nStrong reddish halation\nBlue channel contrast highest";
+        else if(!strcmp(e->stock, "kodak_vision3_500t"))
+          desc = "Negative, cine, ISO 500, tungsten-balanced\nNeutral, low contrast, smooth shadows\n"
+                 "Uneven grain \u2014 blue channel noisiest\nTight halation, active colour separation";
+        dt_search_dropdown_add_entry(g->film, e->name, desc, GINT_TO_POINTER(g->film_entry[f]));
       }
     }
   }
-  dt_bauhaus_combobox_clear(g->paper);
-  if(g->n_papers == 0)
-    dt_bauhaus_combobox_add(g->paper, _("(none)"));
-  else
+
+  /* ── print paper dropdown ── */
+  dt_search_dropdown_clear(g->paper);
+  if(g->n_papers > 0)
   {
-    static const struct { int bw; const char *label; } paper_groups[] = {
+    static const struct { int bw; const char *label; } pgroups[] = {
       { 0, N_("color") },
       { 1, N_("monochrome") },
     };
@@ -2034,53 +2068,36 @@ void gui_update(dt_iop_module_t *self)
       for(int k = 0; k < g->n_papers; k++)
       {
         const sf_prof_entry_t *e = &g->entries[g->paper_entry[k]];
-        if(e->bw != paper_groups[gi].bw)
-          continue;
-        if(first)
-        {
-          dt_bauhaus_combobox_add_section(g->paper, _(paper_groups[gi].label));
-          first = FALSE;
-        }
-        dt_bauhaus_combobox_add_full(g->paper, e->name,
-                                     DT_BAUHAUS_COMBOBOX_ALIGN_RIGHT,
-                                     GINT_TO_POINTER(g->paper_entry[k]),
-                                     NULL, TRUE);
+        if(e->bw != pgroups[gi].bw) continue;
+        if(first) { dt_search_dropdown_add_section(g->paper, _(pgroups[gi].label)); first = FALSE; }
+        const char *desc = NULL;
+        /* TODO: load from profile metadata; hardcoded demo */
+        if(!strcmp(e->stock, "kodak_portra_endura"))
+          desc = "Paper, RA-4\nModerate-high contrast, deep cyan shadows\n"
+                 "Clean white base, wide tonal range\nLight filter correction";
+        else if(!strcmp(e->stock, "kodak_2383"))
+          desc = "Print film, cine (projection)\nVery high contrast, extremely deep blacks\n"
+                 "Strong colour skew \u2014 teal-green shadows\nExtreme density range";
+        else if(!strcmp(e->stock, "fujifilm_crystal_archive_typeii"))
+          desc = "Paper, RA-4\nModerate contrast, balanced dye densities\n"
+                 "Neutral shadows, moderate D-max\nHeavy filter correction";
+        dt_search_dropdown_add_entry(g->paper, e->name, desc, GINT_TO_POINTER(g->paper_entry[k]));
       }
     }
   }
 
+  /* ── film hash → index ── */
   int fi = 0;
   gboolean film_matched = FALSE;
   for(int f = 0; f < g->n_films; f++)
     if(g->entries[g->film_entry[f]].hash == p->film_hash) { fi = f; film_matched = TRUE; }
   if(!film_matched)
-  {
-    /* no hash match (fresh param with film_hash==0, or the saved stock
-       vanished from the pack) -- mirror sf_resolve_stock's fallback so the
-       combobox agrees with what the pixel pipeline actually renders, instead
-       of silently landing on whatever sorts first (e.g. "Fujifilm C200"
-       alphabetically before "Kodak Portra 400") while the pipe renders the
-       real default. */
     for(int f = 0; f < g->n_films; f++)
       if(!strcmp(g->entries[g->film_entry[f]].stock, "kodak_portra_400")) fi = f;
-  }
-  dt_bauhaus_combobox_set_from_value(g->film, g->film_entry[fi]);
-  /* _film_changed() is a no-op during the combobox-set above (it bails out
-     on darktable.gui->reset, which gui_update runs under, so programmatic
-     loads don't get treated as user edits / spawn spurious history items).
-     That means its scan_film "what should a reset target" bookkeeping --
-     self->default_params->scan_film and the checkbox's own cached
-     "dt-toggle-default" -- never gets re-baselined on a fresh module load,
-     only when the user actually interacts with the film combobox. Left
-     alone, both stay at the compiled FALSE default after e.g. closing and
-     reopening darktable on an image using a positive/reversal film (which
-     has no print stage and needs scan_film TRUE): the checkbox itself still
-     shows correctly checked here (synced from p->scan_film below), but a
-     later double-click reset on it would silently flip scan_film back off.
-     Re-baseline both here too, exactly like _film_changed does -- but
-     WITHOUT touching p->scan_film itself, since the just-loaded value may
-     be a deliberate user override away from the film's natural mode and
-     must be preserved on load; only the reset target needs fixing. */
+  dt_search_dropdown_set_by_data(g->film, GINT_TO_POINTER(g->film_entry[fi]));
+  /* Re-baseline scan_film defaults (same logic as _film_changed but
+     without touching p->scan_film itself).  The search-dropdown widget
+     does NOT fire the changed callback on programmatic set(). */
   if(fi < g->n_films)
   {
     const sf_prof_entry_t *e = &g->entries[g->film_entry[fi]];
@@ -2089,6 +2106,7 @@ void gui_update(dt_iop_module_t *self)
     if(g->scan_film)
       g_object_set_data(G_OBJECT(g->scan_film), "dt-toggle-default", GINT_TO_POINTER(e->positive));
   }
+  /* ── paper hash → index ── */
   int pi = 0;
   const char *target = (fi < g->n_films) ? g->entries[g->film_entry[fi]].target_print : NULL;
   for(int k = 0; k < g->n_papers; k++)
@@ -2098,7 +2116,7 @@ void gui_update(dt_iop_module_t *self)
                      : (target && !strcmp(e->stock, target)))
       pi = k;
   }
-  dt_bauhaus_combobox_set_from_value(g->paper, g->paper_entry[pi]);
+  dt_search_dropdown_set_by_data(g->paper, GINT_TO_POINTER(g->paper_entry[pi]));
 
   /* toggle_from_params check buttons are NOT auto-synced by
      dt_bauhaus_update_from_field (it only handles sliders/combos), so set
@@ -2119,17 +2137,19 @@ void gui_init(dt_iop_module_t *self)
   dt_iop_spektrafilm_gui_data_t *g = IOP_GUI_ALLOC(spektrafilm);
   self->widget = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
-  g->film = dt_bauhaus_combobox_new(self);
-  dt_bauhaus_widget_set_label(g->film, NULL, N_("film stock"));
+  g->film = dt_search_dropdown_new(N_("film stock"));
+  dt_search_dropdown_set_width_strategy(g->film, DT_SEARCH_DROPDOWN_WIDTH_LIST_AND_DESC);
+  dt_search_dropdown_set_changed_callback(g->film, (void (*)(GtkWidget *, gpointer))_film_changed, self);
+  dt_search_dropdown_set_config_key(g->film, "plugins/darkroom/spektrafilm/film_desc_visible");
   gtk_widget_set_tooltip_text(g->film, _("film emulsion (spektrafilm filming profile)"));
-  g_signal_connect(G_OBJECT(g->film), "value-changed", G_CALLBACK(_film_changed), self);
   gtk_box_pack_start(GTK_BOX(self->widget), g->film, TRUE, TRUE, 0);
 
-  g->paper = dt_bauhaus_combobox_new(self);
-  dt_bauhaus_widget_set_label(g->paper, NULL, N_("print paper"));
+  g->paper = dt_search_dropdown_new(N_("print paper"));
+  dt_search_dropdown_set_width_strategy(g->paper, DT_SEARCH_DROPDOWN_WIDTH_LIST_AND_DESC);
+  dt_search_dropdown_set_changed_callback(g->paper, (void (*)(GtkWidget *, gpointer))_paper_changed, self);
+  dt_search_dropdown_set_config_key(g->paper, "plugins/darkroom/spektrafilm/paper_desc_visible");
   gtk_widget_set_tooltip_text(g->paper,
                               _("print/paper stock; defaults to the film's target print"));
-  g_signal_connect(G_OBJECT(g->paper), "value-changed", G_CALLBACK(_paper_changed), self);
   gtk_box_pack_start(GTK_BOX(self->widget), g->paper, TRUE, TRUE, 0);
 
   /* filmic-style tabbed notebook: everything else lives in tabs instead of a
