@@ -18,6 +18,7 @@ include(CheckCXXSymbolExists)
 #
 FILE(GLOB SOURCE_FILES
   "bauhaus/bauhaus.c"
+  "bauhaus/search_dropdown.c"
   "common/act_on.c"
   "common/atomic.c"
   "common/bilateral.c"
