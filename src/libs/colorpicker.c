@@ -571,13 +571,15 @@ static void _live_sample_button_cb(GtkGestureSingle *gesture,
 
     if(simulate_event)
     {
-      dt_gui_simulate_button_event
+      // same entry real clicks and shortcuts use: a plain toggle starts a
+      // point pick, the right-variant an area pick (mimicking the old
+      // synthesized button-1/button-3 press on the picker button)
+      dt_iop_color_picker_toggle
         (data->picker_button,
-         GDK_BUTTON_PRESS,
-         /* button 1 to create use a point and 3 for a box */
          data->primary_sample.size == DT_LIB_COLORPICKER_SIZE_POINT
-         ? 1
-         : 3);
+         ? DT_ACTION_EFFECT_TOGGLE
+         : DT_ACTION_EFFECT_TOGGLE_RIGHT,
+         1.0);
     }
 
     if(picker && picker->module)
