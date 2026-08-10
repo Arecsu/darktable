@@ -2667,7 +2667,7 @@ static void _restore_clicked(GtkButton *button, gpointer user_data)
 
   gtk_widget_show_all(dialog);
 
-  const int resp = gtk_dialog_run(GTK_DIALOG(dialog));
+  const int resp = dt_gui_dialog_run(GTK_DIALOG(dialog));
   const gboolean wipe = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(clear));
 
   gtk_widget_destroy(dialog);
@@ -2760,7 +2760,7 @@ static void _export_clicked(GtkButton *button, gpointer user_data)
 
   gtk_combo_box_set_active(GTK_COMBO_BOX(combo_dev), 0);
 
-  const int resp = gtk_dialog_run(GTK_DIALOG(dialog));
+  const int resp = dt_gui_dialog_run(GTK_DIALOG(dialog));
 
   const gint dev = gtk_combo_box_get_active(GTK_COMBO_BOX(combo_dev));
   const gint id = dev == 0 ? DT_ALL_DEVICES :
@@ -2844,7 +2844,7 @@ static void _import_clicked(GtkButton *button, gpointer user_data)
 
   gtk_combo_box_set_active(GTK_COMBO_BOX(combo_dev), 0);
 
-  const int resp = gtk_dialog_run(GTK_DIALOG(dialog));
+  const int resp = dt_gui_dialog_run(GTK_DIALOG(dialog));
   const gint dev = gtk_combo_box_get_active(GTK_COMBO_BOX(combo_dev));
   const gint from_id = dev == 0 ? DT_ALL_DEVICES :
                        dev == 1 ? 0 :
@@ -2929,7 +2929,7 @@ static void _import_extended_clicked(GtkButton *button, gpointer user_data)
   dt_gui_dialog_add(GTK_DIALOG(dialog), label);
   gtk_widget_show_all(dialog);
 
-  const int resp = gtk_dialog_run(GTK_DIALOG(dialog));
+  const int resp = dt_gui_dialog_run(GTK_DIALOG(dialog));
   gtk_widget_destroy(dialog);
 
   if(resp == GTK_RESPONSE_OK)

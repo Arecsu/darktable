@@ -526,7 +526,7 @@ static void _export_clicked(GtkWidget *w, dt_lib_styles_t *d)
   dt_osx_disallow_fullscreen(dialog_overwrite_export);
 #endif
 
-            overwrite_dialog_res = gtk_dialog_run(GTK_DIALOG(dialog_overwrite_export));
+            overwrite_dialog_res = dt_gui_dialog_run(GTK_DIALOG(dialog_overwrite_export));
             overwrite_dialog_check_button_res = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overwrite_dialog_check_button));
             gtk_widget_destroy(dialog_overwrite_export);
           }
@@ -676,7 +676,7 @@ static void _import_clicked(GtkWidget *w, dt_lib_styles_t *d)
   dt_osx_disallow_fullscreen(dialog_overwrite_import);
 #endif
 
-            overwrite_dialog_res = gtk_dialog_run(GTK_DIALOG(dialog_overwrite_import));
+            overwrite_dialog_res = dt_gui_dialog_run(GTK_DIALOG(dialog_overwrite_import));
             overwrite_dialog_check_button_res = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overwrite_dialog_check_button));
             gtk_widget_destroy(dialog_overwrite_import);
           }
@@ -1034,7 +1034,7 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
   dt_osx_disallow_fullscreen(dialog);
 #endif
   gtk_widget_show_all(dialog);
-  int res = gtk_dialog_run(GTK_DIALOG(dialog));      
+  int res = dt_gui_dialog_run(GTK_DIALOG(dialog));      
   if(res == GTK_RESPONSE_ACCEPT)
   {
     const int size = dt_bauhaus_combobox_get(preview_size);

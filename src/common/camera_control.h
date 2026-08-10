@@ -357,12 +357,14 @@ const char *dt_camctl_camera_property_get_next_choice(const dt_camctl_t *c,
                                                       const dt_camera_t *cam,
                                                       const char *property_name);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 /** build a popup menu with all properties available */
 void dt_camctl_camera_build_property_menu(const dt_camctl_t *c,
                                           const dt_camera_t *cam,
                                           GtkMenu **menu,
                                           GCallback item_activate,
                                           gpointer user_data);
+#endif
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

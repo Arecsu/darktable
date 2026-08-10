@@ -1519,7 +1519,7 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
 #endif
   gtk_widget_show_all(dialog);
 
-  int res = gtk_dialog_run(GTK_DIALOG(dialog));
+  int res = dt_gui_dialog_run(GTK_DIALOG(dialog));
   while(res == GTK_RESPONSE_YES)
   {
     gtk_tree_model_get_iter_first(model, &iter);
@@ -1534,7 +1534,7 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
                          -1);
       gtk_tree_model_iter_next(model, &iter);
     }
-    res = gtk_dialog_run(GTK_DIALOG(dialog));
+    res = dt_gui_dialog_run(GTK_DIALOG(dialog));
   }
 
   int i = 0;

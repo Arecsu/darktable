@@ -370,7 +370,7 @@ static gboolean ask_and_delete(gpointer user_data)
 
   gtk_widget_show_all(dialog); // needed for the content area!
 
-  const gint res = gtk_dialog_run(GTK_DIALOG(dialog));
+  const gint res = dt_gui_dialog_run(GTK_DIALOG(dialog));
   gtk_widget_destroy(dialog);
   if(res == GTK_RESPONSE_YES)
     for(GList *iter = empty_dirs; iter; iter = g_list_next(iter))

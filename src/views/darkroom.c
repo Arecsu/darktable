@@ -282,7 +282,7 @@ void _display_module_trouble_message_callback(gpointer instance,
 
   if(module && module->has_trouble && module->widget)
   {
-    label_widget = dt_gui_container_first_child(GTK_CONTAINER(gtk_widget_get_parent(module->widget)));
+    label_widget = dt_gui_container_first_child(gtk_widget_get_parent(module->widget));
     if(g_strcmp0(gtk_widget_get_name(label_widget), "iop-plugin-warning"))
       label_widget = NULL;
   }
@@ -1561,7 +1561,7 @@ static gboolean _dev_load_requested_image(gpointer user_data)
       if(!dt_iop_is_hidden(module))
       {
         // Make sure module header buttons are reset to a safe state
-        dt_iop_show_hide_header_buttons(module, NULL, FALSE, FALSE);
+        dt_iop_show_hide_header_buttons(module, FALSE, FALSE);
         snprintf(option, sizeof(option), "plugins/darkroom/%s/expanded", module->op);
         module->expanded = dt_conf_get_bool(option);
         dt_iop_gui_update_expanded(module);
@@ -3774,7 +3774,7 @@ static void _darkroom_apply_dropped_xmps(dt_develop_t *dev, GList *xmps)
     gtk_dialog_add_button(GTK_DIALOG(dialog), _("create _duplicate"), _DND_XMP_DUPLICATE);
     gtk_dialog_add_button(GTK_DIALOG(dialog), _("_replace history"), _DND_XMP_REPLACE);
     gtk_dialog_set_default_response(GTK_DIALOG(dialog), _DND_XMP_REPLACE);
-    const gint res = gtk_dialog_run(GTK_DIALOG(dialog));
+    const gint res = dt_gui_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 
     if(res == _DND_XMP_REPLACE)
@@ -3809,7 +3809,7 @@ static void _darkroom_apply_dropped_xmps(dt_develop_t *dev, GList *xmps)
     gtk_dialog_add_button(GTK_DIALOG(dialog), _("_cancel"), GTK_RESPONSE_CANCEL);
     gtk_dialog_add_button(GTK_DIALOG(dialog), _("_create"), GTK_RESPONSE_OK);
     gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
-    const gint res = gtk_dialog_run(GTK_DIALOG(dialog));
+    const gint res = dt_gui_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 
     if(res == GTK_RESPONSE_OK)
@@ -4968,7 +4968,7 @@ static void _dt_second_window_change_cursor(dt_develop_t *dev,
                                             const gchar *curs)
 {
   GtkWidget *widget = dev->second_wnd;
-  GdkCursor *cursor = gdk_cursor_new_from_name(gdk_display_get_default(), curs);
+  GdkCursor *cursor = gdk_cursor_new_from_name(curs, NULL);
   gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
   g_object_unref(cursor);
 }

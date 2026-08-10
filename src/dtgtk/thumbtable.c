@@ -2371,6 +2371,9 @@ static void _dt_collection_changed_callback(gpointer instance,
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
+/* GTK3 drag & drop (GtkTargetEntry / GdkDragContext / GtkSelectionData) —
+ * removed from GTK4.  TODO P3: rework as GdkDropTarget/GdkContentProvider. */
 static void _event_dnd_get(GtkWidget *widget,
                            GdkDragContext *context,
                            GtkSelectionData *selection_data,
@@ -2611,6 +2614,7 @@ static void _event_dnd_end(GtkWidget *widget,
   // in any case, with reset the reordering class if any
   dt_gui_remove_class(table->widget, "dt_thumbtable_reorder");
 }
+#endif /* !GTK_CHECK_VERSION(4,0,0) */
 
 static void _thumbtable_init_accels();
 
@@ -2666,6 +2670,7 @@ dt_thumbtable_t *dt_thumbtable_new()
 
   // drag and drop : used for reordering, interactions with maps,
   // exporting uri to external apps, importing images in filmroll...
+#if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_drag_source_set(table->widget, GDK_BUTTON1_MASK,
                       target_list_all, n_targets_all, GDK_ACTION_MOVE);
   gtk_drag_dest_set(table->widget, GTK_DEST_DEFAULT_ALL,
@@ -2678,6 +2683,7 @@ dt_thumbtable_t *dt_thumbtable_new()
                    G_CALLBACK(_event_dnd_get), table);
   g_signal_connect(table->widget, "drag-data-received",
                    G_CALLBACK(dt_thumbtable_event_dnd_received), table);
+#endif
 
   dt_gui_connect_scroll(table->widget, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES,
                         _event_scroll, table);
@@ -3008,6 +3014,7 @@ void dt_thumbtable_set_parent(dt_thumbtable_t *table,
     }
 
     // if needed, we block/unblock drag and drop
+#if !GTK_CHECK_VERSION(4, 0, 0)
     if(mode == DT_THUMBTABLE_MODE_ZOOM)
     {
       gtk_drag_source_unset(table->widget);
@@ -3017,6 +3024,7 @@ void dt_thumbtable_set_parent(dt_thumbtable_t *table,
       gtk_drag_source_set(table->widget, GDK_BUTTON1_MASK,
                           target_list_all, n_targets_all, GDK_ACTION_MOVE);
     }
+#endif
 
     // we set selection/activation properties of all thumbs
     dt_thumbnail_selection_mode_t sel_mode = DT_THUMBNAIL_SEL_MODE_NORMAL;

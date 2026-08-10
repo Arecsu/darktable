@@ -539,7 +539,6 @@ void dt_iop_refresh_all(const dt_iop_module_t *module);
 
 /** (un)hide iop module header right side buttons */
 gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
-                                         GdkEventCrossing *event,
                                          gboolean show_buttons,
                                          const gboolean always_hide);
 

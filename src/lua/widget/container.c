@@ -73,7 +73,7 @@ static void on_child_removed(GtkContainer *container,GtkWidget *child,lua_contai
 static void container_cleanup(lua_State* L,lua_widget widget)
 {
   g_signal_handlers_disconnect_by_func(widget->widget, G_CALLBACK(on_child_removed), widget);
-  dt_gui_container_remove_children(GTK_CONTAINER(widget->widget));
+  dt_gui_container_remove_children(widget->widget);
 }
 
 
@@ -117,7 +117,7 @@ static int container_len(lua_State*L)
 {
   lua_container container;
   luaA_to(L,lua_container,&container,1);
-  int children = dt_gui_container_num_children(GTK_CONTAINER(container->widget));
+  int children = dt_gui_container_num_children(container->widget);
   lua_pushinteger(L,children);
   return 1;
 }

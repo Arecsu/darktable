@@ -262,7 +262,7 @@ void gui_update(dt_lib_module_t *self)
     dt_lib_import_t *d = self->data;
 
     /* cleanup of widgets in devices container*/
-    dt_gui_container_remove_children(GTK_CONTAINER(d->devices));
+    dt_gui_container_remove_children(GTK_WIDGET(d->devices));
     GtkWidget *button = NULL;
 
     // Add detected supported devices
@@ -2047,8 +2047,8 @@ static void _import_from_dialog_new(dt_lib_module_t* self)
   dt_gui_connect_key(d->from.dialog, dt_handle_dialog_enter, self);
 
   // images numbers in action-box
-  GtkWidget *box = dt_gui_container_first_child(GTK_CONTAINER(d->from.dialog));
-  box = dt_gui_container_first_child(GTK_CONTAINER(box)); // action-box
+  GtkWidget *box = dt_gui_container_first_child(d->from.dialog);
+  box = dt_gui_container_first_child(box); // action-box
 
   d->select_all = gtk_button_new_with_label(_("select all"));
   gtk_box_pack_start(GTK_BOX(box), d->select_all, FALSE, FALSE, 2);
@@ -2225,7 +2225,7 @@ static void _import_from_dialog_run(dt_lib_module_t* self)
 {
   dt_lib_import_t *d = self->data;
 
-  while(gtk_dialog_run(GTK_DIALOG(d->from.dialog)) == GTK_RESPONSE_ACCEPT)
+  while(dt_gui_dialog_run(GTK_DIALOG(d->from.dialog)) == GTK_RESPONSE_ACCEPT)
   {
     // reset filter so that view isn't empty
     dt_view_filtering_reset(darktable.view_manager, TRUE);

@@ -24,11 +24,14 @@
 G_BEGIN_DECLS
 
 #define DTGTK_TYPE_ICON dtgtk_icon_get_type()
-G_DECLARE_FINAL_TYPE(GtkDarktableIcon, dtgtk_icon, DTGTK, ICON, GtkEventBox)
+G_DECLARE_FINAL_TYPE(GtkDarktableIcon, dtgtk_icon, DTGTK, ICON, GtkWidget)
 
+/* GtkEventBox was removed in GTK4; this widget only ever used it as a
+ * windowless drawing surface, which a plain GtkWidget provides in both
+ * GTK3 and GTK4 (the type currently has no callers). */
 struct _GtkDarktableIcon
 {
-  GtkEventBox widget;
+  GtkWidget widget;
   DTGTKCairoPaintIconFunc icon;
   gint icon_flags;
   void *icon_data;

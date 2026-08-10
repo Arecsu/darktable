@@ -1911,6 +1911,7 @@ static void _colorspaces_get_display_profile_colord_callback(GObject *source,
 #endif
 
 #if defined GDK_WINDOWING_X11
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static int _gtk_get_monitor_num(GdkMonitor *monitor)
 {
   GdkDisplay *display;
@@ -1925,6 +1926,7 @@ static int _gtk_get_monitor_num(GdkMonitor *monitor)
 
   return -1;
 }
+#endif
 #endif
 
 // Get the display ICC profile of the monitor associated with the widget.
@@ -1951,6 +1953,22 @@ void dt_colorspaces_set_display_profile
 
 #if defined GDK_WINDOWING_X11
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* TODO P3: GTK4 removed GdkScreen/gdk_property_get/GdkWindow, so the
+   * xatom ICC profile lookup below is GDK3-only.  On GTK4, colord is the
+   * only profile source; the configured "xatom" source degrades to no
+   * profile until an Xlib-based rewrite (gdk_x11_display_get_xdisplay +
+   * XGetWindowProperty on the root window) exists. */
+  gboolean use_colord = TRUE;
+#if defined USE_COLORDGTK
+  const char *display_profile_source =
+    (profile_type == DT_COLORSPACE_DISPLAY2)
+    ? dt_conf_get_string_const("ui_last/display2_profile_source")
+    : dt_conf_get_string_const("ui_last/display_profile_source");
+  if(display_profile_source && !strcmp(display_profile_source, "xatom"))
+    use_colord = FALSE;
+#endif
+#else
   // we will use the xatom no matter what configured when compiled
   // without colord
   gboolean use_xatom = TRUE;
@@ -1997,6 +2015,7 @@ void dt_colorspaces_set_display_profile
                      64 * 1024 * 1024, FALSE, &type, &format, &buffer_size, &buffer);
     g_free(atom_name);
   }
+#endif /* GTK4 */
 
 #ifdef USE_COLORDGTK
   /* also try to get the profile from colord. this will set the value asynchronously! */

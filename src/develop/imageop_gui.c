@@ -263,7 +263,13 @@ GtkWidget *dt_iop_togglebutton_new(dt_iop_module_t *self, const char *section, c
 {
   GtkWidget *w = dtgtk_togglebutton_new(paint, 0, NULL);
   {
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // GtkGestureMultiPress was renamed to GtkGestureClick; it no longer
+    // takes the widget at creation (dt_gui_add_controller attaches it).
+    GtkGesture *gesture = gtk_gesture_click_new();
+#else
     GtkGesture *gesture = gtk_gesture_multi_press_new(w);
+#endif
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
                                                GTK_PHASE_CAPTURE);
     dt_gui_add_controller(w, gesture);
@@ -285,7 +291,7 @@ GtkWidget *dt_iop_togglebutton_new(dt_iop_module_t *self, const char *section, c
   }
 
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), FALSE);
-  if(GTK_IS_BOX(box)) gtk_box_pack_end(GTK_BOX(box), w, FALSE, FALSE, 0);
+  if(GTK_IS_BOX(box)) gtk_box_append(GTK_BOX(box), w);
 
   dt_action_define_iop(self, section, label, w, &dt_action_def_toggle);
 
@@ -308,7 +314,7 @@ GtkWidget *dt_iop_button_new(dt_iop_module_t *self, const gchar *label,
   else
   {
     button = gtk_button_new_with_label(Q_(label));
-    gtk_label_set_ellipsize(GTK_LABEL(gtk_bin_get_child(GTK_BIN(button))), PANGO_ELLIPSIZE_END);
+    gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(button))), PANGO_ELLIPSIZE_END);
   }
 
   g_signal_connect_data(G_OBJECT(button), "clicked", callback, (gpointer)self, NULL, 0);

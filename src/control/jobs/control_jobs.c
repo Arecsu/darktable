@@ -1065,7 +1065,12 @@ static gboolean _delete_dialog_main_thread(gpointer user_data)
   GtkWidget *check = gtk_check_button_new_with_mnemonic(_("_apply to all"));
   GtkWidget *area = gtk_message_dialog_get_message_area(GTK_MESSAGE_DIALOG(dialog));
   gtk_widget_set_halign(area, GTK_ALIGN_CENTER);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // the message area is a GtkBox in GTK4
+  gtk_box_append(GTK_BOX(area), check);
+#else
   gtk_container_add(GTK_CONTAINER(area), check);
+#endif
   gtk_widget_show(check);
 
   if(modal_dialog->send_to_trash)
@@ -1090,7 +1095,7 @@ static gboolean _delete_dialog_main_thread(gpointer user_data)
         ? _("trashing error")
         : _("deletion error"));
 
-  modal_dialog->dialog_result = gtk_dialog_run(GTK_DIALOG(dialog));
+  modal_dialog->dialog_result = dt_gui_dialog_run(GTK_DIALOG(dialog));
 
   if(!modal_dialog->send_to_trash)
     modal_dialog->dialog_result |= _DT_DELETE_DIALOG_CHOICE_PHYSICAL;
@@ -1124,7 +1129,9 @@ static gint _dt_delete_file_display_modal_dialog(const int send_to_trash,
 
   dt_pthread_mutex_lock(&modal_dialog.mutex);
 
-  gdk_threads_add_idle(_delete_dialog_main_thread, &modal_dialog);
+  // GTK4 dropped gdk_threads_add_idle(); g_idle_add() is the thread-safe
+  // way to marshal onto the main loop.
+  g_idle_add(_delete_dialog_main_thread, &modal_dialog);
   while(modal_dialog.dialog_result == GTK_RESPONSE_NONE)
     dt_pthread_cond_wait(&modal_dialog.cond, &modal_dialog.mutex);
 
@@ -2205,9 +2212,12 @@ void dt_control_move_images()
         _("_select as destination"), _("_cancel"));
 
   dt_conf_get_folder_to_file_chooser("ui_last/move_path", GTK_FILE_CHOOSER(filechooser));
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    dir = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    // GTK4's deprecated GtkFileChooser returns GFile* everywhere
+    GFile *dir_file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    dir = dir_file ? g_file_get_path(dir_file) : NULL;
+    if(dir_file) g_object_unref(dir_file);
     dt_conf_set_folder_from_file_chooser("ui_last/move_path",
                                          GTK_FILE_CHOOSER(filechooser));
   }

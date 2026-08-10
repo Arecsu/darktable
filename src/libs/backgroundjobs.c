@@ -139,7 +139,7 @@ static gboolean _added_gui_thread(gpointer user_data)
   GdkWindow *window = gtk_widget_get_window(params->instance_widget);
   if(window)
   {
-    GdkCursor *cursor = gdk_cursor_new_from_name(gdk_display_get_default(), "default");
+    GdkCursor *cursor = gdk_cursor_new_from_name("default", NULL);
     gdk_window_set_cursor(window, cursor);
     g_object_unref(cursor);
   }
@@ -208,7 +208,7 @@ static gboolean _destroyed_gui_thread(gpointer user_data)
   params->instance->widget = NULL;
 
   /* if jobbox is empty let's hide */
-  if(!dt_gui_container_has_children(GTK_CONTAINER(params->self->widget)))
+  if(!dt_gui_container_has_children(params->self->widget))
     gtk_widget_hide(params->self->widget);
 
   // free data

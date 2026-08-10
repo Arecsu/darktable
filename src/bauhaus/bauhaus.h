@@ -132,6 +132,9 @@ typedef struct dt_bauhaus_t
   // resolves to the same css as the check part of a gtk check button, so
   // that toggles are drawn by the theme rather than from hardcoded colours
   GtkStyleContext *check_context;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *check_widget;              // hidden real check button backing check_context
+#endif
   float check_size;                      // side of a toggle's tick box
   GtkBorder check_margin;                // space the css keeps around it
 

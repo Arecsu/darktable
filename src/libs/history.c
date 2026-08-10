@@ -1142,7 +1142,7 @@ void gui_update(dt_lib_module_t *self)
   dt_pthread_mutex_lock(&darktable.develop->history_mutex);
 
   /* first destroy all buttons in list */
-  dt_gui_container_destroy_children(GTK_CONTAINER(d->history_box));
+  dt_gui_container_destroy_children(d->history_box);
 
   /* add default which always should be */
   GtkWidget *widget =
@@ -1296,7 +1296,7 @@ static void _lib_history_button_clicked_callback(GtkGestureSingle *gesture,
   for(GList *l = children; l != NULL; l = g_list_next(l))
   {
     GtkToggleButton *b = GTK_TOGGLE_BUTTON
-      (dt_gui_container_nth_child(GTK_CONTAINER(l->data), HIST_WIDGET_MODULE));
+      (dt_gui_container_nth_child(l->data, HIST_WIDGET_MODULE));
     if(b != GTK_TOGGLE_BUTTON(widget))
       g_object_set(G_OBJECT(b), "active", FALSE, (gchar *)0);
   }

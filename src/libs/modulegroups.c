@@ -2032,7 +2032,7 @@ static void _manage_editor_basics_update_list(dt_lib_module_t *self)
   dt_lib_modulegroups_t *d = self->data;
 
   // first, we remove all existing modules
-  dt_gui_container_destroy_children(GTK_CONTAINER(d->edit_basics_box));
+  dt_gui_container_destroy_children(d->edit_basics_box);
 
   // and we add the ones from the list
   for(const GList *modules = g_list_last(darktable.develop->iop);
@@ -2160,7 +2160,7 @@ static void _manage_editor_module_update_list(dt_lib_module_t *self,
   dt_lib_modulegroups_t *d = self->data;
 
   // first, we remove all existing modules
-  dt_gui_container_destroy_children(GTK_CONTAINER(gr->iop_box));
+  dt_gui_container_destroy_children(gr->iop_box);
 
   // and we add the ones from the list
   for(GList *modules2 = g_list_last(darktable.develop->iop);
@@ -2214,7 +2214,7 @@ static void _manage_editor_group_update_arrows(GtkWidget *box)
   for(const GList *lw_iter = lw; lw_iter; lw_iter = g_list_next(lw_iter))
   {
     GtkWidget *w = (GtkWidget *)lw_iter->data;
-    GtkWidget *hb = dt_gui_container_nth_child(GTK_CONTAINER(w), 1);
+    GtkWidget *hb = dt_gui_container_nth_child(w, 1);
     if(pos > 0 && hb) // we skip the first item as it's quick access panel
     {
       GList *lw2 = gtk_container_get_children(GTK_CONTAINER(hb));
@@ -3914,7 +3914,7 @@ static void _manage_editor_preset_action(GtkWidget *btn,
   dt_gui_dialog_add(GTK_DIALOG(dialog), gtk_label_new(_("new preset name:")), tb, lb);
   gtk_widget_show_all(dialog);
   gtk_entry_set_text(GTK_ENTRY(tb), new_name);
-  res = gtk_dialog_run(GTK_DIALOG(dialog));
+  res = dt_gui_dialog_run(GTK_DIALOG(dialog));
 
   g_free(new_name);
 
@@ -4025,7 +4025,7 @@ static void _manage_editor_load(const char *preset,
   d->editor_reset = TRUE;
 
   // we remove all widgets from the groups-box
-  dt_gui_container_destroy_children(GTK_CONTAINER(d->preset_groups_box));
+  dt_gui_container_destroy_children(d->preset_groups_box);
   gtk_box_set_homogeneous(GTK_BOX(d->preset_groups_box), TRUE);
 
   // we select the right preset in the combobox (or we select the first one)

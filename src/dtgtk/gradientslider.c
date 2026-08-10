@@ -558,7 +558,7 @@ static void _gradient_slider_get_preferred_height(GtkWidget *widget,
 
   GtkBorder margin, border, padding;
   int css_min_height;
-  gtk_style_context_get(context, state, "min-height", &css_min_height, NULL);
+  dt_gui_style_context_get(context, state, "min-height", &css_min_height, NULL);
   gtk_style_context_get_margin(context, state, &margin);
   gtk_style_context_get_border(context, state, &border);
   gtk_style_context_get_padding(context, state, &padding);

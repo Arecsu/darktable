@@ -1620,7 +1620,12 @@ int dt_init(int argc,
   // however after gtk_disable_setlocale
   if(init_gui)
   {
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // GTK4's gtk_init() takes no arguments; it no longer consumes argv
+    gtk_init();
+#else
     gtk_init(&argc, &argv);
+#endif
 
     darktable.themes = NULL;
     dt_gui_theme_init(darktable.gui);

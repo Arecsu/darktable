@@ -34,6 +34,10 @@ enum
 };
 
 /* drag & drop for internal image ids */
+#if !GTK_CHECK_VERSION(4, 0, 0)
+/* GTK3 drag & drop (GtkTargetEntry) is removed from GTK4.
+ * TODO P3: rework as GdkDropTarget/GdkContentProvider.  The DND_TARGET_
+ * enum above stays (target-type ids are used by the GTK3 code below). */
 static const GtkTargetEntry target_list_internal[] = { { "image-id", GTK_TARGET_SAME_APP, DND_TARGET_IMGID } };
 static const guint n_targets_internal = G_N_ELEMENTS(target_list_internal);
 
@@ -54,6 +58,7 @@ static const GtkTargetEntry target_list_tags_dest[]
     = { { "image-id", GTK_TARGET_SAME_APP, DND_TARGET_IMGID },
         { "tags-dnd", GTK_TARGET_SAME_WIDGET, DND_TARGET_TAG } };
 static const guint n_targets_tags_dest = G_N_ELEMENTS(target_list_tags_dest);
+#endif
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

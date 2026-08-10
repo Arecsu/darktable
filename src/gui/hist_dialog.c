@@ -383,7 +383,7 @@ int dt_gui_hist_dialog_new(dt_history_copy_item_t *d,
 
   while(1)
   {
-    res = gtk_dialog_run(GTK_DIALOG(dialog));
+    res = dt_gui_dialog_run(GTK_DIALOG(dialog));
     if(res == GTK_RESPONSE_CANCEL
        || res == GTK_RESPONSE_DELETE_EVENT
        || res == GTK_RESPONSE_OK

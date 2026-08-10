@@ -894,7 +894,7 @@ _download_model_with_dialog(dt_prefs_ai_data_t *data, const char *model_id)
   guint timer_id = g_timeout_add(100, _update_progress_idle, dl);
 
   // run dialog
-  gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+  gint response = dt_gui_dialog_run(GTK_DIALOG(dialog));
 
   // handle cancellation (atomic so curl progress callback can read it safely)
   if(response == GTK_RESPONSE_CANCEL)
@@ -927,7 +927,7 @@ _download_model_with_dialog(dt_prefs_ai_data_t *data, const char *model_id)
       GTK_BUTTONS_OK,
       "%s", dl->error);
     gtk_window_set_title(GTK_WINDOW(err), _("model download failed"));
-    gtk_dialog_run(GTK_DIALOG(err));
+    dt_gui_dialog_run(GTK_DIALOG(err));
     gtk_widget_destroy(err);
   }
 
@@ -1059,7 +1059,7 @@ static void _on_install_model(GtkButton *button, gpointer user_data)
       GTK_MESSAGE_ERROR,
       GTK_BUTTONS_OK,
       "%s", errors->str);
-    gtk_dialog_run(GTK_DIALOG(err_dialog));
+    dt_gui_dialog_run(GTK_DIALOG(err_dialog));
     gtk_widget_destroy(err_dialog);
   }
   g_string_free(errors, TRUE);
@@ -1210,7 +1210,7 @@ static void _show_model_card(dt_prefs_ai_data_t *data,
   }
 
   gtk_widget_show_all(dlg);
-  gtk_dialog_run(GTK_DIALOG(dlg));
+  dt_gui_dialog_run(GTK_DIALOG(dlg));
   gtk_widget_destroy(dlg);
 
   dt_ai_model_card_free(card);
@@ -1332,7 +1332,7 @@ static void _show_ort_probe_result(GtkWindow *parent, const char *path, const ch
       GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
       GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
       _("not a valid ONNX Runtime library:\n%s"), path);
-  gtk_dialog_run(GTK_DIALOG(dlg));
+  dt_gui_dialog_run(GTK_DIALOG(dlg));
   gtk_widget_destroy(dlg);
 }
 
@@ -1362,7 +1362,7 @@ static void _on_detect_system_ort(GtkButton *button, gpointer user_data)
       _("no system ONNX Runtime library found.\n\n"
         "install one via your package manager or use\n"
         "the browse button to select a custom build."));
-    gtk_dialog_run(GTK_DIALOG(dlg));
+    dt_gui_dialog_run(GTK_DIALOG(dlg));
     gtk_widget_destroy(dlg);
   }
   else if(count == 1)
@@ -1376,7 +1376,7 @@ static void _on_detect_system_ort(GtkButton *button, gpointer user_data)
       GTK_MESSAGE_INFO, GTK_BUTTONS_OK,
       _("ONNX Runtime %s [%s]\n%s\n\nRestart darktable to apply."),
       f->version, f->eps, f->path);
-    gtk_dialog_run(GTK_DIALOG(dlg));
+    dt_gui_dialog_run(GTK_DIALOG(dlg));
     gtk_widget_destroy(dlg);
   }
   else
@@ -1410,7 +1410,7 @@ static void _on_detect_system_ort(GtkButton *button, gpointer user_data)
     gtk_container_add(GTK_CONTAINER(content), combo);
     gtk_widget_show_all(content);
 
-    if(gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT)
+    if(dt_gui_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT)
     {
       const int sel = gtk_combo_box_get_active(GTK_COMBO_BOX(combo));
       if(sel >= 0)

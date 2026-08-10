@@ -266,7 +266,7 @@ static void _gui_styles_new_style_response(GtkDialog *dialog,
       dt_osx_disallow_fullscreen(dlg_changename);
 #endif
       gtk_window_set_title(GTK_WINDOW(dlg_changename), _("unnamed style"));
-      gtk_dialog_run(GTK_DIALOG(dlg_changename));
+      dt_gui_dialog_run(GTK_DIALOG(dlg_changename));
       gtk_widget_destroy(dlg_changename);
       return;
     }
@@ -345,7 +345,7 @@ static void _gui_styles_edit_style_response(GtkDialog *dialog,
       dt_osx_disallow_fullscreen(dlg_changename);
 #endif
       gtk_window_set_title(GTK_WINDOW(dlg_changename), _("unnamed style"));
-      gtk_dialog_run(GTK_DIALOG(dlg_changename));
+      dt_gui_dialog_run(GTK_DIALOG(dlg_changename));
       gtk_widget_destroy(dlg_changename);
       return;
     }
@@ -864,7 +864,7 @@ static gboolean _gui_styles_dialog_run(const gboolean edit,
   gint dr = GTK_RESPONSE_YES;
   while(dr == GTK_RESPONSE_YES || dr == GTK_RESPONSE_NONE)
   {
-    dr = gtk_dialog_run(GTK_DIALOG(dialog));
+    dr = dt_gui_dialog_run(GTK_DIALOG(dialog));
   }
 
   const gboolean res = !sd->cancelled;

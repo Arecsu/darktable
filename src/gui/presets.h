@@ -141,6 +141,7 @@ void dt_gui_presets_update_filter(const char *name,
                                   const int filter);
 
 /** show the popup menu for the given module, with default behavior. */
+#if !GTK_CHECK_VERSION(4, 0, 0)
 GtkMenu *dt_gui_presets_popup_menu_show_for_module(dt_iop_module_t *module);
 
 /** ops for building a preset popup menu (dt_gui_presets_popup_menu_show()).
@@ -172,8 +173,10 @@ typedef struct dt_gui_presets_menu_ops_t
  *  the menu up and any per-menu destroy cleanup; the menu is not popped and
  *  not destroyed here. */
 GtkMenu *dt_gui_presets_popup_menu_show(const dt_gui_presets_menu_ops_t *ops);
+#endif
 
-/** show popupmenu for favorite modules */
+/** show popupmenu for favorite modules
+ *  (GTK4: no-op stub until the GtkMenu->GtkPopoverMenu migration, TODO P2) */
 void dt_gui_favorite_presets_menu_show(GtkWidget *w);
 
 /** apply a preset to the current module **/

@@ -242,7 +242,7 @@ void _menuitem_preferences(GtkMenuItem *menuitem, dt_lib_module_t *self)
 
   const int old_nb_items = _conf_get_max_saved_items(); // preserve previous value
 
-  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
   {
     dt_lib_recentcollect_t *d = self->data;
 

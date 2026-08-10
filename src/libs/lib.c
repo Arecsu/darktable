@@ -181,6 +181,9 @@ static void _edit_preset(const char *name_in,
     (name, rowid, NULL, NULL, TRUE, TRUE, FALSE, GTK_WINDOW(window));
 }
 
+// The lib preset menu is GtkMenu-based; GtkMenu is gone in GTK4.  Deferred to the
+// GtkMenu->GtkPopoverMenu migration (TODO P2).
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _menuitem_update_preset(GtkMenuItem *menuitem,
                                     dt_lib_module_info_t *minfo)
 {
@@ -461,6 +464,7 @@ static void _menuitem_button_preset_released(GtkGestureSingle *gesture,
   dt_shortcut_copy_lua((dt_action_t*)minfo->module,
                        g_object_get_data(G_OBJECT(menuitem), "dt-preset-name"));
 }
+#endif
 
 static void _free_module_info(GtkWidget *widget,
                               gpointer user_data)
@@ -473,6 +477,7 @@ static void _free_module_info(GtkWidget *widget,
 
 /* ---------- lib preset menu (dt_gui_presets_popup_menu_show() ops) ---------- */
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gchar *_lib_presets_query(gpointer data)
 {
   (void)data;
@@ -532,6 +537,7 @@ static void _lib_presets_prefs(GtkMenu *menu, gpointer data)
   const dt_lib_module_info_t *minfo = data;
   minfo->module->set_preferences(GTK_MENU_SHELL(menu), minfo->module);
 }
+#endif
 
 static int _lib_position(const dt_lib_module_t *module)
 {
@@ -891,6 +897,7 @@ static void _lib_gui_reset_button_clicked_callback(GtkWidget *widget,
   _lib_gui_reset_callback(NULL, 1, 0.0, 0.0, module);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _presets_popup_callback(GtkWidget *button,
                                       dt_lib_module_t *module)
 {
@@ -919,6 +926,15 @@ static void _presets_popup_callback(GtkWidget *button,
   if(button)
     dtgtk_button_set_active(DTGTK_BUTTON(button), FALSE);
 }
+#else
+// TODO P2: GtkMenu->GtkPopoverMenu migration; the preset popup is a no-op
+// on GTK4 until then.
+static void _presets_popup_callback(GtkWidget *button, dt_lib_module_t *module)
+{
+  (void)button;
+  (void)module;
+}
+#endif
 
 
 void dt_lib_gui_set_expanded(dt_lib_module_t *module, const gboolean expanded)

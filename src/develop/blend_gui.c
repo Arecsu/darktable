@@ -586,6 +586,15 @@ static void _add_wrapped_box(GtkWidget *container,
                              GtkBox *box,
                              gchar *help_url)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: GtkEventBox is gone; the help-link qdata goes on the revealer
+  // (the click-to-help cursor filter is GTK3-only anyway, see
+  // global_toolbox.c).  All callers pass a GtkBox.
+  GtkWidget *revealer = gtk_revealer_new();
+  gtk_box_append(GTK_BOX(revealer), GTK_WIDGET(box));
+  gtk_box_append(GTK_BOX(container), revealer);
+  if(help_url) dt_gui_add_help_link(revealer, help_url);
+#else
   GtkWidget *event_box = gtk_event_box_new();
   GtkWidget *revealer = gtk_revealer_new();
   gtk_container_add(GTK_CONTAINER(revealer), GTK_WIDGET(box));
@@ -593,6 +602,7 @@ static void _add_wrapped_box(GtkWidget *container,
   gtk_container_add(GTK_CONTAINER(container), event_box);
   // event box is needed so that one can click into the area to get help
   dt_gui_add_help_link(event_box, help_url);
+#endif
   gtk_widget_set_name(GTK_WIDGET(box), "blending-box");
 }
 
@@ -2548,7 +2558,7 @@ void dt_iop_gui_update_blendif(dt_iop_module_t *module)
     dt_iop_color_picker_reset(module, TRUE);
 
     /* remove tabs before adding others */
-    dt_gui_container_destroy_children(GTK_CONTAINER(bd->channel_tabs));
+    dt_gui_container_destroy_children(GTK_WIDGET(bd->channel_tabs));
 
     bd->channel_tabs_csp = bd->csp;
 

@@ -765,7 +765,7 @@ static gboolean dt_iop_zonesystem_preview_draw(GtkWidget *widget, cairo_t *crf, 
     if(g->image)
     {
       GdkRGBA *color;
-      gtk_style_context_get(context, gtk_widget_get_state_flags(self->expander), "background-color", &color,
+      dt_gui_style_context_get(context, gtk_widget_get_state_flags(self->expander), "background-color", &color,
                             NULL);
 
       cairo_set_source_surface(cr, g->image, (width - g->image_width) * 0.5, (height - g->image_height) * 0.5);

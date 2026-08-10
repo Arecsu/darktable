@@ -28,7 +28,7 @@
 #define BAR_WIDTH 4
 
 // define GTypes
-G_DEFINE_TYPE(GtkDarktableRangeSelect, dtgtk_range_select, GTK_TYPE_EVENT_BOX);
+G_DEFINE_TYPE(GtkDarktableRangeSelect, dtgtk_range_select, GTK_TYPE_WIDGET);
 
 typedef struct _range_date_popup
 {
@@ -125,8 +125,8 @@ static void _dt_pref_changed(gpointer instance, gpointer user_data)
   GtkStateFlags state = gtk_widget_get_state_flags(range->band);
   int mh = -1;
   int mw = -1;
-  gtk_style_context_get(context, state, "min-height", &mh, NULL);
-  gtk_style_context_get(context, state, "min-width", &mw, NULL);
+  dt_gui_style_context_get(context, state, "min-height", &mh, NULL);
+  dt_gui_style_context_get(context, state, "min-width", &mw, NULL);
   GtkBorder margin, padding;
   gtk_style_context_get_margin(context, state, &margin);
   gtk_style_context_get_padding(context, state, &padding);
@@ -144,6 +144,18 @@ static void _dt_pref_changed(gpointer instance, gpointer user_data)
 }
 
 // cleanup everything when the widget is destroyed
+static void _range_measure(GtkWidget *widget,
+                           GtkOrientation orientation,
+                           int for_size,
+                           int *minimum,
+                           int *natural,
+                           int *minimum_baseline,
+                           int *natural_baseline);
+static void _range_size_allocate(GtkWidget *widget,
+                                 int width,
+                                 int height,
+                                 int baseline);
+
 static void _range_select_dispose(GObject *object)
 {
   g_return_if_fail(DTGTK_IS_RANGE_SELECT(object));
@@ -180,10 +192,47 @@ static void dtgtk_range_select_class_init(GtkDarktableRangeSelectClass *klass)
   GObjectClass *object_class = (GObjectClass *)klass;
   object_class->dispose = _range_select_dispose;
 
+  // GTK4: a plain GtkWidget parent must size and place its single child
+  // itself (GtkEventBox used to do it).
+  GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
+  widget_class->measure = _range_measure;
+  widget_class->size_allocate = _range_size_allocate;
+
   _signals[VALUE_CHANGED] = g_signal_new("value-changed", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST, 0, NULL,
                                          NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
   _signals[VALUE_RESET] = g_signal_new("value-reset", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST, 0, NULL, NULL,
                                        g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+}
+
+static void _range_measure(GtkWidget *widget,
+                           GtkOrientation orientation,
+                           int for_size,
+                           int *minimum,
+                           int *natural,
+                           int *minimum_baseline,
+                           int *natural_baseline)
+{
+  GtkWidget *child = gtk_widget_get_first_child(widget);
+  if(child)
+    gtk_widget_measure(child, orientation, for_size, minimum, natural,
+                       minimum_baseline, natural_baseline);
+  else
+  {
+    *minimum = 0;
+    *natural = 0;
+    if(minimum_baseline) *minimum_baseline = -1;
+    if(natural_baseline) *natural_baseline = -1;
+  }
+}
+
+static void _range_size_allocate(GtkWidget *widget,
+                                 int width,
+                                 int height,
+                                 int baseline)
+{
+  GtkWidget *child = gtk_widget_get_first_child(widget);
+  if(child)
+    gtk_widget_allocate(child, width, height, baseline, NULL);
 }
 
 static void dtgtk_range_select_init(GtkDarktableRangeSelect *button)

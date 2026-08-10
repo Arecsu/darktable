@@ -51,7 +51,8 @@ void dt_control_button_released(double x, double y, int which, uint32_t state);
 void dt_control_mouse_moved(double x, double y, double pressure, int which);
 void dt_control_mouse_leave(void);
 void dt_control_mouse_enter(void);
-gboolean dt_control_configure(GtkWidget *da, GdkEventConfigure *event, gpointer user_data);
+/* GTK4: no configure-event; the drawing-area resize signal delivers the size */
+void dt_control_configure(const int width, const int height);
 void dt_control_log(const char *msg, ...) __attribute__((format(printf, 1, 2)));
 void dt_control_log_ack_all(void);
 GList *dt_control_log_history_get_entries(void);

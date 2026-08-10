@@ -765,7 +765,7 @@ static void _add_tag_button_clicked(GtkButton *button, dt_lib_metadata_t *d)
 #endif
 
   gtk_widget_show_all(dialog);
-  while(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
+  while(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
   {
     gchar *tagname = dt_metadata_tags_get_selected();
     _add_selected_metadata(tagname, d);
@@ -968,7 +968,7 @@ static void _menuitem_preferences(GtkMenuItem *menuitem,
 
   d->needs_rebuild = FALSE;
 
-  int res = gtk_dialog_run(GTK_DIALOG(dialog));
+  int res = dt_gui_dialog_run(GTK_DIALOG(dialog));
 
   if(res == GTK_RESPONSE_ACCEPT)
   {

@@ -51,11 +51,19 @@
 
 #include <gdk/gdkkeysyms.h>
 #ifdef GDK_WINDOWING_WAYLAND
+#if GTK_CHECK_VERSION(4, 0, 0)
+#include <gdk/wayland/gdkwayland.h>
+#else
 #include <gdk/gdkwayland.h>
+#endif
 #include <wayland-client.h>
 #endif
 #ifdef GDK_WINDOWING_X11
+#if GTK_CHECK_VERSION(4, 0, 0)
+#include <gdk/x11/gdkx.h>
+#else
 #include <gdk/gdkx.h>
+#endif
 #endif
 #include <gtk/gtk.h>
 #include <math.h>
@@ -470,6 +478,7 @@ static gboolean _dt_gui_ignore_scroll(const GdkModifierType mods_pressed)
   return FALSE;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 gboolean dt_gui_ignore_scroll(GdkEventScroll *event)
 {
   const GdkModifierType mods_pressed =
@@ -483,6 +492,7 @@ gboolean dt_gui_ignore_scroll(GdkEventScroll *event)
 
   return ignore;
 }
+#endif
 
 gboolean dt_gui_ignore_scroll_controller(GtkEventControllerScroll *controller)
 {
@@ -1294,6 +1304,7 @@ static gboolean _check_ssd_support(void)
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _configure(GtkWidget *da,
                            GdkEventConfigure *event,
                            const gpointer user_data)
@@ -1302,7 +1313,8 @@ static gboolean _configure(GtkWidget *da,
   dt_configure_ppd_dpi((dt_gui_gtk_t *) user_data);
 #endif
 
-  return dt_control_configure(da, event, user_data);
+  dt_control_configure(event->width, event->height);
+  return TRUE;
 }
 
 static gboolean _window_configure(GtkWidget *da,
@@ -1326,7 +1338,26 @@ static gboolean _window_configure(GtkWidget *da,
 
   return FALSE;
 }
+#else
+// GTK4: the center drawing area emits "resize" instead of configure-event.
+static void _configure_resize(GtkDrawingArea *da,
+                              int width,
+                              int height,
+                              gpointer user_data)
+{
+  (void)da;
+#ifndef GDK_WINDOWING_QUARTZ
+  dt_configure_ppd_dpi((dt_gui_gtk_t *) user_data);
+#endif
 
+  dt_control_configure(width, height);
+}
+
+// TODO P4: GTK4 has no configure-event; re-evaluate the display-profile
+// refresh on window move (monitor change detection) once the app runs.
+#endif
+
+#if !GTK_CHECK_VERSION(4, 0, 0)
 guint dt_gui_translated_key_state(const GdkEventKey *event)
 {
   if(gdk_keyval_to_lower(dt_gdk_event_get_keyval(event)) == gdk_keyval_to_upper(dt_gdk_event_get_keyval(event)) )
@@ -1343,6 +1374,7 @@ guint dt_gui_translated_key_state(const GdkEventKey *event)
   else
     return dt_gdk_event_get_state(event) & gtk_accelerator_get_default_mod_mask();
 }
+#endif
 
 static void _button_pressed(GtkGestureSingle *gesture,
                             gint n_press,
@@ -1529,7 +1561,7 @@ static void _window_set_titlebar_color_callback(GtkWidget *widget)
     if(style)
     {
       GdkRGBA *bg_color = NULL;
-      gtk_style_context_get(style, gtk_widget_get_state_flags(widget),
+      dt_gui_style_context_get(style, gtk_widget_get_state_flags(widget),
                             GTK_STYLE_PROPERTY_BACKGROUND_COLOR, &bg_color, NULL);
       if(bg_color)
       {
@@ -1753,8 +1785,13 @@ int dt_gui_gtk_init(dt_gui_gtk_t *gui)
 #endif
 
   widget = dt_ui_center(darktable.gui->ui);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  g_signal_connect(G_OBJECT(widget), "resize",
+                   G_CALLBACK(_configure_resize), gui);
+#else
   g_signal_connect(G_OBJECT(widget), "configure-event",
                   G_CALLBACK(_configure), gui);
+#endif
   for(int i = 2; i; i--, widget = dt_ui_snapshot(darktable.gui->ui))
   {
     gtk_widget_add_events(widget,
@@ -1825,8 +1862,10 @@ int dt_gui_gtk_init(dt_gui_gtk_t *gui)
   */
   // update the profile when the window is moved. resize is already handled in configure()
   widget = dt_ui_main_window(darktable.gui->ui);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(widget), "configure-event",
                    G_CALLBACK(_window_configure), NULL);
+#endif
   g_signal_override_class_handler("query-tooltip", gtk_widget_get_type(),
                                   G_CALLBACK(dt_shortcut_tooltip_callback));
 
@@ -2312,6 +2351,7 @@ void dt_ui_container_focus_widget(const dt_ui_t *ui,
   gtk_widget_queue_draw(ui->containers[c]);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 void dt_ui_container_foreach(const struct dt_ui_t *ui,
                              const dt_ui_container_t c,
                              const GtkCallback callback)
@@ -2320,11 +2360,12 @@ void dt_ui_container_foreach(const struct dt_ui_t *ui,
   gtk_container_foreach(GTK_CONTAINER(ui->containers[c]),
                         callback, (gpointer)ui->containers[c]);
 }
+#endif
 
 void dt_ui_container_destroy_children(const struct dt_ui_t *ui,
                                       const dt_ui_container_t c)
 {
-  dt_gui_container_destroy_children(GTK_CONTAINER(ui->containers[c]));
+  dt_gui_container_destroy_children(ui->containers[c]);
 }
 
 void dt_ui_toggle_panels_visibility(const struct dt_ui_t *ui)
@@ -3697,11 +3738,152 @@ gboolean dt_gui_show_yes_no_dialog(const char *title,
     dt_osx_disallow_fullscreen(dialog);
 #endif
 
-  const int resp = gtk_dialog_run(GTK_DIALOG(dialog));
+  const int resp = dt_gui_dialog_run(GTK_DIALOG(dialog));
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_window_destroy(GTK_WINDOW(dialog));
+#else
   gtk_widget_destroy(dialog);
+#endif
   g_free(question);
 
   return resp == GTK_RESPONSE_YES;
+}
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+struct _dt_gui_dialog_run_data
+{
+  GMainLoop *loop;
+  gint response;
+};
+
+static void _dt_gui_dialog_run_response(GtkDialog *dialog,
+                                        gint response_id,
+                                        gpointer user_data)
+{
+  struct _dt_gui_dialog_run_data *data = user_data;
+  data->response = response_id;
+  gtk_widget_set_visible(GTK_WIDGET(dialog), FALSE);
+  g_main_loop_quit(data->loop);
+}
+#endif
+
+int dt_gui_dialog_run(GtkDialog *dialog)
+{
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4 removed gtk_dialog_run(); emulate the blocking run with a modal
+  // window + nested main loop until a response arrives.
+  struct _dt_gui_dialog_run_data data = { .loop = g_main_loop_new(NULL, FALSE),
+                                          .response = GTK_RESPONSE_NONE };
+  gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+  g_signal_connect(dialog, "response", G_CALLBACK(_dt_gui_dialog_run_response), &data);
+  gtk_widget_set_visible(GTK_WIDGET(dialog), TRUE);
+  g_main_loop_run(data.loop);
+  g_signal_handlers_disconnect_by_data(dialog, &data);
+  g_main_loop_unref(data.loop);
+  return data.response;
+#else
+  return gtk_dialog_run(dialog);
+#endif
+}
+
+static void _dt_gui_native_dialog_run_response(GtkNativeDialog *dialog,
+                                               gint response_id,
+                                               gpointer user_data)
+{
+  int *response = user_data;
+  *response = response_id;
+  g_main_loop_quit((GMainLoop *)g_object_get_data(G_OBJECT(dialog), "dt-gui-dialog-run-loop"));
+}
+
+int dt_gui_native_dialog_run(GtkNativeDialog *dialog)
+{
+  // GTK4 removed gtk_native_dialog_run(): same emulation as
+  // dt_gui_dialog_run(), for the deprecated GtkFileChooserNative dialogs.
+  gint response = GTK_RESPONSE_NONE;
+  GMainLoop *loop = g_main_loop_new(NULL, FALSE);
+  g_object_set_data(G_OBJECT(dialog), "dt-gui-dialog-run-loop", loop);
+  g_signal_connect(dialog, "response", G_CALLBACK(_dt_gui_native_dialog_run_response), &response);
+  gtk_native_dialog_show(dialog);
+  g_main_loop_run(loop);
+  g_signal_handlers_disconnect_by_data(dialog, &response);
+  g_object_set_data(G_OBJECT(dialog), "dt-gui-dialog-run-loop", NULL);
+  g_main_loop_unref(loop);
+  return response;
+}
+
+void dt_gui_box_reorder_child_before(GtkBox *box,
+                                     GtkWidget *child,
+                                     GtkWidget *sibling)
+{
+  // GTK4's gtk_box_reorder_child_after() can only position a child after a
+  // sibling; to place child immediately before sibling, reorder after the
+  // widget that precedes it (or to the front when sibling is first).  This
+  // reproduces gtk_box_reorder_child(box, child, position_of(sibling)).
+  if(!sibling || sibling == gtk_widget_get_first_child(GTK_WIDGET(box)))
+  {
+    gtk_box_reorder_child_after(box, child, NULL);
+    return;
+  }
+  GtkWidget *prev = gtk_widget_get_first_child(GTK_WIDGET(box));
+  while(prev && gtk_widget_get_next_sibling(prev) != sibling)
+    prev = gtk_widget_get_next_sibling(prev);
+  gtk_box_reorder_child_after(box, child, prev);
+}
+
+void dt_gui_style_context_get(GtkStyleContext *context,
+                              GtkStateFlags state,
+                              const char *first_property_name,
+                              ...)
+{
+#if GTK_CHECK_VERSION(4, 0, 0)
+  (void)state;
+  /* GTK4 dropped the variadic dt_gui_style_context_get(); handle the
+   * property names darktable uses with the remaining deprecated API. */
+  va_list args;
+  va_start(args, first_property_name);
+  const char *property = first_property_name;
+  while(property)
+  {
+    if(!strcmp(property, GTK_STYLE_PROPERTY_COLOR))
+    {
+      GdkRGBA *out = va_arg(args, GdkRGBA *);
+      gtk_style_context_get_color(context, out);
+    }
+    else if(!strcmp(property, GTK_STYLE_PROPERTY_BACKGROUND_COLOR))
+    {
+      /* TODO P5: GTK4 exposes no background-color lookup; widgets should
+       * paint it via gtk_render_background()/GtkSnapshot instead. */
+      GdkRGBA *out = va_arg(args, GdkRGBA *);
+      gdk_rgba_parse(out, "transparent");
+    }
+    else if(!strcmp(property, "min-width") || !strcmp(property, "min-height"))
+    {
+      /* TODO P5: GTK4 sizes widgets via the CSS engine; there is no
+       * lookup for these.  Returning 0 falls back to natural sizing. */
+      gint *out = va_arg(args, gint *);
+      *out = 0;
+    }
+    else if(!strcmp(property, GTK_STYLE_PROPERTY_FONT))
+    {
+      /* TODO P5: NULL keeps the widget's pango context default (theme
+       * font); fetching the resolved theme font needs the widget. */
+      PangoFontDescription **out = va_arg(args, PangoFontDescription **);
+      *out = NULL;
+    }
+    else
+    {
+      g_warning("dt_gui_style_context_get: unsupported property `%s' on GTK4", property);
+      (void)va_arg(args, void *); // keep the argument list in sync
+    }
+    property = va_arg(args, const char *);
+  }
+  va_end(args);
+#else
+  va_list args;
+  va_start(args, first_property_name);
+  gtk_style_context_get_valist(context, state, args);
+  va_end(args);
+#endif
 }
 
 // TODO: should that go to another place than gtk.c?
@@ -4007,12 +4189,18 @@ void dt_gui_apply_theme()
 
 GdkModifierType dt_key_modifier_state()
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GdkDevice *device =
+    gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default()));
+  return gdk_device_get_modifier_state(device);
+#else
   guint state = 0;
   GdkWindow *window = gtk_widget_get_window(dt_ui_main_window(darktable.gui->ui));
   gdk_device_get_state
     (gdk_seat_get_pointer(gdk_display_get_default_seat
                           (gdk_window_get_display(window))), window, NULL, &state);
   return state;
+#endif
 
 /* FIXME double check correct way of doing this (merge conflict with
    Input System NG 20210319)
@@ -4633,8 +4821,15 @@ static void _resize_wrap_motion_controller(GtkEventControllerMotion *controller,
 
   const gboolean prior = _resize_wrap_handle_hover;
   GdkEvent *event = dt_gui_get_current_event(GTK_EVENT_CONTROLLER(controller));
+#if GTK_CHECK_VERSION(4, 0, 0)
+  const gboolean on_widget =
+    !event || gdk_event_get_surface(event) == gtk_native_get_surface(gtk_widget_get_native(widget));
+#else
+  const gboolean on_widget =
+    !event || dt_gdk_event_get_window(event) == gtk_widget_get_window(widget);
+#endif
   if(!(dt_gui_get_current_event_state(GTK_EVENT_CONTROLLER(controller)) & GDK_BUTTON1_MASK)
-     && (!event || dt_gdk_event_get_window(event) == gtk_widget_get_window(widget)))
+     && on_widget)
   {
     _resize_wrap_handle_hover =
       y >= gtk_widget_get_allocated_height(widget) - DT_RESIZE_HANDLE_SIZE;
@@ -4808,41 +5003,64 @@ GtkWidget *dt_ui_resize_wrap(GtkWidget *w,
   return w;
 }
 
-gboolean dt_gui_container_has_children(GtkContainer *container)
+gboolean dt_gui_container_has_children(GtkWidget *container)
 {
-  g_return_val_if_fail(GTK_IS_CONTAINER(container), FALSE);
-  GList *children = gtk_container_get_children(container);
+  g_return_val_if_fail(GTK_IS_WIDGET(container), FALSE);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  return gtk_widget_get_first_child(container) != NULL;
+#else
+  GList *children = gtk_container_get_children(GTK_CONTAINER(container));
   const gboolean has_children = children != NULL;
   g_list_free(children);
   return has_children;
+#endif
 }
 
-int dt_gui_container_num_children(GtkContainer *container)
+int dt_gui_container_num_children(GtkWidget *container)
 {
-  g_return_val_if_fail(GTK_IS_CONTAINER(container), FALSE);
-  GList *children = gtk_container_get_children(container);
+  g_return_val_if_fail(GTK_IS_WIDGET(container), 0);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  int num = 0;
+  for(GtkWidget *child = gtk_widget_get_first_child(container); child;
+      child = gtk_widget_get_next_sibling(child))
+    num++;
+  return num;
+#else
+  GList *children = gtk_container_get_children(GTK_CONTAINER(container));
   const int num_children = g_list_length(children);
   g_list_free(children);
   return num_children;
+#endif
 }
 
-GtkWidget *dt_gui_container_first_child(GtkContainer *container)
+GtkWidget *dt_gui_container_first_child(GtkWidget *container)
 {
-  g_return_val_if_fail(GTK_IS_CONTAINER(container), NULL);
-  GList *children = gtk_container_get_children(container);
+  g_return_val_if_fail(GTK_IS_WIDGET(container), NULL);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  return gtk_widget_get_first_child(container);
+#else
+  GList *children = gtk_container_get_children(GTK_CONTAINER(container));
   GtkWidget *child = children ? (GtkWidget*)children->data : NULL;
   g_list_free(children);
   return child;
+#endif
 }
 
-GtkWidget *dt_gui_container_nth_child(GtkContainer *container,
+GtkWidget *dt_gui_container_nth_child(GtkWidget *container,
                                       const int which)
 {
-  g_return_val_if_fail(GTK_IS_CONTAINER(container), NULL);
-  GList *children = gtk_container_get_children(container);
+  g_return_val_if_fail(GTK_IS_WIDGET(container), NULL);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *child = gtk_widget_get_first_child(container);
+  for(int i = 0; child && i < which; i++)
+    child = gtk_widget_get_next_sibling(child);
+  return child;
+#else
+  GList *children = gtk_container_get_children(GTK_CONTAINER(container));
   GtkWidget *child = (GtkWidget*)g_list_nth_data(children, which);
   g_list_free(children);
   return child;
+#endif
 }
 
 static void _remove_child(GtkWidget *widget,
@@ -4851,10 +5069,20 @@ static void _remove_child(GtkWidget *widget,
   gtk_container_remove((GtkContainer*)data, widget);
 }
 
-void dt_gui_container_remove_children(GtkContainer *container)
+void dt_gui_container_remove_children(GtkWidget *container)
 {
-  g_return_if_fail(GTK_IS_CONTAINER(container));
-  gtk_container_foreach(container, _remove_child, container);
+  g_return_if_fail(GTK_IS_WIDGET(container));
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *child = gtk_widget_get_first_child(container);
+  while(child)
+  {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_widget_unparent(child);
+    child = next;
+  }
+#else
+  gtk_container_foreach(GTK_CONTAINER(container), _remove_child, container);
+#endif
 }
 
 static void _delete_child(GtkWidget *widget,
@@ -4864,12 +5092,25 @@ static void _delete_child(GtkWidget *widget,
   gtk_widget_destroy(widget);
 }
 
-void dt_gui_container_destroy_children(GtkContainer *container)
+void dt_gui_container_destroy_children(GtkWidget *container)
 {
-  g_return_if_fail(GTK_IS_CONTAINER(container));
-  gtk_container_foreach(container, _delete_child, NULL);
+  g_return_if_fail(GTK_IS_WIDGET(container));
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *child = gtk_widget_get_first_child(container);
+  while(child)
+  {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_widget_destroy(child);
+    child = next;
+  }
+#else
+  gtk_container_foreach(GTK_CONTAINER(container), _delete_child, NULL);
+#endif
 }
 
+// GtkMenu is removed in GTK4; dt_gui_menu_popup stays GTK3-only until the
+// GtkMenu->GtkPopoverMenu migration (TODO P2).
+#if !GTK_CHECK_VERSION(4, 0, 0)
 void dt_gui_menu_popup(GtkMenu *menu,
                        GtkWidget *button,
                        const GdkGravity widget_anchor,
@@ -4900,6 +5141,7 @@ void dt_gui_menu_popup(GtkMenu *menu,
   }
   gdk_event_free(event);
 }
+#endif
 
 gboolean dt_gui_forward_scroll(GtkEventControllerScroll *controller,
                                GtkWidget *target)
@@ -4945,6 +5187,7 @@ void dt_gui_widget_reallocate_now(GtkWidget *widget)
   gtk_widget_queue_resize(widget);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 gboolean dt_gui_search_start(GtkWidget *widget,
                              GdkEventKey *event,
                              GtkSearchEntry *entry)
@@ -4957,6 +5200,7 @@ gboolean dt_gui_search_start(GtkWidget *widget,
 
   return FALSE;
 }
+#endif
 
 void dt_gui_search_stop(GtkSearchEntry *entry,
                         GtkWidget *widget)

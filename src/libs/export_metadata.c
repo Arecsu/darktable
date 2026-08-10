@@ -106,7 +106,7 @@ static void _add_tag_button_clicked(GtkButton *button, dt_lib_export_metadata_t 
 #endif
 
   gtk_widget_show_all(dialog);
-  while(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
+  while(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
   {
     gchar *tagname = dt_metadata_tags_get_selected();
     _add_selected_metadata(tagname, d);
@@ -309,7 +309,7 @@ char *dt_lib_export_metadata_configuration_dialog(char *metadata_presets, const 
   gtk_widget_show_all(dialog);
 
   char *newlist = metadata_presets;
-  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
   {
     if(active_editable)
       gtk_cell_editable_editing_done(active_editable);

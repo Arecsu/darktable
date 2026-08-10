@@ -34,35 +34,44 @@ G_BEGIN_DECLS
 
 static inline GdkEventType dt_gdk_event_get_type(const void *e)
 {
-  return gdk_event_get_event_type((const GdkEvent *)e);
+  return gdk_event_get_event_type((GdkEvent *)e);
 }
 
 static inline guint32 dt_gdk_event_get_time(const void *e)
 {
-  return gdk_event_get_time((const GdkEvent *)e);
+  return gdk_event_get_time((GdkEvent *)e);
 }
 
 static inline guint dt_gdk_event_get_button(const void *e)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  return gdk_button_event_get_button((GdkEvent *)e);
+#else
   guint b = 0;
-  gdk_event_get_button((const GdkEvent *)e, &b);
+  gdk_event_get_button((GdkEvent *)e, &b);
   return b;
+#endif
 }
 
 static inline guint dt_gdk_event_get_click_count(const void *e)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GdkEvent.get_click_count was removed in GTK4 (no replacement).
+  return 1;
+#else
   guint c = 0;
-  gdk_event_get_click_count((const GdkEvent *)e, &c);
+  gdk_event_get_click_count((GdkEvent *)e, &c);
   return c;
+#endif
 }
 
 static inline GdkModifierType dt_gdk_event_get_state(const void *e)
 {
 #if GTK_CHECK_VERSION(4, 0, 0)
-  return gdk_event_get_modifier_state((const GdkEvent *)e);
+  return gdk_event_get_modifier_state((GdkEvent *)e);
 #else
   GdkModifierType s = 0;
-  gdk_event_get_state((const GdkEvent *)e, &s);
+  gdk_event_get_state((GdkEvent *)e, &s);
   return s;
 #endif
 }
@@ -71,12 +80,12 @@ static inline gdouble dt_gdk_event_get_x(const void *e)
 {
 #if GTK_CHECK_VERSION(4, 0, 0)
   gdouble x = 0, y = 0;
-  gdk_event_get_position((const GdkEvent *)e, &x, &y);
+  gdk_event_get_position((GdkEvent *)e, &x, &y);
   (void)y;
   return x;
 #else
   gdouble x = 0, y = 0;
-  gdk_event_get_coords((const GdkEvent *)e, &x, &y);
+  gdk_event_get_coords((GdkEvent *)e, &x, &y);
   (void)y;
   return x;
 #endif
@@ -86,12 +95,12 @@ static inline gdouble dt_gdk_event_get_y(const void *e)
 {
 #if GTK_CHECK_VERSION(4, 0, 0)
   gdouble x = 0, y = 0;
-  gdk_event_get_position((const GdkEvent *)e, &x, &y);
+  gdk_event_get_position((GdkEvent *)e, &x, &y);
   (void)x;
   return y;
 #else
   gdouble x = 0, y = 0;
-  gdk_event_get_coords((const GdkEvent *)e, &x, &y);
+  gdk_event_get_coords((GdkEvent *)e, &x, &y);
   (void)x;
   return y;
 #endif
@@ -103,12 +112,12 @@ static inline gdouble dt_gdk_event_get_root_x(const void *e)
   // GTK4 has no root (screen-absolute) coordinates; fall back to the
   // surface-relative position (delta-based consumers are unaffected).
   gdouble x = 0, y = 0;
-  gdk_event_get_position((const GdkEvent *)e, &x, &y);
+  gdk_event_get_position((GdkEvent *)e, &x, &y);
   (void)y;
   return x;
 #else
   gdouble x = 0, y = 0;
-  gdk_event_get_root_coords((const GdkEvent *)e, &x, &y);
+  gdk_event_get_root_coords((GdkEvent *)e, &x, &y);
   (void)y;
   return x;
 #endif
@@ -118,12 +127,12 @@ static inline gdouble dt_gdk_event_get_root_y(const void *e)
 {
 #if GTK_CHECK_VERSION(4, 0, 0)
   gdouble x = 0, y = 0;
-  gdk_event_get_position((const GdkEvent *)e, &x, &y);
+  gdk_event_get_position((GdkEvent *)e, &x, &y);
   (void)x;
   return y;
 #else
   gdouble x = 0, y = 0;
-  gdk_event_get_root_coords((const GdkEvent *)e, &x, &y);
+  gdk_event_get_root_coords((GdkEvent *)e, &x, &y);
   (void)x;
   return y;
 #endif
@@ -131,16 +140,24 @@ static inline gdouble dt_gdk_event_get_root_y(const void *e)
 
 static inline guint dt_gdk_event_get_keyval(const void *e)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  return gdk_key_event_get_keyval((GdkEvent *)e);
+#else
   guint k = 0;
-  gdk_event_get_keyval((const GdkEvent *)e, &k);
+  gdk_event_get_keyval((GdkEvent *)e, &k);
   return k;
+#endif
 }
 
 static inline guint16 dt_gdk_event_get_keycode(const void *e)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  return gdk_key_event_get_keycode((GdkEvent *)e);
+#else
   guint16 k = 0;
-  gdk_event_get_keycode((const GdkEvent *)e, &k);
+  gdk_event_get_keycode((GdkEvent *)e, &k);
   return k;
+#endif
 }
 
 static inline GdkScrollDirection dt_gdk_event_get_scroll_direction(const void *e)
@@ -149,7 +166,7 @@ static inline GdkScrollDirection dt_gdk_event_get_scroll_direction(const void *e
   return gdk_scroll_event_get_direction((GdkEvent *)e);
 #else
   GdkScrollDirection d = GDK_SCROLL_UP;
-  if(!gdk_event_get_scroll_direction((const GdkEvent *)e, &d))
+  if(!gdk_event_get_scroll_direction((GdkEvent *)e, &d))
   {
     // gdk_event_get_scroll_direction() fails for smooth scrolling events.
     // The consuming code (dt_gui_get_scroll_delta, dt_gui_get_scroll_unit_deltas,
@@ -171,7 +188,7 @@ static inline gdouble dt_gdk_event_get_scroll_delta_x(const void *e)
   return dx;
 #else
   gdouble dx = 0, dy = 0;
-  gdk_event_get_scroll_deltas((const GdkEvent *)e, &dx, &dy);
+  gdk_event_get_scroll_deltas((GdkEvent *)e, &dx, &dy);
   (void)dy;
   return dx;
 #endif
@@ -186,7 +203,7 @@ static inline gdouble dt_gdk_event_get_scroll_delta_y(const void *e)
   return dy;
 #else
   gdouble dx = 0, dy = 0;
-  gdk_event_get_scroll_deltas((const GdkEvent *)e, &dx, &dy);
+  gdk_event_get_scroll_deltas((GdkEvent *)e, &dx, &dy);
   (void)dx;
   return dy;
 #endif
@@ -197,18 +214,20 @@ static inline gboolean dt_gdk_event_is_scroll_stop(const void *e)
 #if GTK_CHECK_VERSION(4, 0, 0)
   return gdk_scroll_event_is_stop((GdkEvent *)e);
 #else
-  return gdk_event_is_scroll_stop_event((const GdkEvent *)e);
+  return gdk_event_is_scroll_stop_event((GdkEvent *)e);
 #endif
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static inline GdkWindow *dt_gdk_event_get_window(const void *e)
 {
-  return gdk_event_get_window((const GdkEvent *)e);
+  return gdk_event_get_window((GdkEvent *)e);
 }
+#endif
 
 static inline GdkDevice *dt_gdk_event_get_device(const void *e)
 {
-  return gdk_event_get_device((const GdkEvent *)e);
+  return gdk_event_get_device((GdkEvent *)e);
 }
 
 static inline GdkDevice *dt_gdk_event_get_source_device(const void *e)
@@ -216,20 +235,22 @@ static inline GdkDevice *dt_gdk_event_get_source_device(const void *e)
 #if GTK_CHECK_VERSION(4, 0, 0)
   // GTK4 dropped the separate "source device": the event device is the
   // source (the GdkDeviceTool distinguishes pen/eraser on top of it).
-  return gdk_event_get_device((const GdkEvent *)e);
+  return gdk_event_get_device((GdkEvent *)e);
 #else
-  return gdk_event_get_source_device((const GdkEvent *)e);
+  return gdk_event_get_source_device((GdkEvent *)e);
 #endif
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static inline GdkScreen *dt_gdk_event_get_screen(const void *e)
 {
-  return gdk_event_get_screen((const GdkEvent *)e);
+  return gdk_event_get_screen((GdkEvent *)e);
 }
+#endif
 
 static inline GdkSeat *dt_gdk_event_get_seat(const void *e)
 {
-  return gdk_event_get_seat((const GdkEvent *)e);
+  return gdk_event_get_seat((GdkEvent *)e);
 }
 
 static inline gboolean dt_gdk_event_get_pointer_emulated(void *e)
@@ -241,7 +262,7 @@ static inline gboolean dt_gdk_event_get_axis(const void *e,
                                               GdkAxisUse axis_use,
                                               gdouble *value)
 {
-  return gdk_event_get_axis((const GdkEvent *)e, axis_use, value);
+  return gdk_event_get_axis((GdkEvent *)e, axis_use, value);
 }
 
 /* --- touchpad gesture events ---
@@ -253,7 +274,7 @@ static inline GdkTouchpadGesturePhase dt_gdk_touchpad_pinch_get_phase(const void
 #if GTK_CHECK_VERSION(4, 0, 0)
   return gdk_touchpad_event_get_gesture_phase((GdkEvent *)e);
 #else
-  return ((const GdkEvent *)e)->touchpad_pinch.phase;
+  return ((GdkEvent *)e)->touchpad_pinch.phase;
 #endif
 }
 
@@ -262,7 +283,7 @@ static inline guint dt_gdk_touchpad_pinch_get_n_fingers(const void *e)
 #if GTK_CHECK_VERSION(4, 0, 0)
   return gdk_touchpad_event_get_n_fingers((GdkEvent *)e);
 #else
-  return ((const GdkEvent *)e)->touchpad_pinch.n_fingers;
+  return ((GdkEvent *)e)->touchpad_pinch.n_fingers;
 #endif
 }
 
@@ -273,8 +294,8 @@ static inline void dt_gdk_touchpad_pinch_get_deltas(const void *e,
 #if GTK_CHECK_VERSION(4, 0, 0)
   gdk_touchpad_event_get_deltas((GdkEvent *)e, dx, dy);
 #else
-  if(dx) *dx = ((const GdkEvent *)e)->touchpad_pinch.dx;
-  if(dy) *dy = ((const GdkEvent *)e)->touchpad_pinch.dy;
+  if(dx) *dx = ((GdkEvent *)e)->touchpad_pinch.dx;
+  if(dy) *dy = ((GdkEvent *)e)->touchpad_pinch.dy;
 #endif
 }
 
@@ -283,7 +304,7 @@ static inline gdouble dt_gdk_touchpad_pinch_get_scale(const void *e)
 #if GTK_CHECK_VERSION(4, 0, 0)
   return gdk_touchpad_event_get_pinch_scale((GdkEvent *)e);
 #else
-  return ((const GdkEvent *)e)->touchpad_pinch.scale;
+  return ((GdkEvent *)e)->touchpad_pinch.scale;
 #endif
 }
 
@@ -292,7 +313,7 @@ static inline GdkTouchpadGesturePhase dt_gdk_touchpad_swipe_get_phase(const void
 #if GTK_CHECK_VERSION(4, 0, 0)
   return gdk_touchpad_event_get_gesture_phase((GdkEvent *)e);
 #else
-  return ((const GdkEvent *)e)->touchpad_swipe.phase;
+  return ((GdkEvent *)e)->touchpad_swipe.phase;
 #endif
 }
 

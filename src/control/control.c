@@ -267,6 +267,29 @@ static GdkCursor* _prev_cursor = NULL;
 void _change_cursor_with_fallback(const char *cursor_name,
                                   gboolean is_temp)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: the cursor is a per-widget property; CSS names cover the full
+  // spec (the GTK3 GdkCursorType fallback below is obsolete, "none" is
+  // part of the CSS cursor spec on every backend).
+  GtkWidget *widget = dt_ui_main_window(darktable.gui->ui);
+  if(!widget) return;
+  // GTK4's gdk_cursor_new_from_name() dropped the display arg (it uses
+  // the default display) and takes a fallback cursor instead.
+  GdkCursor *cursor = gdk_cursor_new_from_name(cursor_name, NULL);
+
+  if(!is_temp && _prev_cursor)
+  {
+    // cursor change request via dt_control_change_cursor() is overriden
+    // by temp cursor, save new cursor to use when clear temp cursor
+    g_object_unref(_prev_cursor);
+    _prev_cursor = g_object_ref(cursor);
+  }
+  else if(!darktable.control->lock_cursor_shape)
+  {
+    gtk_widget_set_cursor(widget, cursor);
+  }
+  g_object_unref(cursor);
+#else
   GdkWindow *window = gtk_widget_get_window(dt_ui_main_window(darktable.gui->ui));
   if(!window) return;
   GdkDisplay *display = gdk_window_get_display(window);
@@ -277,8 +300,6 @@ void _change_cursor_with_fallback(const char *cursor_name,
   // mapping table despite Windows having IDC_WAIT and IDC_HELP;
   // "none" is missing from both the Win32 and X11 backends).
   // Fall back to the legacy GdkCursorType enum API for these cases.
-  // TODO(GTK4): remove this fallback when migrating to GTK4, where
-  // all backends support the full CSS cursor name spec.
   if(!cursor)
   {
     GdkCursorType type = GDK_LEFT_PTR;
@@ -303,10 +324,26 @@ void _change_cursor_with_fallback(const char *cursor_name,
     gdk_window_set_cursor(window, cursor);
     g_object_unref(cursor);
   }
+#endif
 }
 
 void dt_control_set_temp_cursor(const char *cursor_name)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *widget = dt_ui_main_window(darktable.gui->ui);
+  if(!widget) return;
+  // store cursor to return to once clear temp cursor if this is the
+  // initial setup of this temp cursor (as can call this multiple
+  // times to vary a temp cursor)
+  if(!_prev_cursor)
+  {
+    // gtk_widget_get_cursor() is transfer-none: take our own reference
+    _prev_cursor = gtk_widget_get_cursor(widget);
+    if(_prev_cursor)
+      g_object_ref(_prev_cursor);
+  }
+  _change_cursor_with_fallback(cursor_name, TRUE);
+#else
   GdkWindow *window = gtk_widget_get_window(dt_ui_main_window(darktable.gui->ui));
   if(!window) return;
   // store cursor to return to once clear temp cursor if this is the
@@ -319,10 +356,24 @@ void dt_control_set_temp_cursor(const char *cursor_name)
       g_object_ref(_prev_cursor);
   }
   _change_cursor_with_fallback(cursor_name, TRUE);
+#endif
 }
 
 void dt_control_clear_temp_cursor()
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *widget = dt_ui_main_window(darktable.gui->ui);
+  if(!_prev_cursor)
+  {
+    if(widget)
+      gtk_widget_set_cursor(widget, NULL);
+    return;
+  }
+  if(widget)
+    gtk_widget_set_cursor(widget, _prev_cursor);
+  g_object_unref(_prev_cursor);
+  _prev_cursor = NULL;
+#else
   GdkWindow *window = gtk_widget_get_window(dt_ui_main_window(darktable.gui->ui));
   if(!_prev_cursor)
   {
@@ -334,6 +385,7 @@ void dt_control_clear_temp_cursor()
     gdk_window_set_cursor(window, _prev_cursor);
   g_object_unref(_prev_cursor);
   _prev_cursor = NULL;
+#endif
 }
 
 void dt_control_change_cursor(const char *cursor_name)
@@ -473,13 +525,11 @@ void dt_control_cleanup(const gboolean withgui)
 //  gui functions:
 // ================================================================================
 
-gboolean dt_control_configure(GtkWidget *da,
-                              GdkEventConfigure *event,
-                              gpointer user_data)
+// GTK4: no configure-event; the drawing-area resize signal delivers the size
+void dt_control_configure(const int width, const int height)
 {
   // re-configure all components:
-  dt_view_manager_configure(darktable.view_manager, event->width, event->height);
-  return TRUE;
+  dt_view_manager_configure(darktable.view_manager, width, height);
 }
 
 void dt_control_draw_busy_msg(cairo_t *cr, int width, int height)
@@ -515,10 +565,27 @@ void dt_control_draw_busy_msg(cairo_t *cr, int width, int height)
 
 void dt_control_expose(GtkWidget *widget, cairo_t *cr)
 {
-  int pointerx, pointery;
+  int pointerx = 0, pointery = 0;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: the widget's native surface carries the pointer position
+  // (surface-relative; the center drawing area fills its native).
+  GtkNative *native = gtk_widget_get_native(widget);
+  if(native)
+  {
+    GdkSurface *surface = gtk_native_get_surface(native);
+    GdkDevice *device = gdk_seat_get_pointer(gdk_display_get_default_seat(gtk_widget_get_display(widget)));
+    double px = 0, py = 0;
+    if(surface && gdk_surface_get_device_position(surface, device, &px, &py, NULL))
+    {
+      pointerx = px;
+      pointery = py;
+    }
+  }
+#else
   gdk_window_get_device_position(gtk_widget_get_window(widget),
       gdk_seat_get_pointer(gdk_display_get_default_seat(gtk_widget_get_display(widget))),
       &pointerx, &pointery, NULL);
+#endif
 
   dt_control_t *dc = darktable.control;
   dc->width = gtk_widget_get_allocated_width(widget);

@@ -4123,21 +4123,16 @@ static void _preview_motion_cb(GtkEventControllerMotion *controller,
     const double div_x
       = ox + d->split_pos * d->preview_w * scale;
 
-    GdkWindow *win = gtk_widget_get_window(widget);
-    if(win)
+    const gboolean near = fabs(ex - div_x) < PREVIEW_DIVIDER_NEAR_PX;
+    if(near)
     {
-      const gboolean near = fabs(ex - div_x) < PREVIEW_DIVIDER_NEAR_PX;
-      if(near)
-      {
-        GdkCursor *cursor = gdk_cursor_new_from_name(
-          gdk_display_get_default(), "col-resize");
-        gdk_window_set_cursor(win, cursor);
-        g_object_unref(cursor);
-      }
-      else
-      {
-        gdk_window_set_cursor(win, NULL);
-      }
+      GdkCursor *cursor = gdk_cursor_new_from_name("col-resize", NULL);
+      gtk_widget_set_cursor(widget, cursor);
+      g_object_unref(cursor);
+    }
+    else
+    {
+      gtk_widget_set_cursor(widget, NULL);
     }
   }
 
@@ -4268,7 +4263,7 @@ static void _output_dir_browse(GtkWidget *button,
   if(current && current[0])
     gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), current);
 
-  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
   {
     char *folder = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
     if(folder)

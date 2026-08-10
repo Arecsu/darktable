@@ -48,6 +48,114 @@
 #ifdef _WIN32
 #include "win/getrusage.h"
 #else
+
+/* GTK4 compat shims -----------------------------------------------------
+ * Interim GTK4-only macros for APIs that were removed from the GTK 4.10+
+ * installed headers.  The GTK3 build keeps using the real APIs (these
+ * macros are not defined there).  Each shim carries a TODO for the real
+ * rework; see the gtk4/port plan. */
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GtkCallback (removed in GTK4) is just a GCallback with a typed widget
+ * param; used as a callback typedef by the bauhaus/combobox/filter APIs. */
+typedef void (*GtkCallback)(GtkWidget *widget, gpointer data);
+
+/* GTK_STYLE_PROPERTY_* (removed from GTK4 headers; used by the bauhaus
+ * theme lookups and by dt_gui_style_context_get() below). */
+#define GTK_STYLE_PROPERTY_COLOR "color"
+#define GTK_STYLE_PROPERTY_BACKGROUND_COLOR "background-color"
+#define GTK_STYLE_PROPERTY_FONT "font"
+
+/* GtkStyleContext state-arg removal: the deprecated GTK4 getters dropped
+ * the GtkStateFlags argument (the context always uses its current state).
+ * The state arg is evaluated (as void) so locals declared only for the
+ * call don't trigger -Wunused-variable.  TODO P5: replace with CSS custom
+ * properties / GtkCssProvider lookups. */
+#define gtk_style_context_get_color(ctx, state, out) \
+  ((void)(state), gtk_style_context_get_color((ctx), (out)))
+#define gtk_style_context_get_border(ctx, state, out) \
+  ((void)(state), gtk_style_context_get_border((ctx), (out)))
+#define gtk_style_context_get_padding(ctx, state, out) \
+  ((void)(state), gtk_style_context_get_padding((ctx), (out)))
+#define gtk_style_context_get_margin(ctx, state, out) \
+  ((void)(state), gtk_style_context_get_margin((ctx), (out)))
+
+/* gtk_widget_show_all removal: GTK4 widgets are visible by default, so
+ * showing a toplevel is just set_visible(TRUE).  TODO P2: delete the
+ * redundant calls / make default-visible. */
+#define gtk_widget_show_all(w) gtk_widget_set_visible((w), TRUE)
+
+/* gtk_widget_set_no_show_all removal: GTK4 has no show_all, so the flag
+ * has no meaning.  TODO P2: widgets meant to stay hidden must be created
+ * with set_visible(FALSE). */
+#define gtk_widget_set_no_show_all(w, b) ((void)(w), (void)(b))
+
+/* gtk_widget_destroy removal: GTK3's gtk_widget_destroy() is just
+ * g_object_run_dispose(); GTK4 toplevels additionally need
+ * gtk_window_destroy() (migration guide).  TODO P2: prefer
+ * container-specific remove / explicit unref where the receiver type is
+ * known. */
+static inline void dt_gui_widget_destroy(GtkWidget *widget)
+{
+  if(!widget) return;
+  if(GTK_IS_WINDOW(widget))
+    gtk_window_destroy(GTK_WINDOW(widget));
+  else
+    g_object_run_dispose(G_OBJECT(widget));
+}
+#define gtk_widget_destroy(w) dt_gui_widget_destroy(w)
+
+/* GdkEventType lost the multi-press variants in GTK4 (they never existed
+ * as discrete events); the click gestures' n_press is the only source of
+ * multi-click info.  gtk.c _button_pressed() maps n_press back onto these
+ * sentinels so the dt_control_button_pressed() pipeline (masks, darkroom,
+ * iops) keeps its double/triple-click equality checks.  The offsets keep
+ * the values clear of every real GdkEventType.  TODO P4: pass n_press. */
+#define GDK_2BUTTON_PRESS (GDK_BUTTON_PRESS + 100)
+#define GDK_3BUTTON_PRESS (GDK_BUTTON_PRESS + 101)
+
+/* GdkModifierType renames/removals: MOD1 is ALT, MOD2 was the macOS
+ * Command bit (GTK4 maps Command to META), MOD5 (AltGr/level-3) has no
+ * GTK4 bit. */
+#define GDK_MOD1_MASK GDK_ALT_MASK
+#define GDK_MOD2_MASK GDK_META_MASK
+#define GDK_MOD5_MASK 0
+
+/* GdkEventMask is gone entirely: the constants below are only ever passed
+ * to gtk_widget_add_events()/gtk_widget_set_events() (no-op'd further
+ * down) or stored in a scroll_mask value that only those calls consume,
+ * so 0 is the correct inert value.  TODO P2: delete the calls. */
+#define GDK_EXPOSURE_MASK 0
+#define GDK_POINTER_MOTION_MASK 0
+#define GDK_BUTTON_PRESS_MASK 0
+#define GDK_BUTTON_RELEASE_MASK 0
+#define GDK_KEY_PRESS_MASK 0
+#define GDK_KEY_RELEASE_MASK 0
+#define GDK_ENTER_NOTIFY_MASK 0
+#define GDK_LEAVE_NOTIFY_MASK 0
+#define GDK_FOCUS_CHANGE_MASK 0
+#define GDK_STRUCTURE_MASK 0
+#define GDK_SCROLL_MASK 0
+#define GDK_SMOOTH_SCROLL_MASK 0
+#define GDK_TOUCHPAD_GESTURE_MASK 0
+#define GDK_ALL_EVENTS_MASK 0
+
+/* gtk_widget_add_events()/gtk_widget_set_events() removal: GTK4 has no
+ * event masks, input arrives exclusively through event controllers.
+ * TODO P2: delete the calls, keep the controllers. */
+#define gtk_widget_add_events(w, e) ((void)(w), (void)(e))
+#define gtk_widget_set_events(w, e) ((void)(w), (void)(e))
+
+/* gtk_widget_get_toplevel() removal (migration guide: use
+ * gtk_widget_get_ancestor(widget, GTK_TYPE_WINDOW)). */
+#define gtk_widget_get_toplevel(w) gtk_widget_get_ancestor((w), GTK_TYPE_WINDOW)
+#endif /* GTK_CHECK_VERSION(4,0,0) */
+
+/* gtk_dialog_run() was removed from GTK4; every call site routes through
+ * dt_gui_dialog_run() (gui/gtk.c), which emulates the blocking run with a
+ * modal window + nested main loop on GTK4 (TODO P4: async rework).  The
+ * declaration lives here so common/ files that don't include gui/gtk.h
+ * still see it. */
+
 #include <sys/resource.h>
 #endif
 #include <glib.h>
@@ -141,6 +249,8 @@ typedef unsigned int u_int;
 #include "control/signal.h"
 
 G_BEGIN_DECLS
+
+int dt_gui_dialog_run(GtkDialog *dialog);
 
 /* Create cloned functions for various CPU SSE generations */
 /* See for instructions https://hannes.hauswedell.net/post/2017/12/09/fmv/ */

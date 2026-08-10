@@ -582,7 +582,7 @@ static char *get_export_filename(dt_lut_t *self, const char *extension, char **n
   gtk_file_chooser_set_extra_widget(GTK_FILE_CHOOSER(dialog), grid);
 
   char *filename = NULL;
-  int res = gtk_dialog_run(GTK_DIALOG(dialog));
+  int res = dt_gui_dialog_run(GTK_DIALOG(dialog));
   if(res == GTK_RESPONSE_ACCEPT)
   {
     filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));

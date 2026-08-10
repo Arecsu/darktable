@@ -482,6 +482,7 @@ char *dt_presets_get_multi_name(const char *name,
     return g_strdup(strlen(multi_name) > 0 ? multi_name : "");
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _menu_shell_insert_sorted(GtkWidget *menu_shell,
                                       GtkWidget *item,
                                       const gchar *name)
@@ -547,6 +548,7 @@ GtkWidget *dt_insert_preset_in_menu_hierarchy(const char *name,
   dt_gui_add_class(mi, "dt_transparent_background");
   return mi;
 }
+#endif
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

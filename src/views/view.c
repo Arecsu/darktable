@@ -1618,15 +1618,24 @@ static void _accels_window_sticky(GtkWidget *widget,
   gtk_window_set_default_size(win, alloc.width * 0.7, alloc.height * 0.7);
   g_signal_connect(win, "destroy", G_CALLBACK(_accels_window_destroy), vm);
 
-  GtkWidget *sw = dt_gui_container_first_child(GTK_CONTAINER(vm->accels_window.window));
+  GtkWidget *sw = dt_gui_container_first_child(vm->accels_window.window);
   g_object_ref(sw);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_widget_unparent(sw);
+  gtk_window_set_child(win, sw);
+#else
   gtk_container_remove(GTK_CONTAINER(vm->accels_window.window), sw);
   gtk_container_add(GTK_CONTAINER(win), sw);
+#endif
   g_object_unref(sw);
 
   gtk_widget_destroy(vm->accels_window.window);
   vm->accels_window.window = GTK_WIDGET(win);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_widget_set_visible(vm->accels_window.window, TRUE);
+#else
   gtk_widget_show_all(vm->accels_window.window);
+#endif
   gtk_widget_hide(vm->accels_window.sticky_btn);
 
   vm->accels_window.sticky = TRUE;
@@ -1638,7 +1647,24 @@ void dt_view_accels_show(dt_view_manager_t *vm)
 
   vm->accels_window.sticky = FALSE;
   vm->accels_window.prevent_refresh = FALSE;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  vm->accels_window.window = gtk_window_new();
+#else
   vm->accels_window.window = gtk_window_new(GTK_WINDOW_POPUP);
+#endif
+#if !GTK_CHECK_VERSION(4, 0, 0)
+  gtk_window_set_type_hint(GTK_WINDOW(vm->accels_window.window),
+                           GDK_WINDOW_TYPE_HINT_POPUP_MENU);
+  gtk_window_set_gravity(GTK_WINDOW(vm->accels_window.window), GDK_GRAVITY_STATIC);
+  gtk_window_set_position(GTK_WINDOW(vm->accels_window.window),
+                          GTK_WIN_POS_CENTER_ON_PARENT);
+  gtk_window_set_keep_above(GTK_WINDOW(vm->accels_window.window), TRUE);
+  gtk_widget_show_all(vm->accels_window.window);
+#else
+  // TODO P4: GTK4 removed gtk_window_set_keep_above/type_hint/position;
+  // the accels window needs a popover/present() rework.
+  gtk_widget_set_visible(vm->accels_window.window, TRUE);
+#endif
 #ifdef GDK_WINDOWING_QUARTZ
   dt_osx_disallow_fullscreen(vm->accels_window.window);
 #endif
@@ -1671,7 +1697,11 @@ void dt_view_accels_show(dt_view_manager_t *vm)
   GtkWidget *sw = dt_gui_scroll_wrap(hb);
   gtk_scrolled_window_set_max_content_height(GTK_SCROLLED_WINDOW(sw), alloc.height);
   gtk_scrolled_window_set_max_content_width(GTK_SCROLLED_WINDOW(sw), alloc.width);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_window_set_child(GTK_WINDOW(vm->accels_window.window), sw);
+#else
   gtk_container_add(GTK_CONTAINER(vm->accels_window.window), sw);
+#endif
 
   gtk_window_set_resizable(GTK_WINDOW(vm->accels_window.window), FALSE);
   gtk_window_set_default_size(GTK_WINDOW(vm->accels_window.window),

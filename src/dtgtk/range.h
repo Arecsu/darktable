@@ -37,7 +37,9 @@
 G_BEGIN_DECLS
 
 #define DTGTK_TYPE_RANGE_SELECT dtgtk_range_select_get_type()
-G_DECLARE_FINAL_TYPE(GtkDarktableRangeSelect, dtgtk_range_select, DTGTK, RANGE_SELECT, GtkEventBox)
+/* GtkEventBox was removed in GTK4; this widget sizes and places its single
+ * vbox child itself (see the measure/size_allocate overrides in range.c). */
+G_DECLARE_FINAL_TYPE(GtkDarktableRangeSelect, dtgtk_range_select, DTGTK, RANGE_SELECT, GtkWidget)
 
 typedef double (*DTGTKTranslateValueFunc)(const double value);
 typedef gchar *(*DTGTKPrintValueFunc)(const double value, const gboolean detailled);
@@ -63,7 +65,7 @@ typedef enum dt_range_type_t
 
 struct _GtkDarktableRangeSelect
 {
-  GtkEventBox widget;
+  GtkWidget widget;
 
   dt_range_type_t type;
 

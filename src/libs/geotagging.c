@@ -904,7 +904,7 @@ static void _preview_gpx_file(GtkWidget *widget, dt_lib_module_t *self)
   dt_osx_disallow_fullscreen(dialog);
 #endif
   gtk_widget_show_all(dialog);
-  gtk_dialog_run(GTK_DIALOG(dialog));
+  dt_gui_dialog_run(GTK_DIALOG(dialog));
 
   gtk_widget_destroy(dialog);
 }
@@ -976,11 +976,11 @@ static void _choose_gpx_callback(GtkWidget *widget, dt_lib_module_t *self)
   if(!d->imgs)
     _setup_selected_images_list(self);
 
-  int res = gtk_dialog_run(GTK_DIALOG(filechooser));
+  int res = dt_gui_dialog_run(GTK_DIALOG(filechooser));
   while(res == GTK_RESPONSE_ACCEPT)
   {
     _preview_gpx_file(filechooser, self);
-    res = gtk_dialog_run(GTK_DIALOG(filechooser));
+    res = dt_gui_dialog_run(GTK_DIALOG(filechooser));
   }
   if(res == GTK_RESPONSE_OK)
   {

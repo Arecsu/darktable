@@ -83,7 +83,7 @@ static void _workspace_show_message(dt_workspace_t *session,
 #ifdef GDK_WINDOWING_QUARTZ
   dt_osx_disallow_fullscreen(dlg);
 #endif
-  gtk_dialog_run(GTK_DIALOG(dlg));
+  dt_gui_dialog_run(GTK_DIALOG(dlg));
   gtk_widget_destroy(dlg);
 }
 
@@ -670,7 +670,7 @@ gboolean dt_workspace_create(const char *datadir)
   _workspace_template_radios_set_visible
     (session,
      gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(session->copy_template_check)));
-  while(gtk_dialog_run(GTK_DIALOG(session->db_screen)) == GTK_RESPONSE_ACCEPT);
+  while(dt_gui_dialog_run(GTK_DIALOG(session->db_screen)) == GTK_RESPONSE_ACCEPT);
 
   _workspace_screen_destroy(session);
   g_free(session);

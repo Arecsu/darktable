@@ -1664,6 +1664,7 @@ const char *dt_camctl_camera_get_model(const dt_camctl_t *c,
 }
 
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _camera_build_property_menu(CameraWidget *widget,
                                         GtkMenu *menu,
                                         GCallback item_activate,
@@ -1724,6 +1725,8 @@ static void _camera_build_property_menu(CameraWidget *widget,
   }
 }
 
+// GtkMenu is removed in GTK4; the camera property popup is deferred to the
+// GtkMenu->GtkPopoverMenu migration (TODO P2).
 void dt_camctl_camera_build_property_menu(const dt_camctl_t *c,
                                           const dt_camera_t *cam,
                                           GtkMenu **menu,
@@ -1752,6 +1755,7 @@ void dt_camctl_camera_build_property_menu(const dt_camctl_t *c,
   gtk_widget_show_all(GTK_WIDGET(*menu));
   dt_pthread_mutex_unlock(&camera->config_lock);
 }
+#endif
 
 
 

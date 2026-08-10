@@ -220,7 +220,7 @@ static void _edit_preset_response(GtkDialog *dialog,
 
         gtk_window_set_title(GTK_WINDOW(dlg_changename), _("unnamed preset"));
 
-        gtk_dialog_run(GTK_DIALOG(dlg_changename));
+        dt_gui_dialog_run(GTK_DIALOG(dlg_changename));
         gtk_widget_destroy(dlg_changename);
         return;
       }
@@ -1540,6 +1540,13 @@ static void _menuitem_manage_quick_presets(GtkMenuItem *menuitem,
   gtk_widget_show_all(dialog);
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+// TODO P2: GtkMenu->GtkPopoverMenu migration; favorite-presets popup deferred.
+void dt_gui_favorite_presets_menu_show(GtkWidget *w)
+{
+  (void)w;
+}
+#else
 void dt_gui_favorite_presets_menu_show(GtkWidget *w)
 {
   sqlite3_stmt *stmt;
@@ -1628,6 +1635,7 @@ void dt_gui_favorite_presets_menu_show(GtkWidget *w)
 
   dt_gui_menu_popup(menu, w, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST);
 }
+#endif
 
 /* shared preset popup menu: the query walk, writeprotect separators,
  * hierarchy insertion, active highlight and the manage/edit/delete/
@@ -1635,6 +1643,9 @@ void dt_gui_favorite_presets_menu_show(GtkWidget *w)
  * (modulegroups / header) presets menus.  Everything that differs -- the
  * SQL, the row evaluation, the per-item wiring and the trailing prefs
  * section -- is supplied by ops. */
+// GtkMenu is gone in GTK4; the preset popups are deferred to the
+// GtkMenu->GtkPopoverMenu migration (TODO P2).
+#if !GTK_CHECK_VERSION(4, 0, 0)
 GtkMenu *dt_gui_presets_popup_menu_show(const dt_gui_presets_menu_ops_t *ops)
 {
   GtkMenu *menu = GTK_MENU(gtk_menu_new());
@@ -1936,6 +1947,7 @@ GtkMenu *dt_gui_presets_popup_menu_show_for_module(dt_iop_module_t *module)
   _click_time = 0;
   return menu;
 }
+#endif
 
 void dt_gui_presets_update_mml(const char *name,
                                const dt_dev_operation_t op,

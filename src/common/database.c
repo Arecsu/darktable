@@ -4562,7 +4562,7 @@ start:
 
       gtk_widget_show_all(dialog);
 
-      const int resp = gtk_dialog_run(GTK_DIALOG(dialog));
+      const int resp = dt_gui_dialog_run(GTK_DIALOG(dialog));
 
       gtk_widget_destroy(dialog);
 
@@ -4734,7 +4734,7 @@ start:
 
     gtk_widget_show_all(dialog);
 
-    const int resp = gtk_dialog_run(GTK_DIALOG(dialog));
+    const int resp = dt_gui_dialog_run(GTK_DIALOG(dialog));
 
     gtk_widget_destroy(dialog);
 

@@ -156,7 +156,11 @@ int main(int argc, char *arg[])
   bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
   textdomain(GETTEXT_PACKAGE);
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_init_check();
+#else
   gtk_init_check(&argc, &arg);
+#endif
 
   // parse command line arguments
   dt_mipmap_size_t min_mip = DT_MIPMAP_0;

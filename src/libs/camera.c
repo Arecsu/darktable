@@ -60,7 +60,9 @@ typedef struct dt_lib_camera_t
     GtkWidget *plabel, *pname; // propertylabel, widget
     GList *properties;         // a list of dt_lib_camera_property_t
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
     GtkMenu *properties_menu;  // available properties
+#endif
 
   } gui;
 
@@ -242,6 +244,7 @@ static void _osd_button_clicked(GtkWidget *widget, gpointer user_data)
   dt_control_queue_redraw_center();
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _property_choice_callback(GtkMenuItem *item, gpointer user_data)
 {
   dt_lib_camera_t *lib = (dt_lib_camera_t *)user_data;
@@ -255,6 +258,7 @@ static void _show_property_popupmenu_clicked(GtkWidget *widget, gpointer user_da
 
   dt_gui_menu_popup(lib->gui.properties_menu, widget, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
 }
+#endif
 
 static void _lib_property_add_to_gui(dt_lib_camera_property_t *prop, dt_lib_camera_t *lib)
 {
@@ -527,7 +531,9 @@ void gui_init(dt_lib_module_t *self)
   label = gtk_label_new(_("property"));
   gtk_widget_set_halign(label, GTK_ALIGN_START);
   GtkWidget *widget = gtk_button_new_with_label("O");
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(widget), "clicked", G_CALLBACK(_show_property_popupmenu_clicked), lib);
+#endif
   lib->gui.pname = dt_ui_entry_new(0);
   gtk_box_pack_start(hbox, GTK_WIDGET(lib->gui.pname), TRUE, TRUE, 0);
   gtk_box_pack_start(hbox, GTK_WIDGET(widget), FALSE, FALSE, 0);
@@ -612,8 +618,10 @@ void view_enter(struct dt_lib_module_t *self,
   }
 
   // Build the property menu (we do it now because it needs an actual camera)
+#if !GTK_CHECK_VERSION(4, 0, 0)
   dt_camctl_camera_build_property_menu(darktable.camctl, NULL, &lib->gui.properties_menu,
                                        G_CALLBACK(_property_choice_callback), lib);
+#endif
 
   // Register listener
   dt_camctl_register_listener(darktable.camctl, lib->data.listener);
@@ -632,8 +640,10 @@ void view_leave(struct dt_lib_module_t *self,
   // Remove listener from camera control
   dt_camctl_tether_mode(darktable.camctl, NULL, FALSE);
   dt_camctl_unregister_listener(darktable.camctl, lib->data.listener);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_widget_destroy(GTK_WIDGET(lib->gui.properties_menu));
   lib->gui.properties_menu = NULL;
+#endif
 
   // Remove all properties
   while(lib->gui.prop_end > lib->gui.prop_start +1) {

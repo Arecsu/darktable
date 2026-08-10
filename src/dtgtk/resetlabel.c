@@ -20,14 +20,60 @@
 #include "gui/gtk.h"
 #include "dtgtk/resetlabel.h"
 
-G_DEFINE_TYPE(GtkDarktableResetLabel, dtgtk_reset_label, GTK_TYPE_EVENT_BOX);
+G_DEFINE_TYPE(GtkDarktableResetLabel, dtgtk_reset_label, GTK_TYPE_WIDGET);
+
+static void _reset_label_callback(GtkGestureSingle *gesture,
+                                   gint n_press,
+                                   gdouble x,
+                                   gdouble y,
+                                   gpointer user_data);
+
+static void _reset_label_measure(GtkWidget *widget,
+                                 GtkOrientation orientation,
+                                 int for_size,
+                                 int *minimum,
+                                 int *natural,
+                                 int *minimum_baseline,
+                                 int *natural_baseline)
+{
+  GtkWidget *child = gtk_widget_get_first_child(widget);
+  if(child)
+    gtk_widget_measure(child, orientation, for_size, minimum, natural,
+                       minimum_baseline, natural_baseline);
+  else
+  {
+    *minimum = 0;
+    *natural = 0;
+    if(minimum_baseline) *minimum_baseline = -1;
+    if(natural_baseline) *natural_baseline = -1;
+  }
+}
+
+static void _reset_label_size_allocate(GtkWidget *widget,
+                                       int width,
+                                       int height,
+                                       int baseline)
+{
+  GtkWidget *child = gtk_widget_get_first_child(widget);
+  if(child)
+    gtk_widget_allocate(child, width, height, baseline, NULL);
+}
 
 static void dtgtk_reset_label_class_init(GtkDarktableResetLabelClass *klass)
 {
+  GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
+  widget_class->measure = _reset_label_measure;
+  widget_class->size_allocate = _reset_label_size_allocate;
 }
 
 static void dtgtk_reset_label_init(GtkDarktableResetLabel *label)
 {
+  label->lb = GTK_LABEL(gtk_label_new(NULL));
+  gtk_widget_set_halign(GTK_WIDGET(label->lb), GTK_ALIGN_START);
+  gtk_label_set_ellipsize(GTK_LABEL(label->lb), PANGO_ELLIPSIZE_END);
+  gtk_widget_set_parent(GTK_WIDGET(label->lb), GTK_WIDGET(label));
+  gtk_widget_set_tooltip_text(GTK_WIDGET(label), _("double-click to reset"));
+  dt_gui_connect_click(label, _reset_label_callback, NULL, NULL);
 }
 
 static void _reset_label_callback(GtkGestureSingle *gesture,
@@ -62,20 +108,14 @@ GtkWidget *dtgtk_reset_label_new(const gchar *text, dt_iop_module_t *module, voi
         dt_print(DT_DEBUG_ALWAYS, "[dtgtk_reset_label_new] reference outside %s params", module->so->op);
   }
 
-  label->lb = GTK_LABEL(gtk_label_new(text));
-  gtk_widget_set_halign(GTK_WIDGET(label->lb), GTK_ALIGN_START);
-  gtk_label_set_ellipsize(GTK_LABEL(label->lb), PANGO_ELLIPSIZE_END);
-  gtk_event_box_set_visible_window(GTK_EVENT_BOX(label), FALSE);
-  gtk_widget_set_tooltip_text(GTK_WIDGET(label), _("double-click to reset"));
-  gtk_container_add(GTK_CONTAINER(label), GTK_WIDGET(label->lb));
-  dt_gui_connect_click(label, _reset_label_callback, NULL, NULL);
+  gtk_label_set_text(GTK_LABEL(label->lb), text);
 
   return (GtkWidget *)label;
 }
 
 void dtgtk_reset_label_set_text(GtkDarktableResetLabel *label, const gchar *str)
 {
-  gtk_label_set_text(label->lb, str);
+  gtk_label_set_text(GTK_LABEL(label->lb), str);
 }
 
 // clang-format off
@@ -83,4 +123,3 @@ void dtgtk_reset_label_set_text(GtkDarktableResetLabel *label, const gchar *str)
 // vim: shiftwidth=2 expandtab tabstop=2 cindent
 // kate: tab-indents: off; indent-width 2; replace-tabs on; indent-mode cstyle; remove-trailing-spaces modified;
 // clang-format on
-

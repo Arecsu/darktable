@@ -3865,7 +3865,7 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
   dt_osx_disallow_fullscreen(dialog);
 #endif
   gtk_widget_show_all(dialog);
-  gtk_dialog_run(GTK_DIALOG(dialog));
+  dt_gui_dialog_run(GTK_DIALOG(dialog));
   gtk_widget_destroy(dialog);
   dt_collection_update_query(darktable.collection,
                              DT_COLLECTION_CHANGE_NEW_QUERY,

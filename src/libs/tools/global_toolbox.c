@@ -576,6 +576,9 @@ static void _lib_filter_grouping_button_clicked(GtkWidget *widget, gpointer user
 #endif // USE_LUA
 }
 
+// The help/keymap event filters install gdk_event_handler_set() + gtk_main_do_event(),
+// which are GTK3-only (removed in GTK4). TODO P3: controller-based or deleted.
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _main_do_event_help(GdkEvent *event, gpointer data)
 {
   dt_lib_tool_preferences_t *d = (dt_lib_tool_preferences_t *)data;
@@ -631,6 +634,7 @@ static void _main_do_event_help(GdkEvent *event, gpointer data)
 
   if(!handled) gtk_main_do_event(event);
 }
+#endif
 
 // Don't save across sessions (window managers role)
 static struct { gint x, y, w, h; } _shortcuts_dialog_posize = {};
@@ -686,6 +690,7 @@ static void _show_shortcuts_prefs(GtkWidget *w)
    * callback while the (modeless) dialog is already running */
   if(_shortcuts_dialog_open)
     return;
+#if !GTK_CHECK_VERSION(4, 0, 0)
   _shortcuts_dialog_open = TRUE;
 
   GtkWidget *shortcuts_dialog = gtk_dialog_new_with_buttons(_("shortcuts"), GTK_WINDOW(dt_ui_main_window(darktable.gui->ui)),
@@ -705,12 +710,19 @@ static void _show_shortcuts_prefs(GtkWidget *w)
   dt_gui_dialog_add(GTK_DIALOG(shortcuts_dialog), dt_shortcuts_prefs(w));
   gtk_widget_show_all(shortcuts_dialog);
 
-  gtk_dialog_run(GTK_DIALOG(shortcuts_dialog));
+  dt_gui_dialog_run(GTK_DIALOG(shortcuts_dialog));
   gtk_widget_destroy(shortcuts_dialog);
 
   _shortcuts_dialog_open = FALSE;
+#else
+  // TODO P4: blocking dt_gui_dialog_run() is removed in GTK4; needs the
+  // modal/async dialog rework (dt_gui_show_*_dialog choke point).
+#endif
 }
 
+// The help/keymap event filters install gdk_event_handler_set() + gtk_main_do_event(),
+// which are GTK3-only (removed in GTK4). TODO P3: controller-based or deleted.
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _main_do_event_keymap(GdkEvent *event, gpointer data)
 {
   dt_lib_tool_preferences_t *d = data;
@@ -788,9 +800,14 @@ static void _main_do_event_keymap(GdkEvent *event, gpointer data)
 
   gtk_main_do_event(event);
 }
+#endif
 
 static void _lib_help_button_clicked(GtkWidget *widget, gpointer user_data)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // TODO P3: the help-cursor event filter is GTK3-only (gdk_event_handler_set).
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+#else
   if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
   {
     dt_control_set_temp_cursor("not-allowed");
@@ -803,10 +820,15 @@ static void _lib_help_button_clicked(GtkWidget *widget, gpointer user_data)
     dt_control_clear_temp_cursor();
     gdk_event_handler_set((GdkEventFunc)gtk_main_do_event, NULL, NULL);
   }
+#endif
 }
 
 static void _lib_keymap_button_clicked(GtkWidget *widget, gpointer user_data)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // TODO P3: the keymap event filter is GTK3-only (gdk_event_handler_set).
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+#else
   if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
   {
     dt_control_forbid_change_cursor();
@@ -820,6 +842,7 @@ static void _lib_keymap_button_clicked(GtkWidget *widget, gpointer user_data)
     dt_control_change_cursor("default");
     gdk_event_handler_set((GdkEventFunc)gtk_main_do_event, NULL, NULL);
   }
+#endif
 }
 
 static guint _keymap_button_start_time = 0;

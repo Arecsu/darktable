@@ -1733,7 +1733,7 @@ static void _pop_menu_dictionary_delete_tag(GtkWidget *menuitem,
     dt_gui_dialog_add(GTK_DIALOG(dialog), label1, label2);
     gtk_widget_show_all(dialog);
 
-    res = gtk_dialog_run(GTK_DIALOG(dialog));
+    res = dt_gui_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
   }
   if(res != GTK_RESPONSE_YES)
@@ -1828,7 +1828,7 @@ static void _pop_menu_dictionary_delete_node(GtkWidget *menuitem,
                     dt_gui_hbox(label2, gtk_label_new("  "), label3));
   gtk_widget_show_all(dialog);
 
-  res = gtk_dialog_run(GTK_DIALOG(dialog));
+  res = dt_gui_dialog_run(GTK_DIALOG(dialog));
   gtk_widget_destroy(dialog);
   if(res != GTK_RESPONSE_YES)
   {
@@ -1929,7 +1929,7 @@ static void _pop_menu_dictionary_create_tag(GtkWidget *menuitem,
                     dt_gui_hbox(gtk_label_new(_("synonyms: ")), dt_gui_expand(synonyms)));
   gtk_widget_show_all(dialog);
 
-  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES)
+  if(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES)
   {
     const char *newtag = gtk_entry_get_text(GTK_ENTRY(entry));
     char *message = NULL;
@@ -1952,7 +1952,7 @@ static void _pop_menu_dictionary_create_tag(GtkWidget *menuitem,
         gtk_message_dialog_new(GTK_WINDOW(dialog),
                                GTK_DIALOG_MODAL,
                                GTK_MESSAGE_INFO, GTK_BUTTONS_CLOSE, "%s", message);
-      gtk_dialog_run(GTK_DIALOG(warning_dialog));
+      dt_gui_dialog_run(GTK_DIALOG(warning_dialog));
       gtk_widget_destroy(warning_dialog);
       gtk_widget_destroy(dialog);
       g_free(tagname);
@@ -2078,7 +2078,7 @@ static void _pop_menu_dictionary_edit_tag(GtkWidget *menuitem,
 #endif
   gtk_widget_show_all(dialog);
 
-  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES)
+  if(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES)
   {
     const char *newtag = gtk_entry_get_text(GTK_ENTRY(entry));
     if(g_strcmp0(newtag, subtag ? subtag : tagname) != 0)
@@ -2097,7 +2097,7 @@ static void _pop_menu_dictionary_edit_tag(GtkWidget *menuitem,
                                                            GTK_MESSAGE_INFO,
                                                            GTK_BUTTONS_CLOSE,
                                                            "%s", message);
-        gtk_dialog_run(GTK_DIALOG(warning_dialog));
+        dt_gui_dialog_run(GTK_DIALOG(warning_dialog));
         gtk_widget_destroy(warning_dialog);
         gtk_widget_destroy(dialog);
         g_free(tagname);
@@ -2139,7 +2139,7 @@ static void _pop_menu_dictionary_edit_tag(GtkWidget *menuitem,
              GTK_MESSAGE_INFO, GTK_BUTTONS_CLOSE,
              _("at least one new tag name (%s) already exists, aborting"),
              new_tagname);
-          gtk_dialog_run(GTK_DIALOG(warning_dialog));
+          dt_gui_dialog_run(GTK_DIALOG(warning_dialog));
           gtk_widget_destroy(warning_dialog);
           g_free(new_tagname);
           if(subtag) g_free(new_prefix_tag);
@@ -2274,7 +2274,7 @@ static gboolean _apply_rename_path(GtkWidget *dialog,
          _("at least one new tag name (%s) already exists, aborting"),
          new_tagname);
 
-      gtk_dialog_run(GTK_DIALOG(warning_dialog));
+      dt_gui_dialog_run(GTK_DIALOG(warning_dialog));
       gtk_widget_destroy(warning_dialog);
     }
     g_free(new_tagname);
@@ -2362,7 +2362,7 @@ static void _pop_menu_dictionary_change_path(GtkWidget *menuitem,
                                         dt_gui_expand(entry));
   gtk_widget_show_all(dialog);
 
-  if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES)
+  if(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES)
   {
     const char *newtag = gtk_entry_get_text(GTK_ENTRY(entry));
     if(g_strcmp0(newtag, tagname) == 0)
@@ -2381,7 +2381,7 @@ static void _pop_menu_dictionary_change_path(GtkWidget *menuitem,
          GTK_DIALOG_MODAL,
          GTK_MESSAGE_INFO, GTK_BUTTONS_CLOSE, "%s", message);
 
-      gtk_dialog_run(GTK_DIALOG(warning_dialog));
+      dt_gui_dialog_run(GTK_DIALOG(warning_dialog));
       gtk_widget_destroy(warning_dialog);
       gtk_widget_destroy(dialog);
       g_free(tagname);
@@ -4015,7 +4015,7 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
   dt_osx_disallow_fullscreen(dialog);
 #endif
   gtk_widget_show_all(dialog);
-  gtk_dialog_run(GTK_DIALOG(dialog));
+  dt_gui_dialog_run(GTK_DIALOG(dialog));
   gtk_widget_destroy(dialog);
 
   dt_lib_tagging_t *d = self->data;

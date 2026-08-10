@@ -126,7 +126,9 @@ void dt_conf_set_folder_from_file_chooser(const char *name, GtkFileChooser *choo
   // does not work, so we workaround
   if(GTK_IS_FILE_CHOOSER_NATIVE(chooser))
   {
-    gchar *pathname = gtk_file_chooser_get_filename(chooser);
+    GFile *file = gtk_file_chooser_get_file(chooser);
+    gchar *pathname = file ? g_file_get_path(file) : NULL;
+    if(file) g_object_unref(file);
     if(pathname)
     {
       gchar *folder = g_path_get_dirname(pathname);
@@ -137,7 +139,14 @@ void dt_conf_set_folder_from_file_chooser(const char *name, GtkFileChooser *choo
   }
 #endif
 
+  // GTK3 returns a gchar *, GTK4 (deprecated GtkFileChooser) returns a GFile *
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GFile *folder_file = gtk_file_chooser_get_current_folder(chooser);
+  gchar *folder = folder_file ? g_file_get_path(folder_file) : NULL;
+  if(folder_file) g_object_unref(folder_file);
+#else
   gchar *folder = gtk_file_chooser_get_current_folder(chooser);
+#endif
   if(_conf_set_if_not_overridden(name, folder)) g_free(folder);
 }
 
@@ -354,7 +363,19 @@ gboolean dt_conf_get_folder_to_file_chooser(const char *name, GtkFileChooser *ch
   const gchar *folder = dt_conf_get_string_const(name);
   if(folder)
   {
+#if GTK_CHECK_VERSION(4, 0, 0)
+    GFile *dir = g_file_new_for_path(folder);
+    GError *error = NULL;
+    if(!gtk_file_chooser_set_current_folder(chooser, dir, &error))
+    {
+      g_warning("could not set current folder to '%s': %s", folder,
+                error ? error->message : "unknown error");
+      g_clear_error(&error);
+    }
+    g_object_unref(dir);
+#else
     gtk_file_chooser_set_current_folder(chooser, folder);
+#endif
     return TRUE;
   }
   return FALSE;

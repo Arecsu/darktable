@@ -189,11 +189,13 @@ static inline int dt_cairo_image_surface_get_height(cairo_surface_t *surface) {
   return cairo_image_surface_get_height(surface) / darktable.gui->ppd;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static inline cairo_surface_t *dt_gdk_cairo_surface_create_from_pixbuf(const GdkPixbuf *pixbuf, int scale, GdkWindow *for_window) {
   cairo_surface_t *cst = gdk_cairo_surface_create_from_pixbuf(pixbuf, scale, for_window);
   cairo_surface_set_device_scale(cst, darktable.gui->ppd, darktable.gui->ppd);
   return cst;
 }
+#endif
 
 static inline GdkPixbuf *dt_gdk_pixbuf_new_from_file_at_size(const char *filename, int width, int height, GError **error) {
   return gdk_pixbuf_new_from_file_at_size(filename, width * darktable.gui->ppd, height * darktable.gui->ppd, error);
@@ -225,7 +227,9 @@ double dt_get_screen_resolution(GtkWidget *widget);
  * should be processed by control or by panel. If default is panel scroll but
  * modifiers are pressed to indicate the control should be scrolled, then remove
  * the modifiers from the event before returning false */
+#if !GTK_CHECK_VERSION(4, 0, 0)
 gboolean dt_gui_ignore_scroll(GdkEventScroll *event);
+#endif
 /* Same decision for a GtkEventControllerScroll callback: the modifiers are
  * taken from the current event (GTK4: gtk_event_controller_get_current_event_state).
  * The GdkEvent flavor clears the sidebar_scroll_mask from the event to consume
@@ -313,7 +317,7 @@ static inline void dt_gui_get_event_coords(const GdkEvent *event,
                                            gdouble *y)
 {
 #if GTK_CHECK_VERSION(4, 0, 0)
-  gdk_event_get_position(event, x, y);
+  gdk_event_get_position((GdkEvent *)event, x, y);
 #else
   gdk_event_get_root_coords(event, x, y);
 #endif
@@ -412,10 +416,12 @@ void dt_ui_container_add_widget(const struct dt_ui_t *ui,
 void dt_ui_container_focus_widget(const struct dt_ui_t *ui,
                                   const dt_ui_container_t c,
                                   GtkWidget *w);
+#if !GTK_CHECK_VERSION(4, 0, 0)
 /** \brief calls a callback on all children widgets from container */
 void dt_ui_container_foreach(const struct dt_ui_t *ui,
                              const dt_ui_container_t c,
                              GtkCallback callback);
+#endif
 /** \brief destroy all child widgets from container */
 void dt_ui_container_destroy_children(const struct dt_ui_t *ui,
                                       const dt_ui_container_t c);
@@ -492,8 +498,14 @@ static inline GtkWidget *dt_ui_label_new(const gchar *str)
 static inline GtkWidget *dt_ui_entry_new(gint width_chars)
 {
   GtkWidget *entry = gtk_entry_new();
+#if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_drag_dest_unset(entry);
+#endif
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_editable_set_width_chars(GTK_EDITABLE(entry), width_chars);
+#else
   gtk_entry_set_width_chars(GTK_ENTRY(entry), width_chars);
+#endif
   return entry;
 };
 
@@ -529,6 +541,25 @@ gboolean dt_gui_show_yes_no_dialog(const char *title,
                                    const char *wname,
                                    const char *format, ...);
 
+// gtk_dialog_run() was removed from GTK4.  This is the interim replacement:
+// GTK3 delegates to gtk_dialog_run(), GTK4 emulates the blocking run with a
+// modal window + nested main loop.  TODO P4: convert the callers to the
+// async response-callback / GtkAlertDialog pattern.
+int dt_gui_dialog_run(GtkDialog *dialog);
+int dt_gui_native_dialog_run(GtkNativeDialog *dialog);
+void dt_gui_box_reorder_child_before(GtkBox *box, GtkWidget *child, GtkWidget *sibling);
+
+// gtk_style_context_get() (variadic, with a GtkStateFlags argument) was
+// removed from GTK4 together with the state argument of the other getters.
+// Interim drop-in replacement: GTK3 forwards to gtk_style_context_get(),
+// GTK4 handles the property names darktable uses with the remaining
+// deprecated APIs (best effort, see gtk.c).  TODO P5: the CSS property
+// lookups should become CSS custom properties / GtkCssProvider.
+void dt_gui_style_context_get(GtkStyleContext *context,
+                              GtkStateFlags state,
+                              const char *first_property_name,
+                              ...) G_GNUC_NULL_TERMINATED;
+
 void dt_gui_add_help_link(GtkWidget *widget,
                           const char *link);
 char *dt_gui_get_help_url(GtkWidget *widget);
@@ -543,9 +574,11 @@ void dt_gui_apply_theme();                 // apply the loaded theme to darktabl
 // reload GUI scalings
 void dt_configure_ppd_dpi(dt_gui_gtk_t *gui);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 // translate key press events to remove any modifiers used to produce the keyval
 // for example when the shift key is used to create the asterisk character
 guint dt_gui_translated_key_state(const GdkEventKey *event);
+#endif
 
 // return modifier keys currently pressed, independent of any key event
 GdkModifierType dt_key_modifier_state();
@@ -555,29 +588,33 @@ GtkWidget *dt_ui_resize_wrap(GtkWidget *w,
                              char *config_str);
 
 // check whether the given container has any user-added children
-gboolean dt_gui_container_has_children(GtkContainer *container);
+// (takes GtkWidget*; GTK4 dropped GtkContainer, children are walked via
+// gtk_widget_get_first_child()/gtk_widget_get_next_sibling())
+gboolean dt_gui_container_has_children(GtkWidget *container);
 // return a count of the user-added children in the given container
-int dt_gui_container_num_children(GtkContainer *container);
+int dt_gui_container_num_children(GtkWidget *container);
 // return the first child of the given container
-GtkWidget *dt_gui_container_first_child(GtkContainer *container);
+GtkWidget *dt_gui_container_first_child(GtkWidget *container);
 // return the requested child of the given container, or NULL if it has fewer children
-GtkWidget *dt_gui_container_nth_child(GtkContainer *container,
+GtkWidget *dt_gui_container_nth_child(GtkWidget *container,
                                       const int which);
 
 // remove all of the children we've added to the container.  Any which
 // no longer have any references will be destroyed.
-void dt_gui_container_remove_children(GtkContainer *container);
+void dt_gui_container_remove_children(GtkWidget *container);
 
 // delete all of the children we've added to the container.  Use this
 // function only if you are SURE there are no other references to any
 // of the children (if in doubt, use dt_gui_container_remove_children
 // instead; it's a bit slower but safer).
-void dt_gui_container_destroy_children(GtkContainer *container);
+void dt_gui_container_destroy_children(GtkWidget *container);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 void dt_gui_menu_popup(GtkMenu *menu,
                        GtkWidget *button,
                        GdkGravity widget_anchor,
                        GdkGravity menu_anchor);
+#endif
 
 /* Forward the scroll event a scroll controller is currently dispatching to
  * another widget, as if that widget had received it directly (used for the
@@ -596,11 +633,13 @@ void dt_gui_draw_rounded_rectangle(cairo_t *cr,
 
 void dt_gui_widget_reallocate_now(GtkWidget *widget);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 // event handler for "key-press-event" of GtkTreeView to decide if
 // focus switches to GtkSearchEntry
 gboolean dt_gui_search_start(GtkWidget *widget,
                              GdkEventKey *event,
                              GtkSearchEntry *entry);
+#endif
 
 // event handler for "stop-search" of GtkSearchEntry
 void dt_gui_search_stop(GtkSearchEntry *entry,
@@ -789,9 +828,13 @@ static inline GdkModifierType dt_gui_current_state(GtkGestureSingle *gesture)
 {
   const gpointer synth = g_object_get_data(G_OBJECT(gesture), DT_ACTION_GESTURE_SYNTH_KEY);
   if(synth) return (GdkModifierType)(GPOINTER_TO_INT(synth) >> 8);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  return dt_gui_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
+#else
   GdkModifierType state;
   gtk_get_current_event_state(&state);
   return state;
+#endif
 }
 
 #define dt_gui_claim(gesture) \
@@ -819,8 +862,13 @@ extern "C++"
 template<typename... Widgets>
 inline GtkWidget *dt_gui_box_add(gpointer box, Widgets*... w)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // fold expression: expands to gtk_box_append(box, a), gtk_box_append(box, b), ...
+  (gtk_box_append(GTK_BOX(box), GTK_WIDGET(w)), ...);
+#else
   // fold expression: expands to gtk_container_add(box, a), gtk_container_add(box, b), ...
   (gtk_container_add(GTK_CONTAINER(box), GTK_WIDGET(w)), ...);
+#endif
   return GTK_WIDGET(box);
 }
 }
@@ -848,9 +896,15 @@ static inline GtkWidget *(dt_gui_align_right)(GtkWidget *widget)
 
 static inline GtkWidget *dt_gui_scroll_wrap(GtkWidget *widget)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *scrolled_window = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(scrolled_window, TRUE);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), widget);
+#else
   GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
   gtk_widget_set_vexpand(scrolled_window, TRUE);
   gtk_container_add(GTK_CONTAINER(scrolled_window), widget);
+#endif
   return scrolled_window;
 }
 

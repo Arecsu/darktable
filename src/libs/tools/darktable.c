@@ -213,10 +213,10 @@ static gboolean _lib_darktable_draw_callback(GtkWidget *widget,
 
   // Get the foreground color from the CSS stylesheet
   GdkRGBA *tmpcolor;
-  gtk_style_context_get(context, state, "color", &tmpcolor, NULL);
+  dt_gui_style_context_get(context, state, "color", &tmpcolor, NULL);
 
   PangoFontDescription *font_desc = NULL;
-  gtk_style_context_get(context, state, "font", &font_desc, NULL);
+  dt_gui_style_context_get(context, state, "font", &font_desc, NULL);
 
   /* paint icon image */
   if(d->image)

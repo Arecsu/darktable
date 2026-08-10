@@ -13,8 +13,12 @@ find_package(ONNXRuntime REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0 gobject-2.0 gio-2.0 gmodule-2.0)
 pkg_check_modules(JSON_GLIB REQUIRED json-glib-1.0)
-# GTK3/RSVG needed for headers only (common/darktable.h -> utility.h -> gtk/gtk.h, librsvg/rsvg.h)
-pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+# GTK3/GTK4 needed for headers only (common/darktable.h -> utility.h -> gtk/gtk.h, librsvg/rsvg.h)
+if(USE_GTK4)
+  pkg_check_modules(GTK REQUIRED gtk4>=4.10)
+else()
+  pkg_check_modules(GTK REQUIRED gtk+-3.0)
+endif()
 pkg_check_modules(RSVG2 REQUIRED librsvg-2.0)
 # lcms2 needed for headers (common/colorspaces.h included via darktable.h)
 pkg_check_modules(LCMS2 REQUIRED lcms2)
@@ -26,7 +30,7 @@ target_include_directories(darktable_ai PUBLIC
   $<INSTALL_INTERFACE:include>
   ${GLIB_INCLUDE_DIRS}
   ${JSON_GLIB_INCLUDE_DIRS}
-  ${GTK3_INCLUDE_DIRS}
+  ${GTK_INCLUDE_DIRS}
   ${RSVG2_INCLUDE_DIRS}
   ${LCMS2_INCLUDE_DIRS}
 )

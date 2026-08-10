@@ -48,7 +48,7 @@ static gboolean _thumbnail_btn_draw(GtkWidget *widget, cairo_t *cr)
 
   GdkRGBA *fg_color, *bg_color;
   GtkStyleContext *context = gtk_widget_get_style_context(widget);
-  gtk_style_context_get(context, state, GTK_STYLE_PROPERTY_COLOR, &fg_color, GTK_STYLE_PROPERTY_BACKGROUND_COLOR,
+  dt_gui_style_context_get(context, state, GTK_STYLE_PROPERTY_COLOR, &fg_color, GTK_STYLE_PROPERTY_BACKGROUND_COLOR,
                         &bg_color, NULL);
   if(fg_color->alpha == 0 && bg_color->alpha == 0)
   {

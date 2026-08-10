@@ -506,10 +506,10 @@ static void _header_motion_notify_show_callback(GtkEventControllerMotion *contro
    * it.  Hide the previously shown buttons here instead. */
   if(darktable.develop->header_buttons_module && darktable.develop->header_buttons_module != module
      && g_list_find(darktable.develop->iop, darktable.develop->header_buttons_module))
-    dt_iop_show_hide_header_buttons(darktable.develop->header_buttons_module, NULL, FALSE, FALSE);
+    dt_iop_show_hide_header_buttons(darktable.develop->header_buttons_module, FALSE, FALSE);
   darktable.develop->header_buttons_module = module;
 
-  dt_iop_show_hide_header_buttons(module, NULL, TRUE, FALSE);
+  dt_iop_show_hide_header_buttons(module, TRUE, FALSE);
 }
 
 static void _header_motion_notify_hide_callback(GtkEventControllerMotion *controller,
@@ -524,7 +524,7 @@ static void _header_motion_notify_hide_callback(GtkEventControllerMotion *contro
    * widget crossings there. */
   if(_pointer_in_module(module)) return;
 #endif
-  dt_iop_show_hide_header_buttons(module, NULL, FALSE, FALSE);
+  dt_iop_show_hide_header_buttons(module, FALSE, FALSE);
 }
 
 static void _gui_delete_callback(GtkButton *button, dt_iop_module_t *module)
@@ -691,16 +691,10 @@ static void _gui_movedown_callback(GtkButton *button, dt_iop_module_t *module)
   if(!moved) return;
 
   // we move the headers
-  GValue gv = { 0, { { 0 } } };
-  g_value_init(&gv, G_TYPE_INT);
-  gtk_container_child_get_property(
-      GTK_CONTAINER(dt_ui_get_container(darktable.gui->ui,
-                                        DT_UI_CONTAINER_PANEL_RIGHT_CENTER)),
-      prev->expander,
-      "position", &gv);
-  gtk_box_reorder_child(dt_ui_get_container(darktable.gui->ui,
-                                            DT_UI_CONTAINER_PANEL_RIGHT_CENTER),
-                        module->expander, g_value_get_int(&gv));
+  dt_gui_box_reorder_child_before(
+      dt_ui_get_container(darktable.gui->ui,
+                          DT_UI_CONTAINER_PANEL_RIGHT_CENTER),
+      module->expander, prev->expander);
 
   dt_dev_add_history_item(prev->dev, module, TRUE);
 
@@ -726,17 +720,10 @@ static void _gui_moveup_callback(GtkButton *button, dt_iop_module_t *module)
   if(!moved) return;
 
   // we move the headers
-  GValue gv = { 0, { { 0 } } };
-  g_value_init(&gv, G_TYPE_INT);
-  gtk_container_child_get_property(
-      GTK_CONTAINER(dt_ui_get_container(darktable.gui->ui,
-                                        DT_UI_CONTAINER_PANEL_RIGHT_CENTER)),
-      next->expander,
-      "position", &gv);
-
-  gtk_box_reorder_child(dt_ui_get_container(darktable.gui->ui,
-                                            DT_UI_CONTAINER_PANEL_RIGHT_CENTER),
-                        module->expander, g_value_get_int(&gv));
+  dt_gui_box_reorder_child_before(
+      dt_ui_get_container(darktable.gui->ui,
+                          DT_UI_CONTAINER_PANEL_RIGHT_CENTER),
+      module->expander, next->expander);
 
   dt_dev_add_history_item(next->dev, module, TRUE);
 
@@ -928,7 +915,7 @@ static gboolean _rename_module_key_press(GtkWidget *entry,
                                          G_CALLBACK(_rename_module_key_press),
                                          module);
     gtk_widget_destroy(entry);
-    dt_iop_show_hide_header_buttons(module, NULL, TRUE, FALSE); // after removing entry
+    dt_iop_show_hide_header_buttons(module, TRUE, FALSE); // after removing entry
     dt_iop_gui_update_header(module);
     dt_masks_group_update_name(module);
     return TRUE;
@@ -984,7 +971,7 @@ void dt_iop_gui_rename_module(dt_iop_module_t *module)
   dt_gui_connect_motion(entry, NULL, _header_enter_notify_callback, NULL,
                         GINT_TO_POINTER(DT_ACTION_ELEMENT_SHOW));
 
-  dt_iop_show_hide_header_buttons(module, NULL, FALSE, TRUE); // before adding entry
+  dt_iop_show_hide_header_buttons(module, FALSE, TRUE); // before adding entry
   gtk_box_pack_start(GTK_BOX(module->header), entry, TRUE, TRUE, 0);
   gtk_widget_show(entry);
   gtk_widget_grab_focus(entry);
@@ -1174,7 +1161,7 @@ static gboolean _rename_module_key_pressed(GtkEventControllerKey *controller,
                                          G_CALLBACK(_rename_module_key_press),
                                          module);
     gtk_widget_destroy(entry);
-    dt_iop_show_hide_header_buttons(module, NULL, TRUE, FALSE);
+    dt_iop_show_hide_header_buttons(module, TRUE, FALSE);
     dt_iop_gui_update_header(module);
     dt_masks_group_update_name(module);
     return TRUE;
@@ -2427,8 +2414,7 @@ void dt_iop_gui_update(dt_iop_module_t *module)
       {
         if(module->widget && dt_conf_get_bool("plugins/darkroom/show_warnings"))
         {
-          GtkWidget *label_widget = dt_gui_container_first_child
-            (GTK_CONTAINER(gtk_widget_get_parent(module->widget)));
+          GtkWidget *label_widget = dt_gui_container_first_child(gtk_widget_get_parent(module->widget));
           if(!g_strcmp0(gtk_widget_get_name(label_widget), "iop-plugin-warning"))
             gtk_widget_destroy(label_widget);
           module->has_trouble = FALSE;
@@ -2542,19 +2528,22 @@ static void _gui_reset_clicked(GtkGestureSingle *gesture,
 }
 
 // kept for direct callers from accelerators
-static gboolean _presets_popup_callback(GtkButton *button,
-                                        GdkEventButton *event,
-                                        dt_iop_module_t *module)
+static gboolean _presets_popup_callback(dt_iop_module_t *module)
 {
   const gboolean disabled = !module->default_enabled && module->hide_enable_button;
   if(disabled) return FALSE;
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // TODO P2: GtkMenu->GtkPopoverMenu migration; preset popup deferred.
+  return TRUE;
+#else
   GtkMenu *menu = dt_gui_presets_popup_menu_show_for_module(module);
 
   dt_gui_menu_popup(menu,
-                    GTK_WIDGET(button), GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
+                    NULL, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
 
   return TRUE;
+#endif
 }
 
 static void _presets_popup_clicked(GtkGestureSingle *gesture,
@@ -2566,11 +2555,19 @@ static void _presets_popup_clicked(GtkGestureSingle *gesture,
   const gboolean disabled = !module->default_enabled && module->hide_enable_button;
   if(disabled) return;
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+  (void)gesture;
+  (void)n_press;
+  (void)x;
+  (void)y;
+  // TODO P2: GtkMenu->GtkPopoverMenu migration; preset popup deferred.
+#else
   GtkWidget *button = dt_gui_get_widget(gesture);
   GtkMenu *menu = dt_gui_presets_popup_menu_show_for_module(module);
 
   dt_gui_menu_popup(menu,
                     button, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
+#endif
 }
 
 /* per-presets-button hysteresis state: a continuous trackpad gesture is a
@@ -2911,7 +2908,7 @@ static void _iop_plugin_header_released(GtkGestureSingle *gesture,
   }
   else if(button == GDK_BUTTON_SECONDARY)
   {
-    _presets_popup_callback(NULL, NULL, module);
+    _presets_popup_callback(module);
     return;
   }
 }
@@ -3013,7 +3010,6 @@ static void _header_size_callback(GtkWidget *widget,
 }
 
 gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
-                                         GdkEventCrossing *event,
                                          gboolean show_buttons,
                                          const gboolean always_hide)
 {
@@ -3021,10 +3017,6 @@ gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
   GtkWidget *header = module->header;
   GtkWidget *focused = gtk_container_get_focus_child(GTK_CONTAINER(header));
   if(focused && GTK_IS_ENTRY(focused)) return TRUE;
-
-  if(event && (darktable.develop->darkroom_skip_mouse_events ||
-     event->detail == GDK_NOTIFY_INFERIOR ||
-     event->mode != GDK_CROSSING_NORMAL)) return TRUE;
 
   const char *config = dt_conf_get_string_const("darkroom/ui/hide_header_buttons");
 
@@ -3167,7 +3159,7 @@ void dt_iop_add_remove_mask_indicator(dt_iop_module_t *module, gboolean add)
     {
       gtk_widget_destroy(module->mask_indicator);
       module->mask_indicator = NULL;
-      dt_iop_show_hide_header_buttons(module, NULL, FALSE, FALSE);
+      dt_iop_show_hide_header_buttons(module, FALSE, FALSE);
     }
     else
       gtk_widget_set_sensitive(module->mask_indicator, module->enabled);
@@ -3203,7 +3195,7 @@ void dt_iop_add_remove_mask_indicator(dt_iop_module_t *module, gboolean add)
     }
     g_list_free(children);
 
-    dt_iop_show_hide_header_buttons(module, NULL, FALSE, FALSE);
+    dt_iop_show_hide_header_buttons(module, FALSE, FALSE);
   }
 }
 
@@ -3593,7 +3585,7 @@ void dt_iop_gui_set_expander(dt_iop_module_t *module)
   gtk_widget_show_all(expander);
   dt_ui_container_add_widget(darktable.gui->ui,
                              DT_UI_CONTAINER_PANEL_RIGHT_CENTER, expander);
-  dt_iop_show_hide_header_buttons(module, NULL, FALSE, FALSE);
+  dt_iop_show_hide_header_buttons(module, FALSE, FALSE);
 }
 
 GtkWidget *dt_iop_gui_get_widget(dt_iop_module_t *module)
@@ -4373,7 +4365,7 @@ static float _action_process(gpointer target,
       {
       case DT_ACTION_EFFECT_ACTIVATE:
         if(module->presets_button)
-          _presets_popup_callback(NULL, NULL, module);
+          _presets_popup_callback(module);
         break;
       case DT_ACTION_EFFECT_NEXT:
         move_size *= -1;

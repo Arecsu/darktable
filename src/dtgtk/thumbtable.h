@@ -144,6 +144,7 @@ gboolean dt_thumbtable_check_imgid_visibility(dt_thumbtable_t *table,
 
 // drag & drop receive function - handles dropping of files in the
 // center view (files are added to the library)
+#if !GTK_CHECK_VERSION(4, 0, 0)
 void dt_thumbtable_event_dnd_received(GtkWidget *widget,
                                       GdkDragContext *context,
                                       const gint x,
@@ -152,6 +153,7 @@ void dt_thumbtable_event_dnd_received(GtkWidget *widget,
                                       const guint target_type,
                                       const guint time,
                                       dt_thumbtable_t *table);
+#endif
 
 // move by key actions.
 // this key accels are not managed here but inside view

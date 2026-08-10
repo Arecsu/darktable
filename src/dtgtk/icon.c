@@ -19,28 +19,30 @@
 #include "gui/gtk.h"
 #include <string.h>
 
-G_DEFINE_TYPE(GtkDarktableIcon, dtgtk_icon, GTK_TYPE_EVENT_BOX);
+G_DEFINE_TYPE(GtkDarktableIcon, dtgtk_icon, GTK_TYPE_WIDGET);
 
 static gboolean _icon_draw(GtkWidget *widget, cairo_t *cr);
+
+static void _icon_snapshot(GtkWidget *widget, GtkSnapshot *snapshot);
 
 static void dtgtk_icon_class_init(GtkDarktableIconClass *klass)
 {
   GtkWidgetClass *widget_class = (GtkWidgetClass *)klass;
-  widget_class->draw = _icon_draw;
+  widget_class->snapshot = _icon_snapshot;
 }
 
 static void dtgtk_icon_init(GtkDarktableIcon *icon)
 {
 }
 
-static gboolean _icon_draw(GtkWidget *widget, cairo_t *cr)
+static void _icon_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
 {
-  g_return_val_if_fail(widget != NULL, FALSE);
-  g_return_val_if_fail(DTGTK_IS_ICON(widget), FALSE);
+  g_return_if_fail(widget != NULL);
+  g_return_if_fail(DTGTK_IS_ICON(widget));
 
-  /* begin cairo drawing */
-  GtkAllocation allocation;
-  gtk_widget_get_allocation(widget, &allocation);
+  const int width = gtk_widget_get_width(widget);
+  const int height = gtk_widget_get_height(widget);
+  cairo_t *cr = gtk_snapshot_append_cairo(snapshot, &GRAPHENE_RECT_INIT(0, 0, width, height));
 
   GtkStateFlags state = gtk_widget_get_state_flags(widget);
 
@@ -52,10 +54,10 @@ static gboolean _icon_draw(GtkWidget *widget, cairo_t *cr)
 
   /* draw icon */
   if(DTGTK_ICON(widget)->icon)
-    DTGTK_ICON(widget)->icon(cr, 0, 0, allocation.width, allocation.height, DTGTK_ICON(widget)->icon_flags,
+    DTGTK_ICON(widget)->icon(cr, 0, 0, width, height, DTGTK_ICON(widget)->icon_flags,
                              DTGTK_ICON(widget)->icon_data);
 
-  return FALSE;
+  cairo_destroy(cr);
 }
 
 // Public functions
@@ -63,7 +65,6 @@ GtkWidget *dtgtk_icon_new(DTGTKCairoPaintIconFunc paint, gint paintflags, void *
 {
   GtkDarktableIcon *icon;
   icon = g_object_new(dtgtk_icon_get_type(), NULL);
-  gtk_event_box_set_visible_window(GTK_EVENT_BOX(icon), FALSE);
   icon->icon = paint;
   icon->icon_flags = paintflags;
   icon->icon_data = paintdata;

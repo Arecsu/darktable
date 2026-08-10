@@ -287,7 +287,7 @@ static void clear_search(dt_lib_location_t *lib)
   g_list_free_full(lib->places, (GDestroyNotify)free_location);
   lib->places = NULL;
 
-  dt_gui_container_destroy_children(GTK_CONTAINER(lib->result));
+  dt_gui_container_destroy_children(lib->result);
   g_list_free_full(lib->callback_params, free);
   lib->callback_params = NULL;
 

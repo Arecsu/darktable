@@ -332,7 +332,7 @@ static void _rating_range_widget_init(dt_lib_filtering_rule_t *rule,
   GtkStateFlags state = gtk_widget_get_state_flags(range->band);
   range->allow_resize = FALSE;
   int mh = -1;
-  gtk_style_context_get(context, state, "min-height", &mh, NULL);
+  dt_gui_style_context_get(context, state, "min-height", &mh, NULL);
   if(mh > 0) range->max_width_px = 8 * mh * 0.8;
   range->step_bd = 1.0;
   dtgtk_range_select_add_icon(range, 7, -1, dtgtk_cairo_paint_reject, 0, NULL);

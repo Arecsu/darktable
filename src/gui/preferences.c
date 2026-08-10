@@ -98,11 +98,13 @@ static void tree_row_activated_presets(GtkTreeView *tree,
                                        gpointer data);
 static void tree_selection_changed(GtkTreeSelection *selection,
                                    gpointer data);
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _search_key_pressed(GtkEventControllerKey *controller,
                                     guint keyval,
                                     guint keycode,
                                     GdkModifierType state,
                                     GtkWidget *search_entry);
+#endif
 static gboolean _delete_preset_key_pressed(GtkEventControllerKey *controller,
                                            guint keyval,
                                            guint keycode,
@@ -639,7 +641,7 @@ void dt_gui_preferences_show()
                                                             current_view));
   }
 
-  (void)gtk_dialog_run(GTK_DIALOG(_preferences_dialog));
+  (void)dt_gui_dialog_run(GTK_DIALOG(_preferences_dialog));
 
 #ifdef USE_LUA
   destroy_tab_lua();
@@ -908,6 +910,7 @@ static gboolean _search_func(GtkTreeModel *model,
   return TRUE;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _search_key_pressed(GtkEventControllerKey *controller,
                                     guint keyval,
                                     guint keycode,
@@ -925,6 +928,7 @@ static gboolean _search_key_pressed(GtkEventControllerKey *controller,
   event.is_modifier = (keyval >= GDK_KEY_Shift_L && keyval <= GDK_KEY_Hyper_R);
   return dt_gui_search_start(widget, &event, entry);
 }
+#endif
 
 static void init_tab_presets(GtkWidget *stack)
 {
@@ -1035,7 +1039,13 @@ static void init_tab_presets(GtkWidget *stack)
                    G_CALLBACK(dt_gui_search_stop), tree);
   g_signal_connect(G_OBJECT(search_presets), "stop-search",
                    G_CALLBACK(dt_gui_search_stop), tree);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: GtkSearchEntry captures keys from a designated widget natively
+  // (gtk_search_entry_handle_event() is gone).
+  gtk_search_entry_set_key_capture_widget(GTK_SEARCH_ENTRY(search_presets), tree);
+#else
   dt_gui_connect_key(tree, _search_key_pressed, search_presets);
+#endif
   gtk_tree_view_set_search_entry(tree, GTK_ENTRY(search_presets));
 
   GtkWidget *button = gtk_button_new_with_label(C_("preferences", "import..."));

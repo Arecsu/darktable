@@ -24,11 +24,16 @@
 G_BEGIN_DECLS
 
 #define DTGTK_TYPE_RESET_LABEL dtgtk_reset_label_get_type()
-G_DECLARE_FINAL_TYPE(GtkDarktableResetLabel, dtgtk_reset_label, DTGTK, RESET_LABEL, GtkEventBox)
+/* GtkEventBox was removed in GTK4 (GtkLabel's class struct is private, so
+ * it cannot be subclassed either): this widget is a plain GtkWidget that
+ * owns a single GtkLabel child and sizes/places it itself (see the
+ * measure/size_allocate overrides in resetlabel.c).  The double-click
+ * reset gesture sits on the widget. */
+G_DECLARE_FINAL_TYPE(GtkDarktableResetLabel, dtgtk_reset_label, DTGTK, RESET_LABEL, GtkWidget)
 
 struct _GtkDarktableResetLabel
 {
-  GtkEventBox widget;
+  GtkWidget widget;
   GtkLabel *lb;
   dt_iop_module_t *module;
   int offset; // offset in params to reset
@@ -47,4 +52,3 @@ G_END_DECLS
 // vim: shiftwidth=2 expandtab tabstop=2 cindent
 // kate: tab-indents: off; indent-width 2; replace-tabs on; indent-mode cstyle; remove-trailing-spaces modified;
 // clang-format on
-

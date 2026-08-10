@@ -166,7 +166,7 @@ static void load_button_clicked(GtkWidget *widget, dt_lib_module_t *self)
 #ifdef GDK_WINDOWING_QUARTZ
       dt_osx_disallow_fullscreen(dialog);
 #endif
-      gtk_dialog_run(GTK_DIALOG(dialog));
+      dt_gui_dialog_run(GTK_DIALOG(dialog));
       gtk_widget_destroy(dialog);
     }
     else
