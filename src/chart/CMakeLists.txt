@@ -12,13 +12,8 @@ target_include_directories(darktable-chart
                            PRIVATE
                               ${CMAKE_CURRENT_BINARY_DIR}/..)
 
-if(USE_GTK4)
-  set(GTK_DEFINITIONS ${GTK4_DEFINITIONS})
-  set(GTK_LIBRARIES ${GTK4_LIBRARIES})
-else()
-  set(GTK_DEFINITIONS ${GTK3_DEFINITIONS})
-  set(GTK_LIBRARIES ${GTK3_LIBRARIES})
-endif()
+set(GTK_DEFINITIONS ${GTK4_DEFINITIONS})
+set(GTK_LIBRARIES ${GTK4_LIBRARIES})
 
 target_compile_options(darktable-chart
                        PRIVATE

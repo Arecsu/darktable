@@ -301,28 +301,20 @@ endif()
 #
 # Find all other required libraries for building
 #
-# GTK3 does pull glib, but this allows us to check for the version
+# Glib is pulled in by GTK4 anyway, but this allows us to check for the version
 find_package(Glib 2.56 REQUIRED)
 add_definitions("-DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_56")
 add_definitions("-DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_MIN_REQUIRED")
 include_directories(SYSTEM ${Glib_INCLUDE_DIRS})
 list(APPEND LIBS ${Glib_LIBRARIES})
 
-# GTK3 pulls in ATK, GDK, GDK-PIXBUF, CAIRO, GLIB, PANGO
-# GTK4 pulls in the same plus graphene; use it via pkg-config (version floor 4.10)
-if(USE_GTK4)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(GTK4 REQUIRED gtk4>=4.10)
-  add_definitions("-DGDK_VERSION_MIN_REQUIRED=GDK_VERSION_4_10")
-  include_directories(SYSTEM ${GTK4_INCLUDE_DIRS})
-  list(APPEND LIBS ${GTK4_LIBRARIES})
-else()
-  find_package(GTK3 3.24.15 REQUIRED)
-  add_definitions("-DGDK_VERSION_MIN_REQUIRED=GDK_VERSION_3_24")
-  #add_definitions("-DGDK_VERSION_MAX_ALLOWED=GDK_VERSION_MIN_REQUIRED")
-  include_directories(SYSTEM ${GTK3_INCLUDE_DIRS})
-  list(APPEND LIBS ${GTK3_LIBRARIES})
-endif()
+# GTK4 pulls in ATK, GDK, GDK-PIXBUF, CAIRO, GLIB, PANGO plus graphene;
+# use it via pkg-config (version floor 4.10).  GTK3 builds are dead.
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GTK4 REQUIRED gtk4>=4.10)
+add_definitions("-DGDK_VERSION_MIN_REQUIRED=GDK_VERSION_4_10")
+include_directories(SYSTEM ${GTK4_INCLUDE_DIRS})
+list(APPEND LIBS ${GTK4_LIBRARIES})
 
 # Check for libxml2 / broken cmake module can't be included in the foreach() below
 find_package(LibXml2 2.6 REQUIRED)
@@ -864,50 +856,23 @@ if(NOT SOURCE_PACKAGE)
   add_definitions(-Werror -Wfatal-errors )
 endif()
 
-if(USE_GTK4)
-  # GTK4 port: deprecated-but-still-present GTK4 APIs (GtkStyleContext,
-  # GtkDialog, GtkTreeView, ...) must not be fatal until P5 works them off.
-  add_definitions(-Wno-deprecated-declarations)
-endif()
+# GTK4 port: deprecated-but-still-present GTK4 APIs (GtkStyleContext,
+# GtkDialog, GtkTreeView, ...) must not be fatal until P5 works them off.
+add_definitions(-Wno-deprecated-declarations)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   # do not error out on "loop not vectorized" clang OpenMP warnings
   add_definitions("-Wno-error=pass-failed")
 endif()
 
-# osm gps map library
-if(USE_MAP)
-  if(USE_GTK4)
-    # libosmgpsmap is GTK3-only (its installed headers use GdkEventButton and
-    # friends, which do not exist in GTK4); the map view needs a GTK4-capable
-    # osm-gps-map and a port of the view to the new event APIs (TODO P3).
-    set(USE_MAP OFF)
-    message(STATUS "Map mode: disabled (GTK4 build; libosmgpsmap is GTK3-only)")
-  else()
-    find_package(OSMGpsMap)
-    if(OSMGpsMap_FOUND)
-      message(STATUS "Map mode: enabled")
-      add_definitions("-DHAVE_MAP")
-      if(NOT OSMGpsMap_VERSION VERSION_LESS 1.1.0)
-        add_definitions("-DHAVE_OSMGPSMAP_110_OR_NEWER")
-      endif()
-      if(OSMGpsMap_VERSION VERSION_GREATER 1.1.0)
-        add_definitions("-DHAVE_OSMGPSMAP_NEWER_THAN_110")
-      endif()
-      include_directories(SYSTEM ${OSMGpsMap_INCLUDE_DIRS})
-      list(APPEND LIBS ${OSMGpsMap_LIBRARIES})
-      add_definitions(${OSMGpsMap_DEFINITIONS})
-    else(OSMGpsMap_FOUND)
-      set(USE_MAP OFF)
-      message(STATUS "Map mode: disabled, please install libosmgpsmap")
-    endif(OSMGpsMap_FOUND)
-  endif()
+# osm gps map library: libosmgpsmap is GTK3-only (its installed headers use
+# GdkEventButton and friends, which do not exist in GTK4); the map view needs
+# a GTK4-capable osm-gps-map and a port of the view to the new event APIs
+# (TODO P3).
+set(USE_MAP OFF)
+message(STATUS "Map mode: disabled (GTK4 build; libosmgpsmap is GTK3-only)")
 
-else(USE_MAP)
-  message(STATUS "Map mode: disabled")
-endif(USE_MAP)
-
-# libcolord-gtk:
+# libcolord-gtk4 (the GTK4 build of colord-gtk):
 if(USE_COLORD)
   find_package(Colord)
   if(Colord_FOUND)
@@ -918,7 +883,7 @@ if(USE_COLORD)
       list(APPEND LIBS ${Colord_LIBRARIES})
       add_definitions(${Colord_DEFINITIONS})
 
-      # ... and also against libcolord-gtk to get the display profile
+      # ... and also against libcolord-gtk4 to get the display profile
       include_directories(SYSTEM ${ColordGTK_INCLUDE_DIRS})
       list(APPEND LIBS ${ColordGTK_LIBRARIES})
       add_definitions(${ColordGTK_DEFINITIONS})

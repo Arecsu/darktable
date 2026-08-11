@@ -1,5 +1,5 @@
 option(USE_CAMERA_SUPPORT "Detect and use camera support if available." ON)
-option(USE_GTK4 "Build against GTK4 instead of GTK3 (GTK4 port, requires >= 4.10)" OFF)
+option(USE_GTK4 "Build against GTK4 (GTK4 port, requires >= 4.10; GTK3 builds are dead and unsupported)" ON)
 option(USE_COLORD "Enable colord support" ON)
 option(USE_MAP "Build Map View parts" ON)
 option(USE_LUA "Build lua scripting support" ON)
