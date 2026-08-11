@@ -774,6 +774,15 @@ void dt_gui_gesture_claim(GtkGesture *gesture,
                           GdkEventSequence *sequence,
                           gpointer user_data);
 
+/* Claim the sequence at "pressed" time instead of "begin" (A2.10); see the
+ * implementation comment in gtk.c.  Connect to the gesture's "pressed"
+ * signal. */
+void dt_gui_gesture_claim_pressed(GtkGestureSingle *gesture,
+                                  int n_press,
+                                  double x,
+                                  double y,
+                                  gpointer user_data);
+
 /* GTK3 "draw" signal shim.  GTK4 removed the per-widget "draw" signal;
  * GtkDrawingArea-derived widgets draw via gtk_drawing_area_set_draw_func()
  * instead.  For GtkDrawingArea widgets this installs the GTK3-style callback
@@ -1039,6 +1048,7 @@ static inline GCallback G_CALLBACK(void *f) { return (GCallback)f; } // as a mac
     BOOLSIGNAL(signal, query-tooltip) \
     BOOLSIGNAL(signal, match-selected) \
     BOOLSIGNAL(signal, get-child-position) \
+    BOOLSIGNAL(signal, scroll) \
     ) == _Generic((DISABLINGPREFIX##c_handler), gboolean(*)(): TRUE, default: FALSE), \
     "signal " signal " return type does not match specified handler " #c_handler); \
   g_signal_connect_data((instance), (signal), (GCallback)(c_handler), (user_data), NULL, (GConnectFlags) 0); } while(0)

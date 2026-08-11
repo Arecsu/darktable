@@ -5307,6 +5307,8 @@ void dt_gui_menu_popup(GtkMenu *menu,
 }
 #endif
 
+static float _scroll_attenuate(gdouble delta);  // defined below the proxy block
+
 gboolean dt_gui_forward_scroll(GtkEventControllerScroll *controller,
                                GtkWidget *target)
 {
@@ -5317,11 +5319,39 @@ gboolean dt_gui_forward_scroll(GtkEventControllerScroll *controller,
   gdk_event_free(event);
   return TRUE;
 #else
-  /* GTK4: no gtk_widget_event() -- reimplement as a scroll controller on the
-   * target widget (see the declaration in gtk.h). */
-  (void)controller;
-  (void)target;
-  return FALSE;
+  /* GTK4 has no gtk_widget_event(): re-dispatch the source event's deltas to
+   * the scroll controllers attached to the target widget.  The deltas are
+   * pre-attenuated exactly like the source proxy would have attenuated them,
+   * and the target proxies skip their own attenuation in that forwarded mode
+   * (they detect it: no current event on the target controller).  The target
+   * still does its own discrete accumulation, so touchpad scrolls forwarded to
+   * a notebook/slider step like native scrolls there. */
+  const GdkEvent *event = dt_gui_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if(!event || gdk_event_get_event_type((GdkEvent *)event) != GDK_SCROLL) return FALSE;
+  gdouble dx = 0.0, dy = 0.0;
+  gdk_scroll_event_get_deltas((GdkEvent *)event, &dx, &dy);
+  if(gdk_scroll_event_get_unit((GdkEvent *)event) != GDK_SCROLL_UNIT_WHEEL)
+  {
+    dx = _scroll_attenuate(dx);
+    dy = _scroll_attenuate(dy);
+  }
+  gboolean handled = FALSE;
+  const guint scroll_signal = g_signal_lookup("scroll", GTK_TYPE_EVENT_CONTROLLER_SCROLL);
+  GListModel *const controllers = gtk_widget_observe_controllers(target);
+  const guint n = g_list_model_get_n_items(controllers);
+  for(guint i = 0; i < n; i++)
+  {
+    gpointer c = g_list_model_get_item(controllers, i);
+    if(GTK_IS_EVENT_CONTROLLER_SCROLL(c))
+    {
+      gboolean target_handled = FALSE;
+      g_signal_emit(c, scroll_signal, 0, dx, dy, &target_handled);
+      handled |= target_handled;
+    }
+    g_object_unref(c);
+  }
+  g_object_unref(controllers);
+  return handled;
 #endif
 }
 
@@ -5517,7 +5547,13 @@ static void _gesture_cancel(GtkGestureSingle *gesture,
                             GdkEventSequence *sequence,
                             GtkWidget *widget)
 {
-  g_signal_emit_by_name(gesture, "released", 1, .0, .0);
+  (void)widget;
+  /* do not re-emit the release at the widget's top-left corner: take the
+   * position of the gesture's last event, if any (A2.11) */
+  gdouble x = 0.0, y = 0.0;
+  const GdkEvent *event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), sequence);
+  if(event) gdk_event_get_position((GdkEvent *)event, &x, &y);
+  g_signal_emit_by_name(gesture, "released", 1, x, y);
 }
 
 GtkGestureSingle *(dt_gui_connect_click)(GtkWidget *widget,
@@ -5567,6 +5603,28 @@ void dt_gui_gesture_claim(GtkGesture *gesture,
                           gpointer user_data)
 {
   gtk_gesture_set_sequence_state(gesture, sequence, GTK_EVENT_SEQUENCE_CLAIMED);
+}
+
+/* Same claim, deferred to the gesture's "pressed" signal (A2.10): a claim in
+ * "begin" steals the sequence from parent and child controllers before the
+ * click handler could inspect the button/modifiers, which can break context
+ * menus and parent scrolling.  A capture-phase gesture's "pressed" still runs
+ * before any bubble-phase internal gesture (GtkToggleButton, GtkTreeView), so
+ * the underlying widget is suppressed exactly as before -- but only once the
+ * press is actually delivered to us. */
+void dt_gui_gesture_claim_pressed(GtkGestureSingle *gesture,
+                                  int n_press,
+                                  double x,
+                                  double y,
+                                  gpointer user_data)
+{
+  (void)n_press;
+  (void)x;
+  (void)y;
+  (void)user_data;
+  GdkEventSequence *const sequence = gtk_gesture_single_get_current_sequence(gesture);
+  if(sequence)
+    gtk_gesture_set_sequence_state(GTK_GESTURE(gesture), sequence, GTK_EVENT_SEQUENCE_CLAIMED);
 }
 
 GtkGesture *(dt_gui_connect_drag)(GtkWidget *widget,
@@ -5806,10 +5864,23 @@ GtkEventController *(dt_gui_connect_motion)(GtkWidget *widget,
   return controller;
 }
 
+/* The user's scroll callback keeps the GTK3 void signature.  GTK4 registers
+ * GtkEventControllerScroll::scroll as G_TYPE_BOOLEAN and uses the return value
+ * to decide whether the event propagates on (gtkeventcontrollerscroll.c), so
+ * the proxies installed between GTK and the callback return gboolean; the real
+ * handler stays void (A2.4). */
 typedef void (*scroll_handler_t)(GtkEventControllerScroll*, gdouble, gdouble, gpointer);
-static gdouble _scroll_discrete_dx = 0.0;
-static gdouble _scroll_discrete_dy = 0.0;
+typedef gboolean (*scroll_proxy_t)(GtkEventControllerScroll*, gdouble, gdouble, gpointer);
 static const char *_scroll_real_handler_key = "real-scroll-handler";
+/* Discrete-scroll remainders live on the controller, not in file statics:
+ * a partial delta accumulated on one widget must not complete a step on a
+ * different controller, device or axis (A2.5). */
+static const char *_scroll_discrete_state_key = "discrete-scroll-state";
+typedef struct dt_scroll_discrete_state_t
+{
+  gdouble dx;
+  gdouble dy;
+} dt_scroll_discrete_state_t;
 
 static gboolean _scroll_sidebar(GtkEventControllerScroll* controller,
                                 gdouble dy,
@@ -5869,46 +5940,113 @@ static float _scroll_attenuate(gdouble delta)
   return scale * copysign(pow(fabs(delta), compression), delta);
 }
 
-static void _scroll_proxy_real(GtkEventControllerScroll* controller,
-                               gdouble dx,
-                               gdouble dy,
-                               gpointer user_data,
-                               gboolean discrete)
+static gboolean _scroll_proxy_real(GtkEventControllerScroll* controller,
+                                   gdouble dx,
+                                   gdouble dy,
+                                   gpointer user_data,
+                                   gboolean discrete)
 {
   GdkEvent *const event = dt_gui_get_current_event(GTK_EVENT_CONTROLLER(controller));
-  if(!event) return;
-  // FIXME: make sure this logic is right -- want to ignore emulated pointer events, attenuate scroll events with data, and use any deltas not emulated
-  if(gdk_event_get_event_type(event) == GDK_SCROLL
-     // don't double counting real and emulated smooth scroll events
-     && !gdk_event_get_pointer_emulated(event)
-     && !_scroll_sidebar(controller, dy, event))
+  gboolean handled = FALSE;
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* dt_gui_forward_scroll() emits ::scroll manually and no event is current on
+   * the target controller.  The deltas then arrive pre-attenuated (the source
+   * event's smooth/notch decision was applied there), so the event checks and
+   * attenuation below are skipped.  A real GTK4 dispatch always sets the
+   * controller's current event, so a NULL event means "forwarded". */
+  const gboolean forwarded = (event == NULL);
+#else
+  const gboolean forwarded = FALSE;
+#endif
+
+  if(!forwarded)
   {
-    if(dt_gdk_event_get_scroll_direction(event) == GDK_SCROLL_SMOOTH)
+    if(!event) return FALSE;
+    // FIXME: make sure this logic is right -- want to ignore emulated pointer events, attenuate scroll events with data, and use any deltas not emulated
+    if(gdk_event_get_event_type(event) == GDK_SCROLL
+       // don't double counting real and emulated smooth scroll events
+       && !gdk_event_get_pointer_emulated(event))
     {
-      dx = _scroll_attenuate(dx);
-      dy = _scroll_attenuate(dy);
-      if(discrete)
+      if(_scroll_sidebar(controller, dy, event))
+        handled = TRUE;
+      else
       {
-        _scroll_discrete_dx += dx;
-        _scroll_discrete_dy += dy;
-        dx = dy = 0.0;
-        // can return |delta| > 1, but clamping to -1 < delta < 1 dulls
-        // responsiveness, so it is up to the caller to handle this
-        // FIXME: actually clamp and if caller doesn't want clamping
-        //        they should not use discerete scrolling?
-        // FIXME: make another flag to setup func if want to clamp?
-        if(fabs(_scroll_discrete_dx) >= 1.0)
+        if(dt_gdk_event_get_scroll_direction(event) == GDK_SCROLL_SMOOTH)
         {
-          const int steps = trunc(_scroll_discrete_dx);
-          _scroll_discrete_dx -= steps;
-          dx = steps;
+          dx = _scroll_attenuate(dx);
+          dy = _scroll_attenuate(dy);
+          if(discrete)
+          {
+            /* per-controller remainder state (A2.5) */
+            dt_scroll_discrete_state_t *state =
+              g_object_get_data(G_OBJECT(controller), _scroll_discrete_state_key);
+            if(!state)
+            {
+              state = g_new0(dt_scroll_discrete_state_t, 1);
+              g_object_set_data_full(G_OBJECT(controller), _scroll_discrete_state_key,
+                                     state, g_free);
+            }
+            state->dx += dx;
+            state->dy += dy;
+            dx = dy = 0.0;
+            // can return |delta| > 1, but clamping to -1 < delta < 1 dulls
+            // responsiveness, so it is up to the caller to handle this
+            // FIXME: actually clamp and if caller doesn't want clamping
+            //        they should not use discerete scrolling?
+            // FIXME: make another flag to setup func if want to clamp?
+            if(fabs(state->dx) >= 1.0)
+            {
+              const int steps = trunc(state->dx);
+              state->dx -= steps;
+              dx = steps;
+            }
+            if(fabs(state->dy) >= 1.0)
+            {
+              const int steps = trunc(state->dy);
+              state->dy -= steps;
+              dy = steps;
+            }
+          }
         }
-        if(fabs(_scroll_discrete_dy) >= 1.0)
+        if(dx != 0.0 || dy != 0.0)
         {
-          const int steps = trunc(_scroll_discrete_dy);
-          _scroll_discrete_dy -= steps;
-          dy = steps;
+          const scroll_handler_t real_handler =
+            g_object_get_data(G_OBJECT(controller), _scroll_real_handler_key);
+          real_handler(controller, dx, dy, user_data);
+          handled = TRUE;
         }
+      }
+    }
+  }
+  else
+  {
+    /* forwarded: deltas are pre-attenuated smooth deltas (or whole notch
+     * steps); only the discrete accumulation still applies. */
+    if(discrete)
+    {
+      dt_scroll_discrete_state_t *state =
+        g_object_get_data(G_OBJECT(controller), _scroll_discrete_state_key);
+      if(!state)
+      {
+        state = g_new0(dt_scroll_discrete_state_t, 1);
+        g_object_set_data_full(G_OBJECT(controller), _scroll_discrete_state_key,
+                               state, g_free);
+      }
+      state->dx += dx;
+      state->dy += dy;
+      dx = dy = 0.0;
+      if(fabs(state->dx) >= 1.0)
+      {
+        const int steps = trunc(state->dx);
+        state->dx -= steps;
+        dx = steps;
+      }
+      if(fabs(state->dy) >= 1.0)
+      {
+        const int steps = trunc(state->dy);
+        state->dy -= steps;
+        dy = steps;
       }
     }
     if(dx != 0.0 || dy != 0.0)
@@ -5916,27 +6054,29 @@ static void _scroll_proxy_real(GtkEventControllerScroll* controller,
       const scroll_handler_t real_handler =
         g_object_get_data(G_OBJECT(controller), _scroll_real_handler_key);
       real_handler(controller, dx, dy, user_data);
+      handled = TRUE;
     }
   }
 #if !GTK_CHECK_VERSION(4, 0, 0)
   gdk_event_free(event);
 #endif
+  return handled;
 }
 
-static void _scroll_proxy(GtkEventControllerScroll* controller,
-                          gdouble dx,
-                          gdouble dy,
-                          gpointer data)
+static gboolean _scroll_proxy(GtkEventControllerScroll* controller,
+                              gdouble dx,
+                              gdouble dy,
+                              gpointer data)
 {
-  _scroll_proxy_real(controller, dx, dy, data, FALSE);
+  return _scroll_proxy_real(controller, dx, dy, data, FALSE);
 }
 
-static void _scroll_discrete_proxy(GtkEventControllerScroll* controller,
-                                   gdouble dx,
-                                   gdouble dy,
-                                   gpointer data)
+static gboolean _scroll_discrete_proxy(GtkEventControllerScroll* controller,
+                                       gdouble dx,
+                                       gdouble dy,
+                                       gpointer data)
 {
-  _scroll_proxy_real(controller, dx, dy, data, TRUE);
+  return _scroll_proxy_real(controller, dx, dy, data, TRUE);
 }
 
 GtkEventController *(dt_gui_connect_scroll)(GtkWidget *widget,
@@ -5945,7 +6085,7 @@ GtkEventController *(dt_gui_connect_scroll)(GtkWidget *widget,
                                                gpointer data)
 {
   // FIXME: instead of using two proxy functions, set controller property if discrete
-  const scroll_handler_t proxy =
+  const scroll_proxy_t proxy =
     (flags & GTK_EVENT_CONTROLLER_SCROLL_DISCRETE) ?
     _scroll_discrete_proxy : _scroll_proxy;
   // proxy will attenuate, so bypass GTK's discrete scrolling code
