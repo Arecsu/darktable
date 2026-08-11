@@ -112,27 +112,33 @@ void dt_splash_screen_create(const gboolean force)
   darktable.splash.start_screen = gtk_window_new();
   gtk_window_set_decorated(GTK_WINDOW(darktable.splash.start_screen), FALSE);
   gtk_window_set_resizable(GTK_WINDOW(darktable.splash.start_screen), FALSE);
-
   gtk_widget_set_name(darktable.splash.start_screen, "splashscreen");
+
+  // progress + remaining-time labels
   darktable.splash.progress_text = gtk_label_new(_("initializing"));
   gtk_widget_set_name(darktable.splash.progress_text, "splashscreen-progress");
   darktable.splash.remaining_text = gtk_label_new("");
   gtk_widget_set_name(darktable.splash.remaining_text, "splashscreen-remaining");
+
+  // version + copyright lines
   int version_len = strlen(darktable_package_version);
   char *delim = strchr(darktable_package_version, '~');
   if(delim)
     version_len = delim - darktable_package_version;
   gchar *version_str = g_strdup_printf("%.*s", version_len, darktable_package_version);
-  GtkWidget *version = GTK_WIDGET(gtk_label_new(version_str));
+  GtkWidget *version = gtk_label_new(version_str);
   g_free(version_str);
   gtk_widget_set_name(version, "splashscreen-version");
+  gtk_label_set_xalign(GTK_LABEL(version), 0.0);
+
   gchar *years = g_strdup_printf("© 2009-%s", darktable_last_commit_year);
-  GtkWidget *copyright = GTK_WIDGET(gtk_label_new(years));
+  GtkWidget *copyright = gtk_label_new(years);
   g_free(years);
   gtk_widget_set_name(copyright, "splashscreen-copyright");
+
+  // logo + program name
   GtkWidget *logo = _get_logo();
   GtkWidget *program_name = _get_program_name();
-  GtkBox *content = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0));
 
 #ifdef USE_FEATURED_IMAGE
   // make a random selection of featured image based on the current
@@ -150,14 +156,15 @@ void dt_splash_screen_create(const gboolean force)
   gtk_label_set_justify(GTK_LABEL(program_desc), GTK_JUSTIFY_CENTER);
   gtk_widget_set_name(program_desc, "splashscreen-description");
 
-  dt_gui_box_add(content,
+  GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_box_append(GTK_BOX(content),
                  dt_gui_hbox(dt_gui_vbox(logo, version, program_name, program_desc),
                              image));
 #else
   gtk_image_set_pixel_size(GTK_IMAGE(logo), ICON_SIZE);
-  gtk_label_set_justify(GTK_LABEL(version), GTK_JUSTIFY_LEFT);
 
-  GtkWidget *program_desc = GTK_WIDGET(gtk_label_new(_("Photography workflow application\nand RAW developer")));
+  GtkWidget *program_desc =
+    GTK_WIDGET(gtk_label_new(_("Photography workflow application\nand RAW developer")));
   gtk_label_set_justify(GTK_LABEL(program_desc), GTK_JUSTIFY_LEFT);
   gtk_widget_set_halign(program_desc, GTK_ALIGN_START);
   gtk_widget_set_name(program_desc, "splashscreen-description");
@@ -166,39 +173,45 @@ void dt_splash_screen_create(const gboolean force)
   gtk_widget_set_name(sep, "splashscreen-separator");
   gtk_widget_set_hexpand(sep, TRUE);
 
-  GtkWidget *title_col = dt_gui_vbox(program_name);
-  gtk_box_set_spacing(GTK_BOX(title_col), 4);
-  dt_gui_box_add(GTK_BOX(title_col), version);
-  gtk_widget_set_halign(program_name, GTK_ALIGN_START);
-  gtk_widget_set_halign(version, GTK_ALIGN_START);
-  gtk_label_set_xalign(GTK_LABEL(version), 0.0);
-  gtk_widget_set_halign(title_col, GTK_ALIGN_START);
-  gtk_widget_set_valign(title_col, GTK_ALIGN_CENTER);
-  gtk_widget_set_valign(logo, GTK_ALIGN_CENTER);
-
+  // left column: logo over copyright
   GtkWidget *logo_col = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-  gtk_widget_set_halign(logo, GTK_ALIGN_START);
-  gtk_box_append(GTK_BOX(logo_col), logo);
-  gtk_widget_set_halign(copyright, GTK_ALIGN_START);
-  gtk_box_append(GTK_BOX(logo_col), copyright);
   gtk_widget_set_halign(logo_col, GTK_ALIGN_START);
   gtk_widget_set_valign(logo_col, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(logo_col), logo);
+  gtk_box_append(GTK_BOX(logo_col), copyright);
 
-  dt_gui_box_add(content,
-                 dt_gui_vbox(dt_gui_hbox(logo_col, title_col),
-                             program_desc, sep, darktable.splash.progress_text));
+  // right column: program name over version
+  GtkWidget *title_col = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+  gtk_widget_set_halign(title_col, GTK_ALIGN_START);
+  gtk_widget_set_valign(title_col, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(title_col), program_name);
+  gtk_box_append(GTK_BOX(title_col), version);
+
+  // header row
+  GtkWidget *head_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_box_append(GTK_BOX(head_row), logo_col);
+  gtk_box_append(GTK_BOX(head_row), title_col);
+
+  // the remaining-time line: clock icon + "  mm:ss"
+  darktable.splash.remaining_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_widget_set_halign(GTK_WIDGET(darktable.splash.remaining_box), GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(darktable.splash.remaining_box),
+                 dtgtk_button_new(dtgtk_cairo_paint_clock, 0, 0));
+  gtk_box_append(GTK_BOX(darktable.splash.remaining_box),
+                 darktable.splash.remaining_text);
+
+  // the splash content, top to bottom
+  GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_box_append(GTK_BOX(content), head_row);
+  gtk_box_append(GTK_BOX(content), program_desc);
+  gtk_box_append(GTK_BOX(content), sep);
+  gtk_box_append(GTK_BOX(content), darktable.splash.progress_text);
+  gtk_box_append(GTK_BOX(content), darktable.splash.remaining_box);
 #endif
 
   gtk_widget_set_halign(darktable.splash.progress_text, GTK_ALIGN_START);
 
-  darktable.splash.remaining_box =
-    dt_gui_hbox(dtgtk_button_new(dtgtk_cairo_paint_clock, 0, 0),
-                darktable.splash.remaining_text);
-  gtk_widget_set_halign(GTK_WIDGET(darktable.splash.remaining_box), GTK_ALIGN_START);
-
-  dt_gui_box_add(content, darktable.splash.remaining_box);
-  gtk_window_set_child(GTK_WINDOW(darktable.splash.start_screen), GTK_WIDGET(content));
-
+  gtk_window_set_child(GTK_WINDOW(darktable.splash.start_screen), content);
   gtk_window_set_default_size(GTK_WINDOW(darktable.splash.start_screen), 700, -1);
   gtk_widget_set_visible(darktable.splash.start_screen, TRUE);
   gtk_widget_set_visible(darktable.splash.remaining_box, FALSE);
