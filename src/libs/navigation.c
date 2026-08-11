@@ -226,8 +226,7 @@ void gui_init(dt_lib_module_t *self)
 
   /* connect callbacks */
   dt_gui_add_class(thumbnail, "dt_transparent_background");
-  g_signal_connect(G_OBJECT(thumbnail), "draw",
-                   G_CALLBACK(_lib_navigation_draw_callback), self);
+  dt_gui_connect_draw(thumbnail, _lib_navigation_draw_callback, self);
   dt_gui_connect_click_all(thumbnail, _lib_navigation_button_press_callback, _lib_navigation_button_release_callback, self);
   dt_gui_connect_scroll(thumbnail, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES,
                         _lib_navigation_scroll_callback, self);

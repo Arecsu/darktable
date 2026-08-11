@@ -1026,10 +1026,19 @@ static void _scrollbar_changed(GtkWidget *widget,
 {
   DT_GUARD_GUI_UPDATE();
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: GtkScrollbar is not a GtkRange; its position lives on the
+   * GtkAdjustment (whose "value-changed" we connect to below). */
+  GtkAdjustment *adjustment_x =
+    gtk_scrollbar_get_adjustment(GTK_SCROLLBAR(darktable.gui->scrollbars.hscrollbar));
+  GtkAdjustment *adjustment_y =
+    gtk_scrollbar_get_adjustment(GTK_SCROLLBAR(darktable.gui->scrollbars.vscrollbar));
+#else
   GtkAdjustment *adjustment_x =
     gtk_range_get_adjustment(GTK_RANGE(darktable.gui->scrollbars.hscrollbar));
   GtkAdjustment *adjustment_y =
     gtk_range_get_adjustment(GTK_RANGE(darktable.gui->scrollbars.vscrollbar));
+#endif
 
   const gdouble value_x = gtk_adjustment_get_value(adjustment_x);
   const gdouble value_y = gtk_adjustment_get_value(adjustment_y);
@@ -1776,8 +1785,7 @@ int dt_gui_gtk_init(dt_gui_gtk_t *gui)
                           | GDK_LEAVE_NOTIFY_MASK | GDK_TOUCHPAD_GESTURE_MASK
                           | darktable.gui->scroll_mask);
 
-    g_signal_connect(G_OBJECT(widget), "draw",
-                    G_CALLBACK(_draw), NULL);
+    dt_gui_connect_draw(widget, _draw, NULL);
 
     // input via controllers (GTK4-compatible; the old motion/button/scroll
     // event signals and the pinch "event" handler are GTK3-only)
@@ -1797,12 +1805,22 @@ int dt_gui_gtk_init(dt_gui_gtk_t *gui)
   // leave-notify-event
 
   widget = darktable.gui->scrollbars.vscrollbar;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: GtkScrollbar has no "value-changed" signal; track the adjustment
+   * (gtk_scrollbar_new(NULL) created a fresh one for each scrollbar). */
+  g_signal_connect(G_OBJECT(gtk_scrollbar_get_adjustment(GTK_SCROLLBAR(widget))),
+                   "value-changed", G_CALLBACK(_scrollbar_changed), NULL);
+  widget = darktable.gui->scrollbars.hscrollbar;
+  g_signal_connect(G_OBJECT(gtk_scrollbar_get_adjustment(GTK_SCROLLBAR(widget))),
+                   "value-changed", G_CALLBACK(_scrollbar_changed), NULL);
+#else
   g_signal_connect(G_OBJECT(widget), "value-changed",
                    G_CALLBACK(_scrollbar_changed), NULL);
 
   widget = darktable.gui->scrollbars.hscrollbar;
   g_signal_connect(G_OBJECT(widget), "value-changed",
                    G_CALLBACK(_scrollbar_changed), NULL);
+#endif
 
   dt_action_t *pnl = dt_action_section(&darktable.control->actions_global, N_("panels"));
   dt_action_t *ac;
@@ -2052,8 +2070,7 @@ static GtkWidget *_init_outer_border(const gint width,
                         GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
                         | GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK | GDK_STRUCTURE_MASK
                         | darktable.gui->scroll_mask);
-  g_signal_connect(widget, "draw",
-                   G_CALLBACK(_draw_borders), GINT_TO_POINTER(which));
+  dt_gui_connect_draw(widget, _draw_borders, GINT_TO_POINTER(which));
   dt_gui_connect_click(widget, _borders_button_pressed, NULL, GINT_TO_POINTER(which));
   gtk_widget_set_name(GTK_WIDGET(widget), "outer-border");
   gtk_widget_show(widget);
@@ -2449,10 +2466,17 @@ void dt_ui_update_scrollbars(dt_ui_t *ui)
   const dt_view_t *cv = dt_view_manager_get_current_view(darktable.view_manager);
 
   DT_ENTER_GUI_UPDATE();
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: GtkScrollbar is not a GtkRange; the adjustment is fetched directly. */
+#define DT_SCROLLBAR_ADJUSTMENT(sb) \
+  gtk_scrollbar_get_adjustment(GTK_SCROLLBAR(sb))
+#else
+#define DT_SCROLLBAR_ADJUSTMENT(sb) gtk_range_get_adjustment(GTK_RANGE(sb))
+#endif
   if(cv->vscroll_size > cv->vscroll_viewport_size)
   {
     gtk_adjustment_configure
-      (gtk_range_get_adjustment(GTK_RANGE(darktable.gui->scrollbars.vscrollbar)),
+      (DT_SCROLLBAR_ADJUSTMENT(darktable.gui->scrollbars.vscrollbar),
        cv->vscroll_pos, cv->vscroll_lower, cv->vscroll_size, 0,
        cv->vscroll_viewport_size,
        cv->vscroll_viewport_size);
@@ -2461,11 +2485,12 @@ void dt_ui_update_scrollbars(dt_ui_t *ui)
   if(cv->hscroll_size > cv->hscroll_viewport_size)
   {
     gtk_adjustment_configure
-      (gtk_range_get_adjustment(GTK_RANGE(darktable.gui->scrollbars.hscrollbar)),
+      (DT_SCROLLBAR_ADJUSTMENT(darktable.gui->scrollbars.hscrollbar),
        cv->hscroll_pos, cv->hscroll_lower, cv->hscroll_size, 0,
        cv->hscroll_viewport_size,
        cv->hscroll_viewport_size);
   }
+#undef DT_SCROLLBAR_ADJUSTMENT
   DT_LEAVE_GUI_UPDATE();
 
   gtk_widget_set_visible(darktable.gui->scrollbars.vscrollbar,
@@ -2866,6 +2891,7 @@ static void _side_panel_press(GtkGestureSingle *gesture,
   _add_remove_modules(NULL);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _side_panel_draw(GtkWidget *widget,
                                  cairo_t *cr,
                                  gpointer user_data)
@@ -2879,6 +2905,21 @@ static gboolean _side_panel_draw(GtkWidget *widget,
     gtk_widget_queue_draw(darktable.gui->ui->center);
   return FALSE;
 }
+#else
+/* GTK4: the panel box has no "draw" signal; the "module lines" overlay in
+ * the empty-lighttable center needs the same kick on panel (re)show.  The
+ * "map" hook covers the initial show and view switches; expanding/collapsing
+ * a module already queues its own center redraws. */
+static void _side_panel_map(GtkWidget *box, gpointer user_data)
+{
+  (void)box;
+  (void)user_data;
+  if(darktable.collection
+     && dt_view_get_current() == DT_VIEW_LIGHTTABLE
+     && dt_collection_get_count(darktable.collection) == 0)
+    gtk_widget_queue_draw(darktable.gui->ui->center);
+}
+#endif
 
 #if GTK_CHECK_VERSION(4, 0, 0)
 /* GTK4 panel-scroll gating: a BUBBLE controller on the panel's content box
@@ -2982,7 +3023,11 @@ static GtkWidget *_ui_init_panel_container_center(GtkWidget *container,
                           NULL, NULL, 0);
   }
 #endif
+#if GTK_CHECK_VERSION(4, 0, 0)
+  g_signal_connect(box, "map", G_CALLBACK(_side_panel_map), NULL);
+#else
   g_signal_connect_swapped(box, "draw", G_CALLBACK(_side_panel_draw), NULL);
+#endif
 
   GtkWidget *empty = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_widget_set_tooltip_text(empty, _("right-click to show/hide modules"));
@@ -4798,6 +4843,10 @@ static gboolean _resize_wrap_draw_handle(GtkWidget *w,
 
   return FALSE;
 }
+/* GTK4 note: drawing-area-based resize wraps draw the hover grabber line via
+ * the draw func (the shim); wraps holding a scrolled-window content are plain
+ * GtkBoxes with no draw hook, so they lose the grabber line for now (TODO
+ * P5: CSS-based handle). */
 
 /* controller version: the drag uses the controller-relative y, the hover
  * check keeps the old window comparison via the current event (BUBBLE phase
@@ -4992,7 +5041,7 @@ GtkWidget *dt_ui_resize_wrap(GtkWidget *w,
     // height to the content when the wrapped widget is mapped
     g_signal_connect(G_OBJECT(w), "map", G_CALLBACK(_resize_wrap_clamp), config_str);
 #else
-    g_signal_connect(G_OBJECT(w), "draw", G_CALLBACK(_resize_wrap_draw), config_str);
+    dt_gui_connect_draw(w, _resize_wrap_draw, config_str);
 #endif
     gtk_widget_set_margin_bottom(sw, DT_RESIZE_HANDLE_SIZE);
     w = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -5015,8 +5064,15 @@ GtkWidget *dt_ui_resize_wrap(GtkWidget *w,
     g_signal_connect(motion, "enter", G_CALLBACK(_resize_wrap_enter_controller), config_str);
     g_signal_connect(motion, "leave", G_CALLBACK(_resize_wrap_leave_controller), config_str);
   }
+#if GTK_CHECK_VERSION(4, 0, 0)
+  if(GTK_IS_DRAWING_AREA(w))
+    dt_gui_connect_draw(w, _resize_wrap_draw_handle, NULL);
+  /* plain-widget wraps: no draw signal in GTK4 (see the guarded GTK3
+   * handler above); the hover grabber line is a TODO P5 CSS item */
+#else
   g_signal_connect_after(G_OBJECT(w), "draw",
                          G_CALLBACK(_resize_wrap_draw_handle), NULL);
+#endif
 
   return w;
 }
@@ -5440,6 +5496,53 @@ GtkGesture *(dt_gui_connect_drag)(GtkWidget *widget,
   if(drag_update) g_signal_connect(gesture, "drag-update", G_CALLBACK(drag_update), data);
 
   return gesture;
+}
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: GtkDrawingArea has no "draw" signal; the callback (and its user data)
+ * are packed into a small struct and installed via set_draw_func().  The
+ * draw func delivers the same (widget, cr) pair to the GTK3-style callback;
+ * the extra width/height args are simply dropped. */
+typedef struct dt_gui_draw_connect_t
+{
+  dt_gui_draw_callback_t callback;
+  gpointer user_data;
+} dt_gui_draw_connect_t;
+
+static void _dt_gui_draw_func_trampoline(GtkDrawingArea *area,
+                                         cairo_t *cr,
+                                         int width,
+                                         int height,
+                                         gpointer user_data)
+{
+  (void)width;
+  (void)height;
+  const dt_gui_draw_connect_t *c = user_data;
+  c->callback(GTK_WIDGET(area), cr, c->user_data);
+}
+#endif
+
+gulong (dt_gui_connect_draw)(GtkWidget *widget,
+                             dt_gui_draw_callback_t callback,
+                             gpointer user_data)
+{
+#if GTK_CHECK_VERSION(4, 0, 0)
+  if(!GTK_IS_DRAWING_AREA(widget))
+  {
+    g_warning("dt_gui_connect_draw: %s is not a GtkDrawingArea; "
+              "the GTK3 'draw' signal has no GTK4 equivalent on plain widgets",
+              G_OBJECT_TYPE_NAME(widget));
+    return 0;
+  }
+  dt_gui_draw_connect_t *c = g_malloc(sizeof(*c));
+  c->callback = callback;
+  c->user_data = user_data;
+  gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(widget),
+                                 _dt_gui_draw_func_trampoline, c, g_free);
+  return 1;
+#else
+  return g_signal_connect(G_OBJECT(widget), "draw", G_CALLBACK(callback), user_data);
+#endif
 }
 
 /* per-gesture state for dt_gui_connect_pinch: handler + active tracking.  Kept

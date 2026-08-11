@@ -5791,8 +5791,7 @@ static void _darkroom_display_second_window(dt_develop_t *dev)
                           | darktable.gui->scroll_mask);
 
     /* connect callbacks */
-    g_signal_connect(G_OBJECT(dev->preview2.widget), "draw",
-                     G_CALLBACK(_second_window_draw_callback), dev);
+    dt_gui_connect_draw(dev->preview2.widget, _second_window_draw_callback, dev);
     dt_gui_connect_scroll(dev->preview2.widget, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES,
                           _second_window_scrolled_callback, dev);
     // touchpad pinch via GtkGestureZoom (the old "event" signal handler is GTK3-only)

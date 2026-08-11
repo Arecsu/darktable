@@ -803,7 +803,7 @@ void gui_init(dt_iop_module_t *self)
   dt_action_define_iop(self, NULL, N_("graph"), GTK_WIDGET(g->area), NULL);
   self->widget = dt_gui_vbox(g->area);
 
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(lowlight_draw), self);
+  dt_gui_connect_draw(g->area, lowlight_draw, self);
   dt_gui_connect_click(g->area, lowlight_button_press, lowlight_button_release, self);
   dt_gui_connect_motion(g->area, lowlight_motion_notify, NULL, lowlight_leave_notify, self);
   dt_gui_connect_scroll(g->area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES

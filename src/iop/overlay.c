@@ -1475,7 +1475,7 @@ void gui_init(dt_iop_module_t *self)
   int line = 0;
 
   g->area = GTK_DRAWING_AREA(dtgtk_drawing_area_new_with_height(0));
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(_draw_thumb), self);
+  dt_gui_connect_draw(g->area, _draw_thumb, self);
   gtk_widget_set_size_request(GTK_WIDGET(g->area), 150, 150);
   gtk_grid_attach(grid, GTK_WIDGET(g->area), 0, line++, 1, 2);
 

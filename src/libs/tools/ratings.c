@@ -98,7 +98,7 @@ void gui_init(dt_lib_module_t *self)
   /* connect callbacks */
   gtk_widget_set_tooltip_text(drawing, _("set star rating for selected images"));
   dt_gui_add_class(drawing, "dt_transparent_background");
-  g_signal_connect(G_OBJECT(drawing), "draw", G_CALLBACK(_lib_ratings_draw_callback), self);
+  dt_gui_connect_draw(drawing, _lib_ratings_draw_callback, self);
   dt_gui_connect_click(drawing, _lib_ratings_button_press_callback, _lib_ratings_button_release_callback, self);
   dt_gui_connect_motion(drawing, _lib_ratings_motion_notify_callback, NULL, _lib_ratings_leave_notify_callback, self);
 

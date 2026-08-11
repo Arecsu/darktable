@@ -1953,7 +1953,7 @@ static GtkWidget* _create_curve_graph_box(dt_iop_module_t *self,
   g_object_set_data(G_OBJECT(g->graph_drawing_area), "iop-instance", self);
   dt_action_define_iop(self, N_("curve"), N_("graph"), GTK_WIDGET(g->graph_drawing_area), NULL);
   gtk_widget_set_can_focus(GTK_WIDGET(g->graph_drawing_area), TRUE);
-  g_signal_connect(G_OBJECT(g->graph_drawing_area), "draw", G_CALLBACK(_agx_draw_curve), self);
+  dt_gui_connect_draw(g->graph_drawing_area, _agx_draw_curve, self);
   gtk_widget_set_tooltip_text(GTK_WIDGET(g->graph_drawing_area), _("tone mapping curve"));
 
   // Pack drawing area at the top

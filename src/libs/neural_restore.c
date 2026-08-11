@@ -3695,8 +3695,7 @@ static gboolean _preview_query_tooltip(GtkWidget *widget,
 
   GtkWidget *area = gtk_drawing_area_new();
   gtk_widget_set_size_request(area, tw, th);
-  g_signal_connect(area, "draw",
-                   G_CALLBACK(_zoom_tooltip_draw), self);
+  dt_gui_connect_draw(area, _zoom_tooltip_draw, self);
   gtk_widget_show(area);
   gtk_tooltip_set_custom(tooltip, area);
   return TRUE;
@@ -4367,8 +4366,7 @@ void gui_init(dt_lib_module_t *self)
 
   // preview area (resizable via dt_ui_resize_wrap)
   d->preview_area = GTK_WIDGET(dt_ui_resize_wrap(NULL, 200, CONF_PREVIEW_HEIGHT));
-  g_signal_connect(d->preview_area, "draw",
-                   G_CALLBACK(_preview_draw), self);
+  dt_gui_connect_draw(d->preview_area, _preview_draw, self);
   dt_gui_connect_click(d->preview_area, _preview_button_press_cb, _preview_button_release_cb, self);
   dt_gui_connect_motion(d->preview_area, _preview_motion_cb, NULL, NULL, self);
   // hover-zoom tooltip: shows the same preview at 2x so the user can

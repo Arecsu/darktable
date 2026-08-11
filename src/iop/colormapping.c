@@ -990,10 +990,10 @@ void gui_init(dt_iop_module_t *self)
   g->buffer = NULL;
 
   g->source_area = dtgtk_drawing_area_new_with_aspect_ratio(1.0 / 3.0);
-  g_signal_connect(G_OBJECT(g->source_area), "draw", G_CALLBACK(cluster_preview_draw), self);
+  dt_gui_connect_draw(g->source_area, cluster_preview_draw, self);
 
   g->target_area = dtgtk_drawing_area_new_with_aspect_ratio(1.0 / 3.0);
-  g_signal_connect(G_OBJECT(g->target_area), "draw", G_CALLBACK(cluster_preview_draw), self);
+  dt_gui_connect_draw(g->target_area, cluster_preview_draw, self);
 
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
 

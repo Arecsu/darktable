@@ -3637,7 +3637,7 @@ void gui_init(dt_iop_module_t *self)
                                                "plugins/darkroom/denoiseprofile/graphheight"));
   dt_action_define_iop(self, NULL, N_("graph"), GTK_WIDGET(g->area), NULL);
 
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(denoiseprofile_draw), self);
+  dt_gui_connect_draw(g->area, denoiseprofile_draw, self);
   dt_gui_connect_click(g->area, denoiseprofile_button_press, denoiseprofile_button_release, self);
   dt_gui_connect_motion(g->area, denoiseprofile_motion_notify, NULL, denoiseprofile_leave_notify, self);
   dt_gui_connect_scroll(g->area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES
@@ -3669,8 +3669,7 @@ void gui_init(dt_iop_module_t *self)
                                 dt_gui_hbox(dt_ui_label_new(_("variance green: ")), g->label_var_G),
                                 dt_gui_hbox(dt_ui_label_new(_("variance blue: ")), g->label_var_B));
 
-  g_signal_connect(G_OBJECT(g->box_variance), "draw",
-                   G_CALLBACK(denoiseprofile_draw_variance), self);
+  dt_gui_connect_draw(g->box_variance, denoiseprofile_draw_variance, self);
 
   // start building top level widget
 

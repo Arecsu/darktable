@@ -70,6 +70,11 @@ static GtkWidget *_last_expanded = NULL;
 static GtkWidget *_drop_widget = NULL;
 static GtkAllocation _start_pos = {0};
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+static void _expander_resize(GtkWidget *widget, GdkRectangle *allocation, gpointer user_data);
+static gboolean _expander_resize_idle(gpointer user_data);
+#endif
+
 static void _set_last_expanded(GtkWidget *widget)
 {
   if(_last_expanded)
@@ -141,6 +146,12 @@ void dtgtk_expander_set_expanded(GtkDarktableExpander *expander, gboolean expand
     // widget layout has not changed (e.g. module already visible and
     // expanded on the current tab).
     gtk_widget_queue_resize(GTK_WIDGET(expander));
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // GTK4: no size-allocate to re-trigger _expander_resize; kick it once
+    // the pending resize has settled.
+    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, _expander_resize_idle,
+                    g_object_ref(GTK_WIDGET(expander)), g_object_unref);
+#endif
   }
 }
 
@@ -150,6 +161,11 @@ gboolean dtgtk_expander_get_expanded(GtkDarktableExpander *expander)
 
   return expander->expanded;
 }
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+static void _expander_resize(GtkWidget *widget, GdkRectangle *allocation, gpointer user_data);
+static gboolean _expander_resize_idle(gpointer user_data);
+#endif
 
 static gboolean _expander_scroll(GtkWidget *widget, GdkFrameClock *frame_clock, gpointer user_data)
 {
@@ -356,6 +372,31 @@ static void dtgtk_expander_init(GtkDarktableExpander *expander)
 {
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: no "size-allocate" signal (and GtkBox's size_allocate vfunc is
+ * never called — the box uses an internal layout manager).  The revealer's
+ * notify::child-revealed fires when the reveal transition completes (or
+ * synchronously for instant reveals), i.e. exactly when the module's size
+ * has changed — the equivalent hook for the scroll-to-module logic. */
+static void _expander_reveal_changed(GObject *revealer,
+                                     GParamSpec *pspec,
+                                     gpointer user_data)
+{
+  GtkWidget *frame = gtk_revealer_get_child(GTK_REVEALER(revealer));
+  _expander_resize(GTK_WIDGET(user_data), NULL, frame);
+}
+
+/* navigation to an already-expanded module: child-revealed never changes,
+ * so kick the scroll once the pending resize has settled. */
+static gboolean _expander_resize_idle(gpointer user_data)
+{
+  GtkWidget *expander = user_data;
+  GtkWidget *frame = gtk_revealer_get_child(GTK_REVEALER(DTGTK_EXPANDER(expander)->frame));
+  _expander_resize(expander, NULL, frame);
+  return G_SOURCE_REMOVE;
+}
+#endif
+
 // public functions
 GtkWidget *dtgtk_expander_new(GtkWidget *header, GtkWidget *body)
 {
@@ -389,7 +430,12 @@ GtkWidget *dtgtk_expander_new(GtkWidget *header, GtkWidget *body)
   g_signal_connect(expander->header_evb, "drag-end", G_CALLBACK(_expander_drag_end), NULL);
   g_signal_connect(expander, "drag-leave", G_CALLBACK(_expander_drag_leave), NULL);
 #endif
+#if GTK_CHECK_VERSION(4, 0, 0)
+  g_signal_connect(expander->frame, "notify::child-revealed",
+                   G_CALLBACK(_expander_reveal_changed), expander);
+#else
   g_signal_connect(expander, "size-allocate", G_CALLBACK(_expander_resize), frame);
+#endif
 
   return GTK_WIDGET(expander);
 }

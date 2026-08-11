@@ -432,7 +432,7 @@ void gui_init(dt_iop_module_t *self)
 
   g->preview = dtgtk_drawing_area_new_with_height(0);
   g_signal_connect(G_OBJECT(g->preview), "size-allocate", G_CALLBACK(size_allocate_callback), self);
-  g_signal_connect(G_OBJECT(g->preview), "draw", G_CALLBACK(dt_iop_zonesystem_preview_draw), self);
+  dt_gui_connect_draw(g->preview, dt_iop_zonesystem_preview_draw, self);
   gtk_widget_add_events(GTK_WIDGET(g->preview), GDK_POINTER_MOTION_MASK
                                                 | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
                                                 | GDK_LEAVE_NOTIFY_MASK);
@@ -442,7 +442,7 @@ void gui_init(dt_iop_module_t *self)
   gtk_widget_set_tooltip_text(g->zones, _("lightness zones\nuse mouse scrollwheel to change the number of zones\n"
                                           "left-click on a border to create a marker\n"
                                           "right-click on a marker to delete it"));
-  g_signal_connect(G_OBJECT(g->zones), "draw", G_CALLBACK(dt_iop_zonesystem_bar_draw), self);
+  dt_gui_connect_draw(g->zones, dt_iop_zonesystem_bar_draw, self);
   gtk_widget_add_events(GTK_WIDGET(g->zones),
                         GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK
                         | GDK_BUTTON_RELEASE_MASK | GDK_LEAVE_NOTIFY_MASK

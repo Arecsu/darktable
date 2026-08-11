@@ -1785,7 +1785,7 @@ void gui_init(dt_iop_module_t *self)
   g_object_set_data(G_OBJECT(g->area), "iop-instance", self);
   dt_action_define_iop(self, NULL, N_("graph"),
                        GTK_WIDGET(g->area), &_action_def_equalizer);
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(area_draw), self);
+  dt_gui_connect_draw(g->area, area_draw, self);
   dt_gui_connect_click(g->area, area_button_press, area_button_release, self);
   dt_gui_connect_motion(g->area, area_motion_notify, area_enter_notify, area_leave_notify, self);
   dt_gui_connect_scroll(g->area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES

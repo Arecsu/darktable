@@ -529,7 +529,11 @@ void dt_control_cleanup(const gboolean withgui)
 void dt_control_configure(const int width, const int height)
 {
   // re-configure all components:
-  dt_view_manager_configure(darktable.view_manager, width, height);
+  // GTK4 fires "resize" eagerly during startup (splash screen), before the
+  // view manager exists — GTK3's configure-event only fired once the window
+  // was mapped, after dt_init had created it.
+  if(darktable.view_manager)
+    dt_view_manager_configure(darktable.view_manager, width, height);
 }
 
 void dt_control_draw_busy_msg(cairo_t *cr, int width, int height)

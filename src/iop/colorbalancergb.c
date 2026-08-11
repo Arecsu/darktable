@@ -1971,7 +1971,7 @@ void gui_init(dt_iop_module_t *self)
                                                "plugins/darkroom/colorbalancergb/graphheight"));
   g_object_set_data(G_OBJECT(g->area), "iop-instance", self);
   dt_action_define_iop(self, NULL, N_("graph"), GTK_WIDGET(g->area), NULL);
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(dt_iop_tonecurve_draw), self);
+  dt_gui_connect_draw(g->area, dt_iop_tonecurve_draw, self);
   dt_gui_box_add(self->widget, GTK_WIDGET(g->area));
 
   g->shadows_weight = dt_bauhaus_slider_from_params(self, "shadows_weight");

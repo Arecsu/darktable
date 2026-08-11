@@ -1043,8 +1043,7 @@ void gui_init(dt_iop_module_t *self)
   gtk_widget_set_tooltip_text(GTK_WIDGET(g->area),
                               _("drag handles to set black, gray, and white points. "
                                 "operates on L channel."));
-  g_signal_connect(G_OBJECT(g->area), "draw",
-                   G_CALLBACK(_area_draw_callback), self);
+  dt_gui_connect_draw(g->area, _area_draw_callback, self);
   dt_gui_connect_click(g->area, _area_button_press_callback, _area_button_release_callback, self);
   dt_gui_connect_motion(g->area, _area_motion_notify_callback, NULL, _area_leave_notify_callback, self);
   dt_gui_connect_scroll(g->area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES

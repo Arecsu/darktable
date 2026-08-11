@@ -1688,7 +1688,7 @@ static void init_image(dt_lut_t *self, image_t *image, void (*motion_cb)(GtkEven
   gtk_widget_add_events(image->drawing_area,
                         GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK);
   g_signal_connect(image->drawing_area, "resize", G_CALLBACK(size_allocate_callback), image);
-  g_signal_connect(image->drawing_area, "draw", G_CALLBACK(draw_image_callback), image);
+  dt_gui_connect_draw(image->drawing_area, draw_image_callback, image);
   dt_gui_connect_motion(image->drawing_area, motion_cb, NULL, NULL, self);
 }
 

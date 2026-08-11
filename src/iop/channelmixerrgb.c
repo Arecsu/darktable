@@ -4477,8 +4477,7 @@ void gui_init(dt_iop_module_t *self)
      _("this is the color of the scene illuminant before chromatic adaptation\n"
        "this color will be turned into pure white by the adaptation."));
 
-  g_signal_connect(G_OBJECT(g->illum_color), "draw",
-                   G_CALLBACK(_illuminant_color_draw), self);
+  dt_gui_connect_draw(g->illum_color, _illuminant_color_draw, self);
 
   g->color_picker = dt_color_picker_new(self, DT_COLOR_PICKER_AREA, NULL);
   dt_action_define_iop(self, NULL, N_("picker"), g->color_picker, &dt_action_def_color_picker);
@@ -4565,8 +4564,7 @@ void gui_init(dt_iop_module_t *self)
   gtk_widget_set_vexpand(g->origin_spot, TRUE);
   gtk_widget_set_tooltip_text(GTK_WIDGET(g->origin_spot),
                               _("the input color that should be mapped to the target"));
-  g_signal_connect(G_OBJECT(g->origin_spot), "draw",
-                   G_CALLBACK(_origin_color_draw), self);
+  dt_gui_connect_draw(g->origin_spot, _origin_color_draw, self);
 
   g->Lch_origin = gtk_label_new(_("L: \tN/A\nh: \tN/A\nc: \tN/A"));
   gtk_widget_set_tooltip_text
@@ -4577,7 +4575,7 @@ void gui_init(dt_iop_module_t *self)
   gtk_widget_set_size_request(g->target_spot, -1, DT_PIXEL_APPLY_DPI(darktable.bauhaus->quad_width));
   gtk_widget_set_tooltip_text(GTK_WIDGET(g->target_spot),
                               _("the desired target color after mapping"));
-  g_signal_connect(G_OBJECT(g->target_spot), "draw", G_CALLBACK(_target_color_draw), self);
+  dt_gui_connect_draw(g->target_spot, _target_color_draw, self);
 
   g->lightness_spot = dt_bauhaus_slider_new_with_range(self, 0., LIGHTNESS_MAX, 0, 0, 1);
   dt_bauhaus_widget_set_label(g->lightness_spot, N_("mapping"), N_("lightness"));

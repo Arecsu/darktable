@@ -1541,8 +1541,7 @@ void gui_init(dt_iop_module_t *self)
 
   // custom 24-patch widget in addition to combo box
   g->area = dtgtk_drawing_area_new_with_aspect_ratio(4.0/6.0);
-  g_signal_connect(G_OBJECT(g->area), "draw",
-                   G_CALLBACK(checker_draw), self);
+  dt_gui_connect_draw(g->area, checker_draw, self);
   dt_gui_connect_click_all(g->area, checker_button_press, NULL, self);
   dt_gui_connect_motion(g->area, checker_motion_notify, NULL, NULL, self);
 

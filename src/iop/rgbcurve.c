@@ -1521,8 +1521,7 @@ void gui_init(dt_iop_module_t *self)
   // to reset curve"));
 
   gtk_widget_set_can_focus(GTK_WIDGET(g->area), TRUE);
-  g_signal_connect(G_OBJECT(g->area), "draw",
-                   G_CALLBACK(_area_draw_callback), self);
+  dt_gui_connect_draw(g->area, _area_draw_callback, self);
   gtk_widget_add_events(GTK_WIDGET(g->area),
                         GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK
                         | GDK_BUTTON_RELEASE_MASK

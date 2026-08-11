@@ -911,7 +911,7 @@ void gui_init(dt_iop_module_t *self)
 
   GtkWidget *box_raw = self->widget = dt_gui_vbox(g->channel_tabs, g->area);
 
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(rawdenoise_draw), self);
+  dt_gui_connect_draw(g->area, rawdenoise_draw, self);
   dt_gui_connect_click(g->area, rawdenoise_button_press, rawdenoise_button_release, self);
   dt_gui_connect_motion(g->area, rawdenoise_motion_notify, NULL, rawdenoise_leave_notify, self);
   dt_gui_connect_scroll(g->area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES

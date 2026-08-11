@@ -551,7 +551,7 @@ void gui_init(dt_iop_module_t *self)
   gtk_widget_set_tooltip_text(GTK_WIDGET(g->area), _("drag and scroll mouse wheel to adjust the virtual color filter"));
   dt_action_define_iop(self, NULL, N_("grid"), GTK_WIDGET(g->area), NULL);
 
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(_monochrome_draw), self);
+  dt_gui_connect_draw(g->area, _monochrome_draw, self);
   gtk_widget_add_events(GTK_WIDGET(g->area),
                         GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK
                         | GDK_BUTTON_RELEASE_MASK | GDK_LEAVE_NOTIFY_MASK

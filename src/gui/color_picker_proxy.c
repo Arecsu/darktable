@@ -122,6 +122,11 @@ static void _color_picker_reset(dt_iop_color_picker_t *picker)
 void dt_iop_color_picker_reset(dt_iop_module_t *module,
                                const gboolean keep)
 {
+  // GTK4: GtkNotebook emits "switch-page" while the notebook is being
+  // destroyed, and darktable destroys a probe instance of every iop during
+  // dt_iop_load_modules_so() — before darktable.lib exists.
+  if(!darktable.lib)
+    return;
   dt_iop_color_picker_t *picker = darktable.lib->proxy.colorpicker.picker_proxy;
   if(picker && picker->module == module)
   {

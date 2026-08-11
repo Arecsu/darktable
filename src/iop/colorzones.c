@@ -2703,8 +2703,7 @@ void gui_init(dt_iop_module_t *self)
   g_object_set_data(G_OBJECT(g->area), "iop-instance", self);
   dt_action_define_iop(self, NULL, N_("graph"), GTK_WIDGET(g->area), &_action_def_zones);
   gtk_widget_set_can_focus(GTK_WIDGET(g->area), TRUE);
-  g_signal_connect(G_OBJECT(g->area), "draw",
-                   G_CALLBACK(_area_draw_callback), self);
+  dt_gui_connect_draw(g->area, _area_draw_callback, self);
   gtk_widget_add_events(GTK_WIDGET(g->area),
                         GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK
                         | GDK_BUTTON_RELEASE_MASK | GDK_KEY_PRESS_MASK
@@ -2717,8 +2716,7 @@ void gui_init(dt_iop_module_t *self)
                         _area_scrolled_callback, self);
   dt_gui_connect_key(g->area, _area_key_press_callback, self);
 
-  g_signal_connect(G_OBJECT(g->bottom_area), "draw",
-                   G_CALLBACK(_bottom_area_draw_callback), self);
+  dt_gui_connect_draw(g->bottom_area, _bottom_area_draw_callback, self);
   gtk_widget_add_events(GTK_WIDGET(g->bottom_area), GDK_BUTTON_PRESS_MASK);
   dt_gui_connect_click(g->bottom_area, _bottom_area_button_press_callback, NULL, self);
 

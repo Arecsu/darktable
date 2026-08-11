@@ -1123,7 +1123,7 @@ void dt_bauhaus_init()
                    "moved-to-rect", G_CALLBACK(_window_moved_to_rect), NULL);
 #endif
   g_signal_connect(window, "show", G_CALLBACK(_window_show), area);
-  g_signal_connect(area, "draw", G_CALLBACK(_popup_draw), NULL);
+  dt_gui_connect_draw(area, _popup_draw, NULL);
   dt_gui_connect_motion(pop->window, _window_motion_handler, NULL, NULL, NULL);
   dt_gui_connect_motion(area, NULL, NULL, _popup_leave_cb, NULL);
   dt_gui_connect_key(area, _popup_key_press, NULL);

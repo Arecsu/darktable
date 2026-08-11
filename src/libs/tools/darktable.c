@@ -93,11 +93,16 @@ void gui_init(dt_lib_module_t *self)
   self->data = (void *)d;
 
   /* create drawing area */
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: the logo was drawn via the box's "draw" signal, which GTK4
+   * removed; the widget is a GtkDrawingArea with the same draw func. */
+  self->widget = gtk_drawing_area_new();
+#else
   self->widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+#endif
 
   /* connect callbacks */
-  g_signal_connect(G_OBJECT(self->widget), "draw",
-                   G_CALLBACK(_lib_darktable_draw_callback), self);
+  dt_gui_connect_draw(self->widget, _lib_darktable_draw_callback, self);
   dt_gui_connect_click(self->widget, _lib_darktable_clicked, NULL, self);
 
   /* create a cairo surface of dt icon */

@@ -1400,12 +1400,18 @@ void gui_init(dt_lib_module_t *self)
   /* creating drawing area */
   self->widget = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
-  /* creating timeline box*/
+  /* creating timeline box: GTK4 has no "draw" signal on plain widgets, so
+   * the timeline strip (which is drawn entirely by _lib_timeline_draw_callback)
+   * is a GtkDrawingArea. */
+#if GTK_CHECK_VERSION(4, 0, 0)
+  d->timeline = gtk_drawing_area_new();
+#else
   d->timeline = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+#endif
 
   gtk_widget_add_events(d->timeline, 0);
 
-  g_signal_connect(G_OBJECT(d->timeline), "draw", G_CALLBACK(_lib_timeline_draw_callback), self);
+  dt_gui_connect_draw(d->timeline, _lib_timeline_draw_callback, self);
   dt_gui_connect_click_all(d->timeline, _lib_timeline_button_press_callback, _lib_timeline_button_release_callback, self);
   dt_gui_connect_motion(d->timeline, _lib_timeline_motion_notify_cb, NULL, _lib_timeline_mouse_leave_cb, self);
   dt_gui_connect_scroll(d->timeline, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES

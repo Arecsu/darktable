@@ -324,6 +324,9 @@ static int _process_xtrans(const dt_iop_hotpixels_data_t *data,
   return fixed;
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+static gboolean _update_fixed_label_idle(gpointer user_data);
+#endif
 void process(dt_iop_module_t *self, dt_dev_pixelpipe_iop_t *piece, const void *const ivoid,
              void *const ovoid, const dt_iop_roi_t *const roi_in, const dt_iop_roi_t *const roi_out)
 {
@@ -352,6 +355,9 @@ void process(dt_iop_module_t *self, dt_dev_pixelpipe_iop_t *piece, const void *c
   if(g && self->dev->gui_attached && dt_pipe_is_full(piece->pipe))
   {
     g->pixels_fixed = fixed;
+#if GTK_CHECK_VERSION(4, 0, 0)
+    g_idle_add(_update_fixed_label_idle, g);
+#endif
   }
 }
 
@@ -414,12 +420,9 @@ void gui_update(dt_iop_module_t *self)
   gtk_stack_set_visible_child_name(GTK_STACK(self->widget), self->hide_enable_button ? "non_raw" : "raw");
 }
 
-static gboolean draw(GtkWidget *widget, cairo_t *cr, dt_iop_module_t *self)
+static void _update_fixed_label(dt_iop_hotpixels_gui_data_t *g)
 {
-  dt_iop_hotpixels_gui_data_t *g = self->gui_data;
-  DT_GUARD_GUI_UPDATE(FALSE);
-
-  if(g->pixels_fixed < 0) return FALSE;
+  if(g->pixels_fixed < 0) return;
 
   char *str = g_strdup_printf(ngettext("fixed %d pixel", "fixed %d pixels", g->pixels_fixed), g->pixels_fixed);
   g->pixels_fixed = -1;
@@ -429,9 +432,30 @@ static gboolean draw(GtkWidget *widget, cairo_t *cr, dt_iop_module_t *self)
   DT_LEAVE_GUI_UPDATE();
 
   g_free(str);
+}
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: the label update was bridged to the GUI thread by the module box's
+ * "draw" signal in GTK3; an idle does the same job from the process thread. */
+static gboolean _update_fixed_label_idle(gpointer user_data)
+{
+  dt_iop_hotpixels_gui_data_t *g = user_data;
+  _update_fixed_label(g);
+  return G_SOURCE_REMOVE;
+}
+#endif
+
+#if !GTK_CHECK_VERSION(4, 0, 0)
+static gboolean draw(GtkWidget *widget, cairo_t *cr, dt_iop_module_t *self)
+{
+  dt_iop_hotpixels_gui_data_t *g = self->gui_data;
+  DT_GUARD_GUI_UPDATE(FALSE);
+
+  _update_fixed_label(g);
 
   return FALSE;
 }
+#endif
 
 void gui_init(dt_iop_module_t *self)
 {
@@ -440,7 +464,9 @@ void gui_init(dt_iop_module_t *self)
   g->pixels_fixed = -1;
 
   GtkWidget *box_raw = self->widget = dt_gui_vbox();
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(box_raw), "draw", G_CALLBACK(draw), self);
+#endif
 
   g->threshold = dt_bauhaus_slider_from_params(self, N_("threshold"));
   dt_bauhaus_slider_set_digits(g->threshold, 4);

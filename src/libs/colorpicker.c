@@ -632,8 +632,7 @@ static void _add_sample(GtkButton *widget,
        "right-click to load sample area into active color picker"));
   gtk_widget_add_events(sample->color_patch, GDK_BUTTON_PRESS_MASK);
   dt_gui_connect_click_all(sample->color_patch, _live_sample_button_cb, NULL, sample);
-  g_signal_connect(G_OBJECT(sample->color_patch), "draw",
-                   G_CALLBACK(_sample_draw_callback), sample);
+  dt_gui_connect_draw(sample->color_patch, _sample_draw_callback, sample);
 
   GtkWidget *color_patch_wrapper = dt_gui_hbox(dt_gui_expand(sample->color_patch));
   gtk_widget_set_name(color_patch_wrapper, "live-sample");
@@ -734,8 +733,7 @@ void gui_init(dt_lib_module_t *self)
   GtkWidget *color_patch = gtk_drawing_area_new();
   data->large_color_patch = color_patch;
   gtk_widget_set_tooltip_text(color_patch, _("click to (un)hide large color patch"));
-  g_signal_connect(G_OBJECT(color_patch), "draw",
-                   G_CALLBACK(_sample_draw_callback), &data->primary_sample);
+  dt_gui_connect_draw(color_patch, _sample_draw_callback, &data->primary_sample);
   gtk_widget_set_events(color_patch,
                         GDK_BUTTON_PRESS_MASK
                         | GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK);
@@ -787,8 +785,7 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_tooltip_text(color_patch, _("click to (un)hide large color patch"));
   gtk_widget_set_events(color_patch, GDK_BUTTON_PRESS_MASK);
   dt_gui_connect_click(color_patch, _large_patch_toggle_cb, NULL, data);
-  g_signal_connect(G_OBJECT(color_patch), "draw",
-                   G_CALLBACK(_sample_draw_callback), &data->primary_sample);
+  dt_gui_connect_draw(color_patch, _sample_draw_callback, &data->primary_sample);
 
   GtkWidget *sample_patch_wrapper = dt_gui_hbox(dt_gui_expand(color_patch));
   gtk_widget_set_name(sample_patch_wrapper, "live-sample");

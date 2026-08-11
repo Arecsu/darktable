@@ -799,6 +799,7 @@ void dt_lib_init_presets(dt_lib_module_t *module)
   sqlite3_finalize(stmt);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _lib_draw_callback(GtkWidget *widget,
                                    gpointer cr,
                                    dt_lib_module_t *self)
@@ -807,11 +808,32 @@ static gboolean _lib_draw_callback(GtkWidget *widget,
 
   return FALSE;
 }
+#else
+static void _lib_map_callback(GtkWidget *widget, gpointer user_data)
+{
+  // GTK4: no "draw" signal to hook the lazy gui_update onto; "map" covers
+  // the initial show (updates after that go through dt_lib_gui_queue_update,
+  // which schedules an idle instead of relying on a draw).
+  dt_lib_gui_update(user_data);
+}
+
+static gboolean _lib_queue_update_idle(gpointer user_data)
+{
+  dt_lib_gui_update(user_data);
+  return G_SOURCE_REMOVE;
+}
+#endif
 
 void dt_lib_gui_queue_update(dt_lib_module_t *module)
 {
   module->gui_uptodate = FALSE;
   gtk_widget_queue_draw(module->widget);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK3 relied on the widget's next draw to run the deferred update; with
+  // no draw signal the idle preserves the main-loop deferral.
+  g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, _lib_queue_update_idle,
+                  module, NULL);
+#endif
 }
 
 void dt_lib_gui_update(dt_lib_module_t *module)
@@ -854,8 +876,13 @@ static void dt_lib_init_module(void *m)
     if(module->widget)
     {
       g_object_ref_sink(module->widget);
+#if GTK_CHECK_VERSION(4, 0, 0)
+      g_signal_connect(G_OBJECT(module->widget), "map",
+                       G_CALLBACK(_lib_map_callback), module);
+#else
       g_signal_connect(G_OBJECT(module->widget), "draw",
                        G_CALLBACK(_lib_draw_callback), module);
+#endif
     }
   }
 }

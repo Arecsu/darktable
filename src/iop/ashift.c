@@ -6132,7 +6132,7 @@ void gui_init(dt_iop_module_t *self)
                     dt_gui_connect_click(g->structure_lines, _event_structure_lines_clicked, NULL, self));
   g_object_set_data(G_OBJECT(g->structure_auto), DT_ACTION_GESTURE_KEY,
                     dt_gui_connect_click(g->structure_auto, _event_structure_auto_clicked, NULL, self));
-  g_signal_connect(G_OBJECT(self->widget), "draw", G_CALLBACK(_event_draw), self);
+  dt_gui_connect_draw(self->widget, _event_draw, self);
 
   dt_action_define_iop(self, N_("fit"),
                        N_("vertical"), g->fit_v, &dt_action_def_button);

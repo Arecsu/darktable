@@ -70,6 +70,20 @@ int position(const dt_lib_module_t *self)
   return 1001;
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+static void _lib_filmstrip_map_callback(GtkWidget *widget, gpointer user_data)
+{
+  // GTK4: no "draw" signal on the container box; the "parent the thumbtable
+  // into the filmstrip on first show" kick moves to "map".
+  if(!gtk_widget_get_first_child(widget))
+  {
+    dt_thumbtable_t *tt = dt_ui_thumbtable(darktable.gui->ui);
+    dt_thumbtable_set_parent(tt, widget, DT_THUMBTABLE_MODE_FILMSTRIP);
+    gtk_widget_show(widget);
+    gtk_widget_show(tt->widget);
+  }
+}
+#else
 static gboolean _lib_filmstrip_draw_callback(GtkWidget *widget,
                                              cairo_t *wcr,
                                              gpointer user_data)
@@ -85,6 +99,7 @@ static gboolean _lib_filmstrip_draw_callback(GtkWidget *widget,
   }
   return FALSE;
 }
+#endif
 
 static void _filmstrip_center(dt_action_t *action)
 {
@@ -135,8 +150,13 @@ void gui_init(dt_lib_module_t *self)
   self->widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
   /* connect callbacks */
+#if GTK_CHECK_VERSION(4, 0, 0)
+  g_signal_connect(G_OBJECT(self->widget), "map",
+                   G_CALLBACK(_lib_filmstrip_map_callback), self);
+#else
   g_signal_connect(G_OBJECT(self->widget), "draw",
                    G_CALLBACK(_lib_filmstrip_draw_callback), self);
+#endif
 
   /* initialize view manager proxy */
   darktable.view_manager->proxy.filmstrip.module = self;

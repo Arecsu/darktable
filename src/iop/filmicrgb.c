@@ -4332,7 +4332,7 @@ void gui_init(dt_iop_module_t *self)
   dt_action_define_iop(self, NULL, N_("graph"), GTK_WIDGET(g->area), NULL);
 
   gtk_widget_set_can_focus(GTK_WIDGET(g->area), TRUE);
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(dt_iop_tonecurve_draw), self);
+  dt_gui_connect_draw(g->area, dt_iop_tonecurve_draw, self);
   dt_gui_connect_click_all(g->area, area_button_press, NULL, self);
   dt_gui_connect_motion(g->area, area_motion_notify, area_enter_notify, area_leave_notify, self);
 

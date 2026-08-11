@@ -1396,7 +1396,7 @@ static GtkWidget *_create_swatch(dt_iop_module_t *self, const int index)
   GtkWidget *swatch = gtk_drawing_area_new();
   gtk_widget_set_size_request(swatch, DT_PIXEL_APPLY_DPI(24), DT_PIXEL_APPLY_DPI(24));
   g_object_set_data(G_OBJECT(swatch), "swatch-index", GINT_TO_POINTER(index));
-  g_signal_connect(G_OBJECT(swatch), "draw", G_CALLBACK(_swatch_draw_callback), self);
+  dt_gui_connect_draw(swatch, _swatch_draw_callback, self);
   return swatch;
 }
 

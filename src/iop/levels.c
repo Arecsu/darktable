@@ -636,7 +636,7 @@ void gui_init(dt_iop_module_t *self)
                                                     "operates on L channel."));
   dt_action_define_iop(self, NULL, N_("levels"), GTK_WIDGET(g->area), NULL);
 
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(dt_iop_levels_area_draw), self);
+  dt_gui_connect_draw(g->area, dt_iop_levels_area_draw, self);
   dt_gui_connect_click(g->area, dt_iop_levels_button_press, dt_iop_levels_button_release, self);
   dt_gui_connect_motion(g->area, dt_iop_levels_motion_notify, NULL, dt_iop_levels_leave_notify, self);
   dt_gui_connect_scroll(g->area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES

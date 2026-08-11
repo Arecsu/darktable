@@ -1385,6 +1385,7 @@ static void _lighttable_expose_empty(cairo_t *cr,
   g_object_unref(layout);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _event_draw(GtkWidget *widget,
                             cairo_t *cr,
                             dt_thumbtable_t *table)
@@ -1413,6 +1414,16 @@ static gboolean _event_draw(GtkWidget *widget,
     dt_thumbtable_full_redraw(table, FALSE);
   return FALSE; // let's propagate this event
 }
+#else
+/* GTK4: no "draw" signal; the "widget is really ready" kick moves to "map"
+ * (fires after allocation on show).  The empty state is drawn by the
+ * container's snapshot vfunc. */
+static void _event_map(GtkWidget *widget, gpointer user_data)
+{
+  dt_thumbtable_t *table = (dt_thumbtable_t *)user_data;
+  dt_thumbtable_full_redraw(table, FALSE);
+}
+#endif
 
 static void _event_leave_cb(GtkEventControllerMotion *controller,
                               dt_thumbtable_t *table)
@@ -2633,12 +2644,81 @@ static void _event_dnd_end(GtkWidget *widget,
 }
 #endif /* !GTK_CHECK_VERSION(4,0,0) */
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: the empty lighttable state (background, help text and module lines)
+ * was drawn via the GtkFixed container's "draw" signal in GTK3, which GTK4
+ * removed.  The container is therefore a GtkFixed subclass whose snapshot
+ * vfunc paints the empty state on top of the (empty) child list.  The
+ * "manual here" link rectangle is computed there too, exactly as GTK3 did
+ * during draw. */
+typedef struct _DtThumbtableFixed DtThumbtableFixed;
+typedef struct _DtThumbtableFixedClass DtThumbtableFixedClass;
+
+struct _DtThumbtableFixed
+{
+  GtkFixed fixed;
+  dt_thumbtable_t *table;
+};
+
+struct _DtThumbtableFixedClass
+{
+  GtkFixedClass parent;
+};
+
+G_DEFINE_TYPE(DtThumbtableFixed, dt_thumbtable_fixed, GTK_TYPE_FIXED)
+
+static void dt_thumbtable_fixed_snapshot(GtkWidget *widget,
+                                         GtkSnapshot *snapshot)
+{
+  GTK_WIDGET_CLASS(dt_thumbtable_fixed_parent_class)->snapshot(widget, snapshot);
+
+  DtThumbtableFixed *fixed = (DtThumbtableFixed *)widget;
+  dt_thumbtable_t *table = fixed->table;
+  if(!table) return;
+
+  // thumbnails cover the whole view; only the empty state draws here
+  if(darktable.collection && dt_collection_get_count(darktable.collection) > 0)
+    return;
+
+  const int width = gtk_widget_get_width(widget);
+  const int height = gtk_widget_get_height(widget);
+  if(width <= 0 || height <= 0) return;
+
+  cairo_t *cr = gtk_snapshot_append_cairo(snapshot, &(const graphene_rect_t){
+    .origin = { 0, 0 },
+    .size = { width, height } });
+  _lighttable_expose_empty(cr, width, height,
+                           table->mode != DT_THUMBTABLE_MODE_FILMSTRIP ? table : NULL);
+  cairo_destroy(cr);
+}
+
+static void dt_thumbtable_fixed_class_init(DtThumbtableFixedClass *klass)
+{
+  GTK_WIDGET_CLASS(klass)->snapshot = dt_thumbtable_fixed_snapshot;
+}
+
+static void dt_thumbtable_fixed_init(DtThumbtableFixed *self)
+{
+  self->table = NULL;
+}
+#endif
+
 static void _thumbtable_init_accels();
 
 dt_thumbtable_t *dt_thumbtable_new()
 {
   dt_thumbtable_t *table = calloc(1, sizeof(dt_thumbtable_t));
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: no "draw" signal on the GtkFixed container; the empty lighttable
+   * state (help text + module lines) is drawn in the container's snapshot
+   * vfunc instead, and the first-draw "widget is really ready" kick is a
+   * "map" hook. */
+  table->widget = g_object_new(dt_thumbtable_fixed_get_type(), NULL);
+  DtThumbtableFixed *fixed = (DtThumbtableFixed *)table->widget;
+  fixed->table = table;
+#else
   table->widget = gtk_fixed_new();
+#endif
   dt_gui_add_help_link(table->widget, "lighttable_filemanager");
 
   // get thumb generation pref for reference in case of change
@@ -2704,8 +2784,15 @@ dt_thumbtable_t *dt_thumbtable_new()
 
   dt_gui_connect_scroll(table->widget, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES,
                         _event_scroll, table);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: first-draw "widget is really ready" kick -> "map"; the empty
+  // state is painted by the container's snapshot vfunc (see above).
+  g_signal_connect(G_OBJECT(table->widget), "map",
+                   G_CALLBACK(_event_map), table);
+#else
   g_signal_connect(G_OBJECT(table->widget), "draw",
                    G_CALLBACK(_event_draw), table);
+#endif
   dt_gui_connect_motion(table->widget, _event_motion_notify_cb, _event_enter_cb, _event_leave_cb, table);
   dt_gui_connect_click_all(table->widget, _event_button_press_cb, _event_button_release_cb, table);
 

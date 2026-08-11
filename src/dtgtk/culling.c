@@ -826,6 +826,7 @@ static void _event_scroll(GtkEventControllerScroll *controller,
 #endif
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _event_draw(GtkWidget *widget,
                             cairo_t *cr,
                             gpointer user_data)
@@ -845,6 +846,18 @@ static gboolean _event_draw(GtkWidget *widget,
   dt_culling_full_redraw(table, FALSE);
   return FALSE; // let's propagate this event
 }
+#endif
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: no "draw" signal on the GtkFixed container; the first-draw "the
+ * widget is really ready" kick moves to "map" (fires after allocation on
+ * show), and the container background is handled by CSS. */
+static void _event_map(GtkWidget *widget, gpointer user_data)
+{
+  dt_culling_t *table = (dt_culling_t *)user_data;
+  dt_culling_full_redraw(table, FALSE);
+}
+#endif
 
 static void _event_leave_cb(GtkEventControllerMotion *controller,
                               dt_culling_t *table)
@@ -1335,8 +1348,12 @@ dt_culling_t *dt_culling_new(const dt_culling_mode_t mode)
 
   dt_gui_connect_scroll(table->widget, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES,
                         _event_scroll, table);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  g_signal_connect(G_OBJECT(table->widget), "map", G_CALLBACK(_event_map), table);
+#else
   g_signal_connect(G_OBJECT(table->widget), "draw",
                    G_CALLBACK(_event_draw), table);
+#endif
   dt_gui_connect_motion(table->widget, _event_motion_notify_cb, _event_enter_cb, _event_leave_cb, table);
   dt_gui_connect_click_all(table->widget, _event_button_press_cb, _event_button_release_cb, table);
 

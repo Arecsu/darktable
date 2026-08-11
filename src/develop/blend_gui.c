@@ -591,7 +591,7 @@ static void _add_wrapped_box(GtkWidget *container,
   // (the click-to-help cursor filter is GTK3-only anyway, see
   // global_toolbox.c).  All callers pass a GtkBox.
   GtkWidget *revealer = gtk_revealer_new();
-  gtk_box_append(GTK_BOX(revealer), GTK_WIDGET(box));
+  gtk_revealer_set_child(GTK_REVEALER(revealer), GTK_WIDGET(box));
   gtk_box_append(GTK_BOX(container), revealer);
   if(help_url) dt_gui_add_help_link(revealer, help_url);
 #else

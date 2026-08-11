@@ -2530,8 +2530,7 @@ void gui_init(dt_iop_module_t *self)
        "top line indicates that the scale is visible at current zoom level\n"
        "bottom line indicates that the scale has shapes on it"));
 
-  g_signal_connect(G_OBJECT(g->wd_bar), "draw",
-                   G_CALLBACK(rt_wdbar_draw), self);
+  dt_gui_connect_draw(g->wd_bar, rt_wdbar_draw, self);
   dt_gui_connect_click(g->wd_bar, rt_wdbar_button_press, rt_wdbar_button_release, self);
   dt_gui_connect_motion(g->wd_bar, rt_wdbar_motion_notify, NULL, rt_wdbar_leave_notify, self);
   dt_gui_connect_scroll(g->wd_bar, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES

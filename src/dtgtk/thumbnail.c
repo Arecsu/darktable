@@ -1538,8 +1538,7 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
     gtk_widget_set_valign(thumb->w_image, GTK_ALIGN_CENTER);
     gtk_widget_set_halign(thumb->w_image, GTK_ALIGN_CENTER);
     // the size will be defined at the end, inside dt_thumbnail_resize
-    g_signal_connect(G_OBJECT(thumb->w_image), "draw",
-                     G_CALLBACK(_event_image_draw), thumb);
+    dt_gui_connect_draw(thumb->w_image, _event_image_draw, thumb);
     dt_gui_connect_motion(thumb->w_image, _event_main_motion_cb, _event_image_enter_cb, _event_image_leave_cb, thumb);
     g_signal_connect(G_OBJECT(thumb->w_image), "style-updated",
                      G_CALLBACK(_event_image_style_updated), thumb);
@@ -1552,8 +1551,7 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
     gtk_widget_set_name(thumb->w_cursor, "thumb-cursor");
     gtk_widget_set_valign(thumb->w_cursor, GTK_ALIGN_START);
     gtk_widget_set_halign(thumb->w_cursor, GTK_ALIGN_CENTER);
-    g_signal_connect(G_OBJECT(thumb->w_cursor), "draw",
-                     G_CALLBACK(_event_cursor_draw), thumb);
+    dt_gui_connect_draw(thumb->w_cursor, _event_cursor_draw, thumb);
     gtk_overlay_add_overlay(GTK_OVERLAY(thumb->w_main), thumb->w_cursor);
 
     // determine the overlays parents

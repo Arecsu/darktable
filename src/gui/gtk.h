@@ -722,6 +722,22 @@ void dt_gui_gesture_claim(GtkGesture *gesture,
                           GdkEventSequence *sequence,
                           gpointer user_data);
 
+/* GTK3 "draw" signal shim.  GTK4 removed the per-widget "draw" signal;
+ * GtkDrawingArea-derived widgets draw via gtk_drawing_area_set_draw_func()
+ * instead.  For GtkDrawingArea widgets this installs the GTK3-style callback
+ * (GtkWidget *, cairo_t *, user_data) as the area's draw func; for any other
+ * widget it warns and returns 0 (those call sites must provide a GTK4
+ * alternative: a "map" hook for update hooks, or a real GtkDrawingArea). */
+typedef gboolean (*dt_gui_draw_callback_t)(GtkWidget *widget,
+                                           cairo_t *cr,
+                                           gpointer user_data);
+gulong dt_gui_connect_draw(GtkWidget *widget,
+                           dt_gui_draw_callback_t callback,
+                           gpointer user_data);
+#define dt_gui_connect_draw(widget, callback, data) ( \
+  ASSERT_FUNC_TYPE(callback, gboolean(*)(GtkWidget *, cairo_t *, __typeof__(data))), \
+  dt_gui_connect_draw(GTK_WIDGET(widget), (dt_gui_draw_callback_t)(callback), (data)))
+
 GtkGesture *(dt_gui_connect_drag)(GtkWidget *widget,
                                   GCallback drag_begin,
                                   GCallback drag_end,
