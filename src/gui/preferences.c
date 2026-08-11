@@ -537,19 +537,21 @@ static void init_tab_general(GtkWidget *dialog,
                    G_CALLBACK(save_usercss_callback), tw);
   g_signal_connect(G_OBJECT(dialog), "response",
                    G_CALLBACK(usercss_dialog_callback), tw);
-  gtk_box_append(GTK_BOX(hbox), tw->save_button);
-  gtk_box_append(GTK_BOX(usercssbox), hbox);
-  gtk_widget_set_valign(hbox, GTK_ALIGN_START);
-  gtk_widget_set_tooltip_text(tw->save_button,
-                              _("click to save and apply the CSS tweaks"
-                                " entered in this editor"));
   GtkWidget *button = gtk_button_new_with_label(_("?"));
   gtk_widget_set_tooltip_text(button, _("open help page for CSS tweaks"));
   dt_gui_add_help_link(button, "css_tweaks");
   g_signal_connect(button, "clicked",
                    G_CALLBACK(dt_gui_show_help), NULL);
+  /* GTK3 packed both buttons with pack_end() (visual: [?][save], right
+   * edge); append in that order and right-align the row. */
   gtk_box_append(GTK_BOX(hbox), button);
-  gtk_widget_set_halign(button, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(hbox), tw->save_button);
+  gtk_widget_set_halign(hbox, GTK_ALIGN_END);
+  gtk_box_append(GTK_BOX(usercssbox), hbox);
+  gtk_widget_set_valign(hbox, GTK_ALIGN_START);
+  gtk_widget_set_tooltip_text(tw->save_button,
+                              _("click to save and apply the CSS tweaks"
+                                " entered in this editor"));
 
   //set textarea text from file or default
   char usercsspath[PATH_MAX] = { 0 }, configdir[PATH_MAX] = { 0 };
@@ -1032,6 +1034,10 @@ static void init_tab_presets(GtkWidget *stack)
 
   GtkWidget *search_presets = gtk_search_entry_new();
   gtk_box_append(GTK_BOX(hbox), search_presets);
+  /* GTK3 packed the buttons with pack_end() in the call order import,
+   * export, "?", which renders right-to-left: [?][export][import] hugging
+   * the right edge; the search entry absorbs the middle space. */
+  gtk_widget_set_hexpand(search_presets, TRUE);
   gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search_presets), _("search presets list"));
   gtk_widget_set_tooltip_text
     (GTK_WIDGET(search_presets),
@@ -1050,21 +1056,20 @@ static void init_tab_presets(GtkWidget *stack)
 #endif
   gtk_tree_view_set_search_entry(tree, GTK_EDITABLE(search_presets));
 
-  GtkWidget *button = gtk_button_new_with_label(C_("preferences", "import..."));
+  GtkWidget *button = gtk_button_new_with_label(_("?"));
+  dt_gui_add_help_link(button, "presets");
+  g_signal_connect(button, "clicked", G_CALLBACK(dt_gui_show_help), NULL);
   gtk_box_append(GTK_BOX(hbox), button);
-  g_signal_connect(G_OBJECT(button), "clicked",
-                   G_CALLBACK(import_preset), (gpointer)model);
 
   button = gtk_button_new_with_label(C_("preferences", "export..."));
   gtk_box_append(GTK_BOX(hbox), button);
   g_signal_connect(G_OBJECT(button), "clicked",
                    G_CALLBACK(export_preset), (gpointer)model);
 
-  button = gtk_button_new_with_label(_("?"));
-  dt_gui_add_help_link(button, "presets");
-  g_signal_connect(button, "clicked", G_CALLBACK(dt_gui_show_help), NULL);
+  button = gtk_button_new_with_label(C_("preferences", "import..."));
   gtk_box_append(GTK_BOX(hbox), button);
-  gtk_widget_set_halign(button, GTK_ALIGN_START);
+  g_signal_connect(G_OBJECT(button), "clicked",
+                   G_CALLBACK(import_preset), (gpointer)model);
 
   // Attaching treeview signals
 

@@ -982,6 +982,10 @@ void dt_iop_gui_rename_module(dt_iop_module_t *module)
 
   dt_iop_show_hide_header_buttons(module, FALSE, TRUE); // before adding entry
   gtk_box_append(GTK_BOX(module->header), entry);
+  /* GTK3 pack_start() put the entry after the instance name, i.e. left of
+   * the pack_end buttons; keep it before the multi-instance button. */
+  if(module->multimenu_button)
+    dt_gui_box_reorder_child_before(GTK_BOX(module->header), entry, module->multimenu_button);
   gtk_widget_set_hexpand(entry, TRUE);
   gtk_widget_set_vexpand(entry, TRUE);
   gtk_widget_show(entry);
@@ -3093,6 +3097,10 @@ gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
     {
       GtkWidget *space = gtk_drawing_area_new();
       gtk_box_append(GTK_BOX(header), space);
+      /* GTK3 pack_end() put the width trigger at the left of the end-group
+       * buttons (visual: instance, space, multi, ...); keep that order. */
+      if(module->multimenu_button)
+        dt_gui_box_reorder_child_before(GTK_BOX(header), space, module->multimenu_button);
       gtk_widget_set_hexpand(space, TRUE);
       gtk_widget_set_vexpand(space, TRUE);
       gtk_widget_show(space);
@@ -3216,13 +3224,17 @@ void dt_iop_add_remove_mask_indicator(dt_iop_module_t *module, gboolean add)
     gtk_widget_set_sensitive(module->mask_indicator, module->enabled);
     gtk_box_append(GTK_BOX(module->header), module->mask_indicator);
 
-    // in dynamic modes, we need to put the mask indicator after the drawing area
-    GtkWidget *child = gtk_widget_get_last_child(GTK_WIDGET(module->header));
-    for(; child && GTK_IS_BUTTON(child); child = gtk_widget_get_prev_sibling(child));
-
-    if(child && GTK_IS_DRAWING_AREA(child))
+    /* GTK3 packed the mask indicator with pack_end() right after the width
+     * trigger (dynamic mode) resp. before the end-group buttons: visual
+     * instance, mask, space?, multi, reset, presets.  Anchor on the widget
+     * that precedes the multi-instance button. */
+    GtkWidget *anchor = module->multimenu_button;
+    GtkWidget *prev = anchor ? gtk_widget_get_prev_sibling(anchor) : NULL;
+    if(prev && GTK_IS_DRAWING_AREA(prev))
+      anchor = prev;
+    if(anchor)
       dt_gui_box_reorder_child_before(GTK_BOX(module->header),
-                                      module->mask_indicator, child);
+                                      module->mask_indicator, anchor);
 
     dt_iop_show_hide_header_buttons(module, FALSE, FALSE);
   }
@@ -3552,29 +3564,7 @@ void dt_iop_gui_set_expander(dt_iop_module_t *module)
   dt_gui_connect_motion(lab, NULL, _header_enter_notify_callback, NULL,
                         GINT_TO_POINTER(DT_ACTION_ELEMENT_SHOW));
 
-  /* add right side header buttons */
-  module->presets_button = dt_iop_gui_header_button(module,
-                                                    dtgtk_cairo_paint_presets,
-                                                    DT_ACTION_ELEMENT_PRESETS,
-                                                    header);
-  module->reset_button = dt_iop_gui_header_button(module,
-                                                  dtgtk_cairo_paint_reset,
-                                                  DT_ACTION_ELEMENT_RESET,
-                                                  header);
-  module->multimenu_button = dt_iop_gui_header_button(module,
-                                                      dtgtk_cairo_paint_multiinstance,
-                                                      DT_ACTION_ELEMENT_INSTANCE,
-                                                      header);
-  if(!(module->flags() & IOP_FLAGS_ONE_INSTANCE))
-    gtk_widget_set_tooltip_text
-      (module->multimenu_button,
-       _("multiple instance actions\nright-click creates new instance"));
-
-  if(!(module->flags() & IOP_FLAGS_ONE_INSTANCE))
-    gtk_widget_set_tooltip_text(module->presets_button,
-                                _("presets\nright-click to apply on new instance"));
-
-  /* add enabled button */
+  /* add enabled button (start group: far left, before the icon) */
   module->off = dt_iop_gui_header_button(module,
                                          dtgtk_cairo_paint_switch,
                                          DT_ACTION_ELEMENT_ENABLE,
@@ -3586,6 +3576,30 @@ void dt_iop_gui_set_expander(dt_iop_module_t *module)
   gtk_box_append(GTK_BOX(header), icon);
   gtk_box_append(GTK_BOX(header), lab);
   gtk_box_append(GTK_BOX(header), module->instance_name);
+
+  /* add right side header buttons.  GTK3 packed them with pack_end() which
+   * renders the end group in reverse call order: visual [multi][reset][presets].
+   * GTK4 append order IS the visual order, so create them multi->reset->presets. */
+  module->multimenu_button = dt_iop_gui_header_button(module,
+                                                      dtgtk_cairo_paint_multiinstance,
+                                                      DT_ACTION_ELEMENT_INSTANCE,
+                                                      header);
+  if(!(module->flags() & IOP_FLAGS_ONE_INSTANCE))
+    gtk_widget_set_tooltip_text
+      (module->multimenu_button,
+       _("multiple instance actions\nright-click creates new instance"));
+
+  module->reset_button = dt_iop_gui_header_button(module,
+                                                  dtgtk_cairo_paint_reset,
+                                                  DT_ACTION_ELEMENT_RESET,
+                                                  header);
+  module->presets_button = dt_iop_gui_header_button(module,
+                                                    dtgtk_cairo_paint_presets,
+                                                    DT_ACTION_ELEMENT_PRESETS,
+                                                    header);
+  if(!(module->flags() & IOP_FLAGS_ONE_INSTANCE))
+    gtk_widget_set_tooltip_text(module->presets_button,
+                                _("presets\nright-click to apply on new instance"));
 
   dt_gui_add_help_link(lab, module->op);
   dt_gui_add_help_link(expander, module->op);

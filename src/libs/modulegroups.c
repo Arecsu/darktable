@@ -697,35 +697,6 @@ static void _basics_add_widget(dt_lib_module_t *self, dt_lib_modulegroups_basic_
     gtk_widget_set_hexpand(d->mod_vbox_basic, TRUE);
     gtk_widget_show_all(hbox_basic);
 
-    // we create the link to the full iop
-    gchar *tt = g_strdup_printf(_("go to the full version of the %s module"), item->module->name());
-    GtkWidget *wbt = dtgtk_button_new_full(dtgtk_cairo_paint_link, 0, NULL,
-      &(dtgtk_button_config_t){
-        .tooltip = tt,
-      });
-    gtk_widget_show(wbt);
-    gtk_widget_set_name(wbt, "basics-link");
-    gtk_widget_set_valign(wbt, GTK_ALIGN_CENTER);
-    g_free(tt);
-    dt_gui_connect_click(wbt, _basics_goto_module, NULL, item->module);
-    gtk_box_append(GTK_BOX(compact_ui ? hbox_basic : header_box), wbt);
-
-    // we create a button to open the presets menu
-    GtkWidget *pbt = dt_iop_gui_header_button(item->module,
-                                              dtgtk_cairo_paint_presets,
-                                              DT_ACTION_ELEMENT_PRESETS,
-                                              compact_ui ? hbox_basic : header_box);
-    gtk_widget_set_name(pbt, "quick-presets");
-    gtk_widget_set_valign(pbt, GTK_ALIGN_CENTER);
-
-    // we create a button to reset the module
-    GtkWidget *rbt = dt_iop_gui_header_button(item->module,
-                                              dtgtk_cairo_paint_reset,
-                                              DT_ACTION_ELEMENT_RESET,
-                                              compact_ui ? hbox_basic : header_box);
-    gtk_widget_set_name(rbt, "quick-reset");
-    gtk_widget_set_valign(rbt, GTK_ALIGN_CENTER);
-
     if(!compact_ui)
     {
       // we add the on-off button
@@ -746,6 +717,39 @@ static void _basics_add_widget(dt_lib_module_t *self, dt_lib_modulegroups_basic_
     else if(item_pos == FIRST_MODULE)
       // if there is no label, we handle separately in css the first module header
       gtk_widget_set_name(header_box, "basics-header-box-first");
+
+    /* GTK3 packed the action buttons with pack_end() in the call order
+     * link, presets, reset, which renders the end group right-to-left:
+     * [reset][presets][link].  GTK4 append order is the visual order, so
+     * create them reset, presets, link. */
+    // we create a button to reset the module
+    GtkWidget *rbt = dt_iop_gui_header_button(item->module,
+                                              dtgtk_cairo_paint_reset,
+                                              DT_ACTION_ELEMENT_RESET,
+                                              compact_ui ? hbox_basic : header_box);
+    gtk_widget_set_name(rbt, "quick-reset");
+    gtk_widget_set_valign(rbt, GTK_ALIGN_CENTER);
+
+    // we create a button to open the presets menu
+    GtkWidget *pbt = dt_iop_gui_header_button(item->module,
+                                              dtgtk_cairo_paint_presets,
+                                              DT_ACTION_ELEMENT_PRESETS,
+                                              compact_ui ? hbox_basic : header_box);
+    gtk_widget_set_name(pbt, "quick-presets");
+    gtk_widget_set_valign(pbt, GTK_ALIGN_CENTER);
+
+    // we create the link to the full iop
+    gchar *tt = g_strdup_printf(_("go to the full version of the %s module"), item->module->name());
+    GtkWidget *wbt = dtgtk_button_new_full(dtgtk_cairo_paint_link, 0, NULL,
+      &(dtgtk_button_config_t){
+        .tooltip = tt,
+      });
+    gtk_widget_show(wbt);
+    gtk_widget_set_name(wbt, "basics-link");
+    gtk_widget_set_valign(wbt, GTK_ALIGN_CENTER);
+    g_free(tt);
+    dt_gui_connect_click(wbt, _basics_goto_module, NULL, item->module);
+    gtk_box_append(GTK_BOX(compact_ui ? hbox_basic : header_box), wbt);
   }
 
   if(item->box) gtk_box_append(GTK_BOX(d->mod_vbox_basic), item->box);
