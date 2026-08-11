@@ -5247,14 +5247,298 @@ void dt_gui_popover_attach(GtkWidget *popover, GtkWidget *anchor)
 #endif
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _delete_child(GtkWidget *widget,
-                          const gpointer data)
+/* ---------- GtkMenu replacement (GTK4): popover menus ----------
+ * See gtk.h for the design.  The menu popover's child is the box stored
+ * under DT_GUI_MENU_BOX; items are full-width flat buttons (plain = click,
+ * check/radio = toggle).  Submenus are popovers parented to the box, so
+ * GtkBox.dispose unparents them when the menu dies; the "closed" hook
+ * pops them down when the menu closes (autohide etc). */
+#define DT_GUI_MENU_BOX "dt-gui-menu-box"
+#define DT_GUI_MENU_ITEM_SUBMENU "dt-gui-menu-item-submenu"
+
+static GtkWidget *_dt_gui_menu_get_box(GtkWidget *menu)
 {
-  (void)data;  // avoid unreferenced-parameter warning
-  gtk_widget_destroy(widget);
+  return g_object_get_data(G_OBJECT(menu), DT_GUI_MENU_BOX);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
+
+static void _dt_gui_menu_item_submenu_clicked(GtkButton *button,
+                                              gpointer user_data);
+
+static GtkWidget *_dt_gui_menu_get_root(GtkWidget *menu);
+static void _dt_gui_menu_item_connect_close(GtkWidget *menu,
+                                            GtkWidget *item);
+
+static GtkWidget *_dt_gui_menu_item_new_common(const gchar *label,
+                                               gboolean check)
+{
+  GtkWidget *item;
+  if(check)
+    item = gtk_check_button_new_with_label(label);
+  else
+    item = gtk_button_new_with_label(label);
+  gtk_button_set_has_frame(GTK_BUTTON(item), FALSE);
+  gtk_widget_set_hexpand(item, TRUE);
+  gtk_widget_set_halign(item, GTK_ALIGN_FILL);
+  gtk_widget_set_focus_on_click(item, TRUE);
+  return item;
+}
+
+GtkWidget *dt_gui_menu_new(void)
+{
+  GtkWidget *menu = gtk_popover_new();
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_popover_set_child(GTK_POPOVER(menu), box);
+  g_object_set_data(G_OBJECT(menu), DT_GUI_MENU_BOX, box);
+  gtk_popover_set_autohide(GTK_POPOVER(menu), TRUE);
+  return menu;
+}
+
+static void _dt_gui_menu_submenu_popdown(GtkPopover *menu,
+                                         gpointer user_data)
+{
+  gtk_popover_popdown(GTK_POPOVER(user_data));
+}
+
+// parent @submenu to @menu's box (it must live in the menu's tree to be
+// positioned at an item and to die with the menu) and hook the menu's
+// close so the submenu pops down with it
+static void _dt_gui_menu_attach_submenu(GtkWidget *menu,
+                                        GtkWidget *submenu)
+{
+  if(gtk_widget_get_parent(submenu)) return;
+  GtkWidget *box = _dt_gui_menu_get_box(menu);
+  gtk_widget_set_parent(submenu, box);
+  g_signal_connect(menu, "closed", G_CALLBACK(_dt_gui_menu_submenu_popdown), submenu);
+}
+
+void dt_gui_menu_append(GtkWidget *menu, GtkWidget *item)
+{
+  g_return_if_fail(GTK_IS_WIDGET(menu));
+  g_return_if_fail(GTK_IS_WIDGET(item));
+  GtkWidget *box = _dt_gui_menu_get_box(menu);
+  gtk_box_append(GTK_BOX(box), item);
+  GtkWidget *submenu = g_object_get_data(G_OBJECT(item), DT_GUI_MENU_ITEM_SUBMENU);
+  if(submenu) _dt_gui_menu_attach_submenu(menu, submenu);
+  _dt_gui_menu_item_connect_close(menu, item);
+}
+
+void dt_gui_menu_insert_sorted(GtkWidget *menu, GtkWidget *item,
+                               const gchar *name)
+{
+  g_return_if_fail(GTK_IS_WIDGET(menu));
+  g_return_if_fail(GTK_IS_WIDGET(item));
+  GtkWidget *box = _dt_gui_menu_get_box(menu);
+  // walk backwards to the last item that sorts before @name, then insert
+  // after it; matches the GTK3 gtk_menu_shell_insert semantics
+  GtkWidget *child = gtk_widget_get_last_child(box);
+  while(child)
+  {
+    const gchar *label = dt_gui_menu_item_get_label(child);
+    if(label && g_utf8_collate(label, name) < 0) break;
+    child = gtk_widget_get_prev_sibling(child);
+  }
+  if(child)
+    gtk_box_insert_child_after(GTK_BOX(box), item, child);
+  else
+    gtk_box_prepend(GTK_BOX(box), item);
+  GtkWidget *submenu = g_object_get_data(G_OBJECT(item), DT_GUI_MENU_ITEM_SUBMENU);
+  if(submenu) _dt_gui_menu_attach_submenu(menu, submenu);
+  _dt_gui_menu_item_connect_close(menu, item);
+}
+
+// walk up from a menu popover (or submenu popover) to the root menu
+// popover, the one attached to the anchor widget
+static GtkWidget *_dt_gui_menu_get_root(GtkWidget *menu)
+{
+  while(GTK_IS_POPOVER(menu))
+  {
+    GtkWidget *box = _dt_gui_menu_get_box(menu);
+    if(!box) break; // not one of ours
+    GtkWidget *parent = gtk_widget_get_parent(box);   // the contents node
+    parent = parent ? gtk_widget_get_parent(parent) : NULL;
+    if(GTK_IS_POPOVER(parent) && _dt_gui_menu_get_box(parent))
+      menu = parent; // @menu is a submenu inside @parent's box
+    else
+      break;
+  }
+  return menu;
+}
+
+// a menu is one-shot: the menu closes when any non-submenu item activates
+// (GTK3's gtk_menu_shell_activate_item forced a deactivate on every item
+// click) and the closed popover unparents itself (GTK3's ref_sink +
+// deactivate->unref).  The close handler runs AFTER the item's own handlers
+// (g_signal_connect_after): the emission holds a ref on the item, so the
+// menu can die mid-emission without a use-after-free in the item handler.
+static void _dt_gui_menu_item_close(GtkWidget *menu, gpointer user_data)
+{
+  (void)user_data;
+  gtk_popover_popdown(GTK_POPOVER(_dt_gui_menu_get_root(menu)));
+}
+
+static void _dt_gui_menu_item_connect_close(GtkWidget *menu, GtkWidget *item)
+{
+  // submenu items toggle their own popover and keep the menu open
+  if(g_object_get_data(G_OBJECT(item), DT_GUI_MENU_ITEM_SUBMENU)) return;
+  if(!GTK_IS_BUTTON(item)) return;
+  g_signal_connect_after(item, "clicked",
+                         G_CALLBACK(_dt_gui_menu_item_close), menu);
+}
+
+static void _dt_gui_menu_closed(GtkPopover *menu, gpointer user_data)
+{
+  (void)user_data;
+  // one-shot menu: unparenting finalizes the popover (nobody else refs),
+  // whose GtkBox.dispose unparents the items and any submenu popovers
+  gtk_widget_unparent(GTK_WIDGET(menu));
+}
+
+GtkWidget *dt_gui_menu_item_new(const gchar *label)
+{
+  return _dt_gui_menu_item_new_common(label, FALSE);
+}
+
+GtkWidget *dt_gui_menu_item_new_markup(const gchar *markup)
+{
+  GtkWidget *item = gtk_button_new();
+  GtkWidget *lab = gtk_label_new(NULL);
+  gtk_label_set_markup(GTK_LABEL(lab), markup);
+  gtk_widget_set_halign(lab, GTK_ALIGN_START);
+  gtk_button_set_child(GTK_BUTTON(item), lab);
+  gtk_button_set_has_frame(GTK_BUTTON(item), FALSE);
+  gtk_widget_set_hexpand(item, TRUE);
+  gtk_widget_set_halign(item, GTK_ALIGN_FILL);
+  gtk_widget_set_focus_on_click(item, TRUE);
+  return item;
+}
+
+void dt_gui_menu_item_set_label_markup(GtkWidget *item, const gchar *markup)
+{
+  g_return_if_fail(GTK_IS_WIDGET(item));
+  if(GTK_IS_BUTTON(item))
+  {
+    GtkWidget *child = gtk_button_get_child(GTK_BUTTON(item));
+    if(GTK_IS_LABEL(child))
+      gtk_label_set_markup(GTK_LABEL(child), markup);
+  }
+}
+
+GtkWidget *dt_gui_menu_check_item_new(const gchar *label)
+{
+  return _dt_gui_menu_item_new_common(label, TRUE);
+}
+
+GtkWidget *dt_gui_menu_radio_item_new(GSList **group, const gchar *label)
+{
+  GtkWidget *item = _dt_gui_menu_item_new_common(label, TRUE);
+  if(*group)
+    gtk_check_button_set_group(GTK_CHECK_BUTTON(item),
+                               GTK_CHECK_BUTTON((*group)->data));
+  *group = g_slist_append(*group, item);
+  return item;
+}
+
+GtkWidget *dt_gui_menu_separator_new(void)
+{
+  return gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+}
+
+void dt_gui_menu_item_set_submenu(GtkWidget *item, GtkWidget *submenu)
+{
+  g_return_if_fail(GTK_IS_WIDGET(item));
+  g_return_if_fail(GTK_IS_WIDGET(submenu));
+  g_object_set_data(G_OBJECT(item), DT_GUI_MENU_ITEM_SUBMENU, submenu);
+  g_signal_connect(item, "clicked", G_CALLBACK(_dt_gui_menu_item_submenu_clicked), NULL);
+}
+
+GtkWidget *dt_gui_menu_item_get_submenu(GtkWidget *item)
+{
+  g_return_val_if_fail(GTK_IS_WIDGET(item), NULL);
+  return g_object_get_data(G_OBJECT(item), DT_GUI_MENU_ITEM_SUBMENU);
+}
+
+static void _dt_gui_menu_item_submenu_clicked(GtkButton *button,
+                                              gpointer user_data)
+{
+  (void)user_data;
+  GtkWidget *item = GTK_WIDGET(button);
+  GtkWidget *submenu = g_object_get_data(G_OBJECT(item), DT_GUI_MENU_ITEM_SUBMENU);
+  if(!submenu) return;
+  if(gtk_widget_get_visible(submenu))
+  {
+    gtk_popover_popdown(GTK_POPOVER(submenu));
+    return;
+  }
+  // point the submenu at its item: the submenu is parented to the menu box,
+  // so the item's bounds in box coordinates are the pointing-to rectangle
+  GtkWidget *box = gtk_widget_get_parent(item);
+  if(!box) return;
+  graphene_rect_t grect;
+  if(!gtk_widget_compute_bounds(item, box, &grect)) return;
+  const GdkRectangle rect = { (int)grect.origin.x, (int)grect.origin.y,
+                              (int)grect.size.width, (int)grect.size.height };
+  gtk_popover_set_pointing_to(GTK_POPOVER(submenu), &rect);
+  gtk_popover_set_position(GTK_POPOVER(submenu), GTK_POS_RIGHT);
+  gtk_popover_popup(GTK_POPOVER(submenu));
+}
+
+void dt_gui_menu_item_set_active(GtkWidget *item, gboolean active)
+{
+  g_return_if_fail(GTK_IS_WIDGET(item));
+  if(GTK_IS_TOGGLE_BUTTON(item))
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(item), active);
+}
+
+gboolean dt_gui_menu_item_get_active(GtkWidget *item)
+{
+  g_return_val_if_fail(GTK_IS_WIDGET(item), FALSE);
+  if(GTK_IS_TOGGLE_BUTTON(item))
+    return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(item));
+  return FALSE;
+}
+
+const gchar *dt_gui_menu_item_get_label(GtkWidget *item)
+{
+  g_return_val_if_fail(GTK_IS_WIDGET(item), NULL);
+  if(GTK_IS_CHECK_BUTTON(item))
+    return gtk_check_button_get_label(GTK_CHECK_BUTTON(item));
+  if(GTK_IS_BUTTON(item))
+    return gtk_button_get_label(GTK_BUTTON(item));
+  return NULL;
+}
+
+void dt_gui_menu_popup(GtkWidget *menu, GtkWidget *anchor)
+{
+  g_return_if_fail(GTK_IS_WIDGET(menu));
+  g_return_if_fail(GTK_IS_POPOVER(menu));
+  if(anchor)
+  {
+    dt_gui_popover_attach(menu, anchor);
+    gtk_popover_set_position(GTK_POPOVER(menu), GTK_POS_BOTTOM);
+  }
+  // one-shot: the menu unparents itself when it closes (see the comment
+  // above _dt_gui_menu_closed); submenu popdown hooks were connected
+  // during the build, so they run before this handler
+  g_signal_connect(menu, "closed", G_CALLBACK(_dt_gui_menu_closed), NULL);
+  gtk_popover_popup(GTK_POPOVER(menu));
+}
+
+void dt_gui_menu_popdown(GtkWidget *menu)
+{
+  g_return_if_fail(GTK_IS_WIDGET(menu));
+  if(GTK_IS_POPOVER(menu))
+    gtk_popover_popdown(GTK_POPOVER(menu));
+}
+
+void dt_gui_menu_close(GtkWidget *menu)
+{
+  g_return_if_fail(GTK_IS_WIDGET(menu));
+  gtk_popover_popdown(GTK_POPOVER(menu));
+  // popdown emits "closed", which unparents the one-shot menu; when the
+  // menu was never popped up there is no closed handler, so unparent here
+  if(gtk_widget_get_parent(menu))
+    gtk_widget_unparent(menu);
+}
 
 void dt_gui_container_destroy_children(GtkWidget *container)
 {
@@ -5271,41 +5555,6 @@ void dt_gui_container_destroy_children(GtkWidget *container)
   gtk_container_foreach(GTK_CONTAINER(container), _delete_child, NULL);
 #endif
 }
-
-// GtkMenu is removed in GTK4; dt_gui_menu_popup stays GTK3-only until the
-// GtkMenu->GtkPopoverMenu migration (TODO P2).
-#if !GTK_CHECK_VERSION(4, 0, 0)
-void dt_gui_menu_popup(GtkMenu *menu,
-                       GtkWidget *button,
-                       const GdkGravity widget_anchor,
-                       const GdkGravity menu_anchor)
-{
-  gtk_widget_show_all(GTK_WIDGET(menu));
-  g_object_ref_sink(G_OBJECT(menu));
-  g_signal_connect(G_OBJECT(menu), "deactivate", G_CALLBACK(g_object_unref), NULL);
-
-  GdkEvent *event = gtk_get_current_event();
-  if(button && event)
-  {
-    gtk_menu_popup_at_widget(menu, button, widget_anchor, menu_anchor, event);
-  }
-  else
-  {
-    if(!event)
-    {
-      event = gdk_event_new(GDK_BUTTON_PRESS);
-      event->button.device =
-        gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default()));
-      event->button.window =
-        gtk_widget_get_window(GTK_WIDGET(darktable.gui->ui->main_window));
-      g_object_ref(event->button.window);
-    }
-
-    gtk_menu_popup_at_pointer(menu, event);
-  }
-  gdk_event_free(event);
-}
-#endif
 
 static float _scroll_attenuate(gdouble delta);  // defined below the proxy block
 

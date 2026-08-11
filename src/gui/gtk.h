@@ -654,12 +654,36 @@ void dt_gui_widget_reparent(GtkWidget *widget, GtkWidget *new_parent);
 // a reparented popover safe from its old anchor's destroy.
 void dt_gui_popover_attach(GtkWidget *popover, GtkWidget *anchor);
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-void dt_gui_menu_popup(GtkMenu *menu,
-                       GtkWidget *button,
-                       GdkGravity widget_anchor,
-                       GdkGravity menu_anchor);
-#endif
+/* ---------- GtkMenu replacement (GTK4): popover menus ----------
+ * GtkMenu/GtkMenuItem are gone in GTK4; a menu is a GtkPopover with a
+ * vertical box of full-width flat buttons.  Plain items are GtkButtons
+ * (connect "clicked"), check/radio items are GtkCheckButtons (connect
+ * "toggled").  A submenu is another popover parented to the menu box,
+ * pointed at its triggering item; it opens on the item's click and closes
+ * with the menu (GtkBox.dispose unparents children, so the submenu dies
+ * with its menu box).  The menu itself is attached to its anchor via
+ * dt_gui_popover_attach, so the anchor-destroy hook keeps the popover
+ * from dangling.  Callers that only append/connect stay GTK-agnostic. */
+GtkWidget *dt_gui_menu_new(void);
+void dt_gui_menu_append(GtkWidget *menu, GtkWidget *item);
+// sorted insert by UTF-8 collation on the item label (preset hierarchies)
+void dt_gui_menu_insert_sorted(GtkWidget *menu, GtkWidget *item, const gchar *name);
+GtkWidget *dt_gui_menu_item_new(const gchar *label);
+GtkWidget *dt_gui_menu_item_new_markup(const gchar *markup);
+void dt_gui_menu_item_set_label_markup(GtkWidget *item, const gchar *markup);
+GtkWidget *dt_gui_menu_check_item_new(const gchar *label);
+GtkWidget *dt_gui_menu_radio_item_new(GSList **group, const gchar *label);
+GtkWidget *dt_gui_menu_separator_new(void);
+void dt_gui_menu_item_set_submenu(GtkWidget *item, GtkWidget *submenu);
+GtkWidget *dt_gui_menu_item_get_submenu(GtkWidget *item);
+void dt_gui_menu_item_set_active(GtkWidget *item, gboolean active);
+gboolean dt_gui_menu_item_get_active(GtkWidget *item);
+const gchar *dt_gui_menu_item_get_label(GtkWidget *item);
+void dt_gui_menu_popup(GtkWidget *menu, GtkWidget *anchor);
+void dt_gui_menu_popdown(GtkWidget *menu);
+// popdown + unparent (finalizes the menu and its submenus); use in
+// handlers that close the menu early (single-shot popups)
+void dt_gui_menu_close(GtkWidget *menu);
 
 /* Forward the scroll event a scroll controller is currently dispatching to
  * another widget, as if that widget had received it directly (used for the

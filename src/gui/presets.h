@@ -141,8 +141,7 @@ void dt_gui_presets_update_filter(const char *name,
                                   const int filter);
 
 /** show the popup menu for the given module, with default behavior. */
-#if !GTK_CHECK_VERSION(4, 0, 0)
-GtkMenu *dt_gui_presets_popup_menu_show_for_module(dt_iop_module_t *module);
+GtkWidget *dt_gui_presets_popup_menu_show_for_module(dt_iop_module_t *module);
 
 /** ops for building a preset popup menu (dt_gui_presets_popup_menu_show()).
  *  The SELECT returned by query() must start with the columns
@@ -165,15 +164,14 @@ typedef struct dt_gui_presets_menu_ops_t
   GCallback del_cb;                  /* "delete this preset" */
   GCallback store_cb;                /* "store new preset.." */
   GCallback update_cb;               /* "update preset" */
-  void (*prefs)(GtkMenu *menu, gpointer data); /* trailing prefs section; NULL = none */
+  void (*prefs)(GtkWidget *menu, gpointer data); /* trailing prefs section; NULL = none */
 } dt_gui_presets_menu_ops_t;
 
 /** build the shared preset popup menu (the iop darkroom and lib header/
  *  modulegroups presets menus are the same menu).  The caller owns popping
  *  the menu up and any per-menu destroy cleanup; the menu is not popped and
  *  not destroyed here. */
-GtkMenu *dt_gui_presets_popup_menu_show(const dt_gui_presets_menu_ops_t *ops);
-#endif
+GtkWidget *dt_gui_presets_popup_menu_show(const dt_gui_presets_menu_ops_t *ops);
 
 /** show popupmenu for favorite modules
  *  (GTK4: no-op stub until the GtkMenu->GtkPopoverMenu migration, TODO P2) */

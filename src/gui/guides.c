@@ -963,38 +963,34 @@ void dt_guides_draw(cairo_t *cr,
   cairo_restore(cr);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _settings_autoshow_change(GtkWidget *mi,
                                       dt_iop_module_t *module)
 {
-  // we inverse the autoshow value for the module
-  gchar *key = _conf_get_path(module->op, "autoshow", NULL);
-  dt_conf_set_bool(key, !dt_conf_get_bool(key));
+  // the check button already holds the new state ("toggled"); write the
+  // conf key from it and mirror the module's guides combo
+  gchar *key = g_object_get_data(G_OBJECT(mi), "dt-guides-key");
+  const gboolean autoshow = dt_gui_menu_item_get_active(mi);
+  dt_conf_set_bool(key, autoshow);
   DT_ENTER_GUI_UPDATE();
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(module->guides_combo),
-                               dt_conf_get_bool(key));
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(module->guides_combo), autoshow);
   DT_LEAVE_GUI_UPDATE();
-  g_free(key);
   dt_control_queue_redraw_center();
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void dt_guides_add_module_menuitem(void *menu,
                                    dt_iop_module_t *module)
 {
-#if GTK_CHECK_VERSION(4, 0, 0)
-  // TODO P2: GtkMenu->GtkPopoverMenu migration; deferred.
-  (void)menu;
-  (void)module;
-#else
-  GtkWidget *mi = gtk_check_menu_item_new_with_label(_("show guides"));
+  // GTK4: the item is a GtkCheckButton; "toggled" fires when the button
+  // state changes, so write the conf key from the new state instead of
+  // inverting it (the GTK3 "activate" path inverted by hand)
+  GtkWidget *mi = dt_gui_menu_check_item_new(_("show guides"));
   gchar *key = _conf_get_path(module->op, "autoshow", NULL);
-  gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(mi), dt_conf_get_bool(key));
-  g_free(key);
-  g_signal_connect(G_OBJECT(mi), "activate",
+  const gboolean autoshow = dt_conf_get_bool(key);
+  dt_gui_menu_item_set_active(mi, autoshow);
+  g_object_set_data_full(G_OBJECT(mi), "dt-guides-key", key, g_free);
+  g_signal_connect(G_OBJECT(mi), "toggled",
                    G_CALLBACK(_settings_autoshow_change), module);
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
-#endif
+  dt_gui_menu_append(GTK_WIDGET(menu), mi);
 }
 
 static void free_guide(void *data)

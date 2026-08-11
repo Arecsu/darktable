@@ -141,7 +141,6 @@ static void _set_module_preset_label(dt_lib_module_t *module,
   g_free(preset_label_text);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _edit_preset(const char *name_in,
                          dt_lib_module_info_t *minfo)
 {
@@ -182,9 +181,7 @@ static void _edit_preset(const char *name_in,
     (name, rowid, NULL, NULL, TRUE, TRUE, FALSE, GTK_WINDOW(window));
 }
 
-// The lib preset menu is GtkMenu-based; GtkMenu is gone in GTK4.  Deferred to the
-// GtkMenu->GtkPopoverMenu migration (TODO P2).
-static void _menuitem_update_preset(GtkMenuItem *menuitem,
+static void _menuitem_update_preset(gpointer menuitem,
                                     dt_lib_module_info_t *minfo)
 {
   char *name = g_object_get_data(G_OBJECT(menuitem), "dt-preset-name");
@@ -217,7 +214,7 @@ static void _menuitem_update_preset(GtkMenuItem *menuitem,
   }
 }
 
-static void _menuitem_new_preset(GtkMenuItem *menuitem,
+static void _menuitem_new_preset(gpointer menuitem,
                                  dt_lib_module_info_t *minfo)
 {
   dt_lib_presets_remove(_("new preset"), minfo->plugin_name, minfo->version);
@@ -251,19 +248,19 @@ static void _menuitem_new_preset(GtkMenuItem *menuitem,
   _edit_preset(_("new preset"), minfo);
 }
 
-static void _menuitem_edit_preset(GtkMenuItem *menuitem,
+static void _menuitem_edit_preset(gpointer menuitem,
                                   dt_lib_module_info_t *minfo)
 {
   _edit_preset(NULL, minfo);
 }
 
-static void _menuitem_manage_presets(GtkMenuItem *menuitem,
+static void _menuitem_manage_presets(gpointer menuitem,
                                      dt_lib_module_info_t *minfo)
 {
   if(minfo->module->manage_presets) minfo->module->manage_presets(minfo->module);
 }
 
-static void _menuitem_delete_preset(GtkMenuItem *menuitem,
+static void _menuitem_delete_preset(gpointer menuitem,
                                     dt_lib_module_info_t *minfo)
 {
   gchar *name = dt_lib_get_active_preset_name(minfo);
@@ -284,7 +281,6 @@ static void _menuitem_delete_preset(GtkMenuItem *menuitem,
   }
   g_free(name);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 gchar *dt_lib_presets_duplicate(const gchar *preset,
                                 const gchar *module_name,
@@ -444,29 +440,27 @@ void dt_lib_presets_update(const gchar *preset,
   sqlite3_finalize(stmt);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _menuitem_activate_preset(GtkMenuItem *menuitem,
+static void _menuitem_activate_preset(GtkButton *button,
                                       dt_lib_module_info_t *minfo)
 {
+  GtkWidget *menuitem = GTK_WIDGET(button);
   dt_lib_presets_apply(g_object_get_data(G_OBJECT(menuitem), "dt-preset-name"),
                        minfo->plugin_name, minfo->version);
 }
 
 /* secondary click copies the preset as lua and keeps the menu open: the
- * gesture is in CAPTURE phase and claims the sequence, so the menu shell
- * never sees the press or release and never activates the item.  primary
- * clicks flow normally and apply via the "activate" signal. */
+ * popover only closes on a primary "clicked" or on an outside click, so a
+ * right-press/release inside the menu leaves it open. */
 static void _menuitem_button_preset_released(GtkGestureSingle *gesture,
                                              gint n_press,
                                              gdouble x,
                                              gdouble y,
                                              dt_lib_module_info_t *minfo)
 {
-  GtkMenuItem *menuitem = GTK_MENU_ITEM(dt_gui_get_widget(gesture));
+  GtkWidget *menuitem = dt_gui_get_widget(gesture);
   dt_shortcut_copy_lua((dt_action_t*)minfo->module,
                        g_object_get_data(G_OBJECT(menuitem), "dt-preset-name"));
 }
-#endif
 
 static void _free_module_info(GtkWidget *widget,
                               gpointer user_data)
@@ -479,7 +473,6 @@ static void _free_module_info(GtkWidget *widget,
 
 /* ---------- lib preset menu (dt_gui_presets_popup_menu_show() ops) ---------- */
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static gchar *_lib_presets_query(gpointer data)
 {
   (void)data;
@@ -525,21 +518,18 @@ static void _lib_presets_connect_row(GtkWidget *mi, sqlite3_stmt *stmt, gpointer
   g_object_set_data(G_OBJECT(mi), "dt-preset-module", minfo->module);
   dt_action_define(&minfo->module->actions, "preset", name, mi, NULL);
 
-  g_signal_connect(G_OBJECT(mi), "activate",
+  g_signal_connect(G_OBJECT(mi), "clicked",
                    G_CALLBACK(_menuitem_activate_preset), minfo);
   GtkGestureSingle *gesture =
     dt_gui_connect_click(mi, NULL, _menuitem_button_preset_released, minfo);
   gtk_gesture_single_set_button(gesture, GDK_BUTTON_SECONDARY);
-  gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture), GTK_PHASE_CAPTURE);
-  g_signal_connect(G_OBJECT(gesture), "begin", G_CALLBACK(dt_gui_gesture_claim), NULL);
 }
 
-static void _lib_presets_prefs(GtkMenu *menu, gpointer data)
+static void _lib_presets_prefs(GtkWidget *menu, gpointer data)
 {
   const dt_lib_module_info_t *minfo = data;
-  minfo->module->set_preferences(GTK_MENU_SHELL(menu), minfo->module);
+  minfo->module->set_preferences(menu, minfo->module);
 }
-#endif
 
 static int _lib_position(const dt_lib_module_t *module)
 {
@@ -926,7 +916,6 @@ static void _lib_gui_reset_button_clicked_callback(GtkWidget *widget,
   _lib_gui_reset_callback(NULL, 1, 0.0, 0.0, module);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _presets_popup_callback(GtkWidget *button,
                                       dt_lib_module_t *module)
 {
@@ -948,22 +937,13 @@ static void _presets_popup_callback(GtkWidget *button,
     .prefs = minfo->module->set_preferences ? _lib_presets_prefs : NULL,
   };
 
-  GtkMenu *menu = dt_gui_presets_popup_menu_show(&ops);
+  GtkWidget *menu = dt_gui_presets_popup_menu_show(&ops);
   g_signal_connect(G_OBJECT(menu), "destroy", G_CALLBACK(_free_module_info), minfo);
-  dt_gui_menu_popup(menu, button, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
+  dt_gui_menu_popup(menu, button);
 
   if(button)
     dtgtk_button_set_active(DTGTK_BUTTON(button), FALSE);
 }
-#else
-// TODO P2: GtkMenu->GtkPopoverMenu migration; the preset popup is a no-op
-// on GTK4 until then.
-static void _presets_popup_callback(GtkWidget *button, dt_lib_module_t *module)
-{
-  (void)button;
-  (void)module;
-}
-#endif
 
 
 void dt_lib_gui_set_expanded(dt_lib_module_t *module, const gboolean expanded)

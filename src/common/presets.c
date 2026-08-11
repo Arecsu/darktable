@@ -482,19 +482,6 @@ char *dt_presets_get_multi_name(const char *name,
     return g_strdup(strlen(multi_name) > 0 ? multi_name : "");
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _menu_shell_insert_sorted(GtkWidget *menu_shell,
-                                      GtkWidget *item,
-                                      const gchar *name)
-{
-  GList *items = gtk_container_get_children(GTK_CONTAINER(menu_shell));
-  int num = g_list_length(items);
-  for(GList *i = g_list_last(items); i; i = i->prev, num--)
-    if(g_utf8_collate(gtk_menu_item_get_label(i->data), name) < 0) break;
-  gtk_menu_shell_insert(GTK_MENU_SHELL(menu_shell), item, num);
-  g_list_free(items);
-}
-
 GtkWidget *dt_insert_preset_in_menu_hierarchy(const char *name,
                                               GSList **menu_path,
                                               GtkWidget *mainmenu,
@@ -519,16 +506,16 @@ GtkWidget *dt_insert_preset_in_menu_hierarchy(const char *name,
   for(; p && *(p+1); p++)
   {
     mpath = g_slist_delete_link(mpath, mpath); // pop
-    *submenu = mpath ? gtk_menu_item_get_submenu(mpath->data) : mainmenu;
+    *submenu = mpath ? dt_gui_menu_item_get_submenu(mpath->data) : mainmenu;
   }
   for(; *(s+1); s++)
   {
-    GtkWidget *sm = gtk_menu_item_new_with_label(*s);
+    GtkWidget *sm = dt_gui_menu_item_new(*s);
     mpath = g_slist_prepend(mpath, sm); // push
 
-    _menu_shell_insert_sorted(*submenu, sm, *s);
-    *submenu = gtk_menu_new();
-    gtk_menu_item_set_submenu(GTK_MENU_ITEM(sm), *submenu);
+    dt_gui_menu_insert_sorted(*submenu, sm, *s);
+    *submenu = dt_gui_menu_new();
+    dt_gui_menu_item_set_submenu(sm, *submenu);
   }
   *menu_path = mpath;
   g_strfreev(*prev_split);
@@ -536,19 +523,18 @@ GtkWidget *dt_insert_preset_in_menu_hierarchy(const char *name,
   if(isdefault)
   {
     gchar *label = g_strdup_printf("%s %s", *s, _("(default)"));
-    mi = gtk_check_menu_item_new_with_label(label);
-    _menu_shell_insert_sorted(*submenu, mi, label);
+    mi = dt_gui_menu_check_item_new(label);
+    dt_gui_menu_insert_sorted(*submenu, mi, label);
     g_free(label);
   }
   else
   {
-    mi = gtk_check_menu_item_new_with_label(*s);
-    _menu_shell_insert_sorted(*submenu, mi, *s);
+    mi = dt_gui_menu_check_item_new(*s);
+    dt_gui_menu_insert_sorted(*submenu, mi, *s);
   }
   dt_gui_add_class(mi, "dt_transparent_background");
   return mi;
 }
-#endif
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

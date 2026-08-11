@@ -2551,17 +2551,13 @@ static gboolean _presets_popup_callback(dt_iop_module_t *module)
   const gboolean disabled = !module->default_enabled && module->hide_enable_button;
   if(disabled) return FALSE;
 
-#if GTK_CHECK_VERSION(4, 0, 0)
-  // TODO P2: GtkMenu->GtkPopoverMenu migration; preset popup deferred.
-  return TRUE;
-#else
-  GtkMenu *menu = dt_gui_presets_popup_menu_show_for_module(module);
-
-  dt_gui_menu_popup(menu,
-                    NULL, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
+  GtkWidget *menu = dt_gui_presets_popup_menu_show_for_module(module);
+  // accelerator invocation: anchor the menu to the module's header button
+  GtkWidget *anchor = module->header ? module->header
+                                     : dt_ui_main_window(darktable.gui->ui);
+  dt_gui_menu_popup(menu, anchor);
 
   return TRUE;
-#endif
 }
 
 static void _presets_popup_clicked(GtkGestureSingle *gesture,
@@ -2573,19 +2569,10 @@ static void _presets_popup_clicked(GtkGestureSingle *gesture,
   const gboolean disabled = !module->default_enabled && module->hide_enable_button;
   if(disabled) return;
 
-#if GTK_CHECK_VERSION(4, 0, 0)
-  (void)gesture;
-  (void)n_press;
-  (void)x;
-  (void)y;
-  // TODO P2: GtkMenu->GtkPopoverMenu migration; preset popup deferred.
-#else
   GtkWidget *button = dt_gui_get_widget(gesture);
-  GtkMenu *menu = dt_gui_presets_popup_menu_show_for_module(module);
+  GtkWidget *menu = dt_gui_presets_popup_menu_show_for_module(module);
 
-  dt_gui_menu_popup(menu,
-                    button, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
-#endif
+  dt_gui_menu_popup(menu, button);
 }
 
 /* per-presets-button hysteresis state: a continuous trackpad gesture is a

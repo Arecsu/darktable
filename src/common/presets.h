@@ -55,9 +55,8 @@ char *dt_presets_get_multi_name(const char *name,
 gchar *dt_get_active_preset_name(dt_iop_module_t *module,
                                  gboolean *writeprotect);
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 /** helper for creating menu hierarchy, generates submenus as
- * indicated by vertical bars in name */
+ * indicated by vertical bars in name (GTK4: popover menus, see gtk.h) */
 GtkWidget *dt_insert_preset_in_menu_hierarchy(const char *name,
                                               GSList **menu_path,
                                               GtkWidget *mainmenu,
@@ -65,7 +64,6 @@ GtkWidget *dt_insert_preset_in_menu_hierarchy(const char *name,
                                               gchar ***prev_split,
                                               gboolean isdefault,
                                               gboolean writeprotect);
-#endif
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py
