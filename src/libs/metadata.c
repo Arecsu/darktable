@@ -697,7 +697,6 @@ static void _add_grid_row(dt_metadata_t *metadata, int row, dt_lib_module_t *sel
   d->num_grid_rows++;
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _toggled_callback(gchar *path_str,
                               gpointer user_data,
                               const int column)
@@ -713,27 +712,21 @@ static void _toggled_callback(gchar *path_str,
 
   gtk_tree_path_free(path);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _visible_toggled_callback(GtkCellRendererToggle *cell_renderer,
                                       gchar *path_str,
                                       gpointer user_data)
 {
   _toggled_callback(path_str, user_data, DT_METADATA_PREF_COL_VISIBLE);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _private_toggled_callback(GtkCellRendererToggle *cell_renderer,
                                       gchar *path_str,
                                       gpointer user_data)
 {
   _toggled_callback(path_str, user_data, DT_METADATA_PREF_COL_PRIVATE);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _display_name_edited_callback(GtkCellRenderer *renderer,
                                           gchar *path_str,
                                           gchar *new_text,
@@ -747,9 +740,7 @@ static void _display_name_edited_callback(GtkCellRenderer *renderer,
   gtk_list_store_set(store, &iter, DT_METADATA_PREF_COL_NAME, new_text, -1);
   gtk_tree_path_free(path);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _find_metadata_iter_per_text(GtkTreeModel *model, GtkTreeIter *iter, gint col, const char *text)
 {
   if(!text) return FALSE;
@@ -770,9 +761,7 @@ static gboolean _find_metadata_iter_per_text(GtkTreeModel *model, GtkTreeIter *i
   }
   return FALSE;
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _add_selected_metadata(gchar *tagname, dt_lib_metadata_t *d)
 {
   GtkTreeIter iter;
@@ -800,10 +789,8 @@ static void _metadata_activated(GtkTreeView *tree_view,
   gchar *tagname = dt_metadata_tags_get_selected();
   _add_selected_metadata(tagname, d);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 // dialog to add metadata tag into the formula list
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _add_tag_button_clicked(GtkButton *button, dt_lib_metadata_t *d)
 {
   GtkWidget *dialog = dt_metadata_tags_dialog(d->dialog, _metadata_activated, d);
@@ -838,14 +825,11 @@ static void _delete_tag_button_clicked(GtkButton *button, dt_lib_metadata_t *d)
     gtk_list_store_remove(d->liststore, &iter);
   }
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _drag_data_inserted(GtkTreeModel *tree_model, GtkTreePath *path, GtkTreeIter *iter, dt_lib_metadata_t *d)
 {
   d->needs_rebuild = TRUE;
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 
 static void _fill_grid(dt_lib_module_t *self)
@@ -893,8 +877,7 @@ static void _fill_grid(dt_lib_module_t *self)
   dt_lib_gui_queue_update(self);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _menuitem_preferences(GtkMenuItem *menuitem,
+static void _menuitem_preferences(GtkWidget *menuitem,
                                   dt_lib_module_t *self)
 {
   dt_lib_metadata_t *d = (dt_lib_metadata_t *)self->data;
@@ -1188,15 +1171,12 @@ static void _menuitem_preferences(GtkMenuItem *menuitem,
 finish:
   gtk_widget_destroy(dialog);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void set_preferences(void *menu, dt_lib_module_t *self)
 {
-#if !GTK_CHECK_VERSION(4, 0, 0)
-  GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
-  g_signal_connect(G_OBJECT(mi), "activate", G_CALLBACK(_menuitem_preferences), self);
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *mi = dt_gui_menu_item_new(_("preferences..."));
+  g_signal_connect(G_OBJECT(mi), "clicked", G_CALLBACK(_menuitem_preferences), self);
+  dt_gui_menu_append(menu, mi);
 }
 
 void gui_init(dt_lib_module_t *self)

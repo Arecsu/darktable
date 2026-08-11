@@ -3890,8 +3890,7 @@ static void _populate_collect_combo(GtkWidget *w)
 #undef ADD_COLLECT_ENTRY
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-void _menuitem_preferences(GtkMenuItem *menuitem,
+void _menuitem_preferences(GtkWidget *menuitem,
                            dt_lib_module_t *self)
 {
   GtkWidget *win = dt_ui_main_window(darktable.gui->ui);
@@ -3914,16 +3913,13 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
                              DT_COLLECTION_CHANGE_NEW_QUERY,
                              DT_COLLECTION_PROP_UNDEF, NULL);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void set_preferences(void *menu,
                      dt_lib_module_t *self)
 {
-#if !GTK_CHECK_VERSION(4, 0, 0)
-  GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
-  g_signal_connect(G_OBJECT(mi), "activate", G_CALLBACK(_menuitem_preferences), self);
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *mi = dt_gui_menu_item_new(_("preferences..."));
+  g_signal_connect(G_OBJECT(mi), "clicked", G_CALLBACK(_menuitem_preferences), self);
+  dt_gui_menu_append(menu, mi);
 }
 
 static gint _sort_model_func(GtkTreeModel *model,

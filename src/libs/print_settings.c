@@ -1203,16 +1203,15 @@ static void _update_style_label(dt_lib_print_settings_t *ps, const char *name)
   dt_conf_set_string(PRINT_CONFIG_PREFIX "style", is_style_set ? name : "");
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _update_style(const dt_stylemenu_data_t *menu_data)
 {
   _update_style_label(menu_data->user_data, menu_data->name);
 }
 
-static void _apply_style_activate_callback(GtkMenuItem *menuitem,
+static void _apply_style_activate_callback(GtkWidget *menuitem,
                                            const dt_stylemenu_data_t *menu_data)
 {
-  if(dt_gui_menuitem_activated_by_keyboard(GTK_WIDGET(menuitem)))
+  if(dt_gui_menuitem_activated_by_keyboard(menuitem))
     _update_style(menu_data);
 }
 
@@ -1229,26 +1228,20 @@ static void _apply_style_button_callback(GtkGestureSingle *gesture,
     //??? dt_shortcut_copy_lua(NULL, name);
   }
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _style_popupmenu_callback(GtkWidget *w, gpointer user_data)
 {
-#if !GTK_CHECK_VERSION(4, 0, 0)
   /* if we got any styles, lets popup menu for selection */
-  GtkMenuShell *menu = dtgtk_build_style_menu_hierarchy(TRUE,
-                                                        _apply_style_activate_callback,
-                                                        _apply_style_button_callback,
-                                                        user_data);
+  GtkWidget *menu = dtgtk_build_style_menu_hierarchy(TRUE,
+                                                     _apply_style_activate_callback,
+                                                     _apply_style_button_callback,
+                                                     user_data);
   if(menu)
   {
-    dt_gui_menu_popup(GTK_MENU(menu), w, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST);
+    dt_gui_menu_popup(menu, w);
   }
   else
     dt_control_log(_("no styles have been created yet"));
-#else
-  // TODO P2: GtkMenu->GtkPopoverMenu migration
-  dt_control_log(_("no styles have been created yet"));
-#endif
 }
 
 static void

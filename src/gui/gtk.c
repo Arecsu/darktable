@@ -2841,21 +2841,21 @@ static void _on_drag_leave(GtkWidget *widget, GdkDragContext *dc, const guint ti
 }
 #endif
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _remove_modules_visibility(const gpointer key,
                                            gpointer value,
                                            gpointer prefix)
 {
+  (void)value;
   return g_str_has_prefix(key, prefix)
          && (g_str_has_suffix(key, "_visible")
           || g_str_has_suffix(key, "_position"));
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _restore_default_modules(GtkMenuItem *menuitem,
+static void _restore_default_modules(GtkWidget *menuitem,
                                      gpointer user_data)
 {
+  (void)menuitem;
+  (void)user_data;
   const dt_view_t *cv = dt_view_manager_get_current_view(darktable.view_manager);
   gchar *prefix = g_strdup_printf("plugins/%s/", cv->module_name);
   g_hash_table_foreach_remove(darktable.conf->table, _remove_modules_visibility, prefix);
@@ -2863,29 +2863,24 @@ static void _restore_default_modules(GtkMenuItem *menuitem,
   dt_view_manager_switch_by_view(darktable.view_manager, cv);
 }
 
-static void _toggle_module_visibility(GtkMenuItem *menuitem,
+static void _toggle_module_visibility(GtkWidget *menuitem,
                                       dt_lib_module_t *module)
 {
+  (void)menuitem;
   dt_lib_set_visible(module, !dt_lib_is_visible(module));
   dt_view_manager_switch_by_view(darktable.view_manager, dt_view_manager_get_current_view(darktable.view_manager));
 }
-#endif
 
-static void _add_remove_modules(dt_action_t *action)
+static void _add_remove_modules(GtkWidget *anchor)
 {
-#if GTK_CHECK_VERSION(4, 0, 0)
-  // TODO P2: GtkMenu->GtkPopoverMenu migration; the show/hide modules
-  // popup is deferred (same as the favorite-presets popup).
-  (void)action;
-#else
   const dt_view_type_flags_t cv = dt_view_get_current();
-  GtkWidget *menu = gtk_menu_new();
+  GtkWidget *menu = dt_gui_menu_new();
 
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
-  GtkWidget *mi = gtk_menu_item_new_with_label(_("restore defaults"));
+  dt_gui_menu_append(menu, dt_gui_menu_separator_new());
+  GtkWidget *mi = dt_gui_menu_item_new(_("restore defaults"));
   gtk_widget_set_tooltip_text(mi, _("restore the default visibility and position of all modules in this view"));
-  g_signal_connect(mi, "activate", G_CALLBACK(_restore_default_modules), NULL);
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+  g_signal_connect(mi, "clicked", G_CALLBACK(_restore_default_modules), NULL);
+  dt_gui_menu_append(menu, mi);
 
   for(const GList *iter = darktable.lib->plugins; iter; iter = iter->next)
   {
@@ -2895,16 +2890,21 @@ static void _add_remove_modules(dt_action_t *action)
     if((mv & cv || mv & (mv - 1) || mv & DT_VIEW_MULTI) // either current view or supports more than one view
        && module->expandable(module))
     {
-      mi = gtk_check_menu_item_new_with_label(module->name(module));
-      gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(mi), dt_lib_is_visible(module));
+      mi = dt_gui_menu_check_item_new(module->name(module));
+      dt_gui_menu_item_set_active(mi, dt_lib_is_visible(module));
       g_signal_connect(mi, "toggled", G_CALLBACK(_toggle_module_visibility), module);
-      gtk_menu_shell_prepend(GTK_MENU_SHELL(menu), mi);
+      dt_gui_menu_prepend(menu, mi);
     }
   }
 
-  gtk_widget_show_all(menu);
-  dt_gui_menu_popup(GTK_MENU(menu), NULL, 0, 0);
-#endif
+  dt_gui_menu_popup(menu, anchor);
+}
+
+// accelerator entry: the action target is the empty side-panel box the
+// action was defined on
+static void _add_remove_modules_action(dt_action_t *action)
+{
+  _add_remove_modules(GTK_WIDGET(action->target));
 }
 
 static void _side_panel_press(GtkGestureSingle *gesture,
@@ -2916,7 +2916,7 @@ static void _side_panel_press(GtkGestureSingle *gesture,
   // this gesture only serves right clicks; a primary press would be a
   // shortcut-activated toggle/activate effect (see dt_gui_current_button)
   if(dt_gui_current_button(gesture) != GDK_BUTTON_SECONDARY) return;
-  _add_remove_modules(NULL);
+  _add_remove_modules(dt_gui_get_widget(gesture));
 }
 
 #if !GTK_CHECK_VERSION(4, 0, 0)
@@ -3071,7 +3071,7 @@ static GtkWidget *_ui_init_panel_container_center(GtkWidget *container,
   dt_gui_connect_click_secondary(empty, _side_panel_press, NULL, NULL);
   dt_action_t *ac = dt_action_define(&darktable.control->actions_global, NULL,
                                      N_("show/hide modules"), empty, NULL);
-  dt_action_register(ac, NULL, _add_remove_modules, 0, 0);
+  dt_action_register(ac, NULL, _add_remove_modules_action, 0, 0);
   return box;
 }
 
@@ -5313,13 +5313,41 @@ static void _dt_gui_menu_attach_submenu(GtkWidget *menu,
 
 void dt_gui_menu_append(GtkWidget *menu, GtkWidget *item)
 {
+  dt_gui_menu_insert(menu, item, -1);
+}
+
+// insert at a box index (GTK3 gtk_menu_shell_insert semantics): pos <= 0
+// prepends, pos >= child count appends, anything else inserts before the
+// current child at that index
+void dt_gui_menu_insert(GtkWidget *menu, GtkWidget *item, gint pos)
+{
   g_return_if_fail(GTK_IS_WIDGET(menu));
   g_return_if_fail(GTK_IS_WIDGET(item));
   GtkWidget *box = _dt_gui_menu_get_box(menu);
-  gtk_box_append(GTK_BOX(box), item);
+  if(pos <= 0)
+    gtk_box_prepend(GTK_BOX(box), item);
+  else
+  {
+    GtkWidget *child = gtk_widget_get_first_child(box);
+    gint i = 0;
+    while(child && i < pos - 1)
+    {
+      child = gtk_widget_get_next_sibling(child);
+      i++;
+    }
+    if(child)
+      gtk_box_insert_child_after(GTK_BOX(box), item, child);
+    else
+      gtk_box_append(GTK_BOX(box), item);
+  }
   GtkWidget *submenu = g_object_get_data(G_OBJECT(item), DT_GUI_MENU_ITEM_SUBMENU);
   if(submenu) _dt_gui_menu_attach_submenu(menu, submenu);
   _dt_gui_menu_item_connect_close(menu, item);
+}
+
+void dt_gui_menu_prepend(GtkWidget *menu, GtkWidget *item)
+{
+  dt_gui_menu_insert(menu, item, 0);
 }
 
 void dt_gui_menu_insert_sorted(GtkWidget *menu, GtkWidget *item,

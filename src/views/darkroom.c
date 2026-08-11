@@ -1842,11 +1842,10 @@ static void _darkroom_ui_favorite_presets_popupmenu(GtkWidget *w,
   dt_gui_favorite_presets_menu_show(w);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _darkroom_ui_apply_style_activate_callback(GtkMenuItem *menuitem,
+static void _darkroom_ui_apply_style_activate_callback(GtkWidget *menuitem,
                                                        const dt_stylemenu_data_t *menu_data)
 {
-  if(dt_gui_menuitem_activated_by_keyboard(GTK_WIDGET(menuitem)))
+  if(dt_gui_menuitem_activated_by_keyboard(menuitem))
     dt_styles_apply_to_dev(menu_data->name, darktable.develop->image_storage.id);
 }
 
@@ -1861,27 +1860,22 @@ static void _darkroom_ui_apply_style_button_callback(GtkGestureSingle *gesture,
   else
     dt_shortcut_copy_lua(NULL, menu_data->name);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _darkroom_ui_apply_style_popupmenu(GtkWidget *w,
                                                gpointer user_data)
 {
-#if !GTK_CHECK_VERSION(4, 0, 0)
   /* if we got any styles, lets popup menu for selection */
-  GtkMenuShell *menu =
+  GtkWidget *menu =
     dtgtk_build_style_menu_hierarchy(FALSE,
                                      _darkroom_ui_apply_style_activate_callback,
                                      _darkroom_ui_apply_style_button_callback,
                                      user_data);
   if(menu)
   {
-    dt_gui_menu_popup(GTK_MENU(menu), w, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST);
+    dt_gui_menu_popup(menu, w);
   }
   else
     dt_control_log(_("no styles have been created yet"));
-#else
-  // TODO P2: GtkMenu->GtkPopoverMenu migration
-#endif
 }
 
 static void _second_window_quickbutton_clicked(GtkWidget *w,

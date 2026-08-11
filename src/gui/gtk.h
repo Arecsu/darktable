@@ -666,6 +666,9 @@ void dt_gui_popover_attach(GtkWidget *popover, GtkWidget *anchor);
  * from dangling.  Callers that only append/connect stay GTK-agnostic. */
 GtkWidget *dt_gui_menu_new(void);
 void dt_gui_menu_append(GtkWidget *menu, GtkWidget *item);
+// insert at a box index (GTK3 gtk_menu_shell_insert semantics)
+void dt_gui_menu_insert(GtkWidget *menu, GtkWidget *item, gint pos);
+void dt_gui_menu_prepend(GtkWidget *menu, GtkWidget *item);
 // sorted insert by UTF-8 collation on the item label (preset hierarchies)
 void dt_gui_menu_insert_sorted(GtkWidget *menu, GtkWidget *item, const gchar *name);
 GtkWidget *dt_gui_menu_item_new(const gchar *label);

@@ -1181,16 +1181,15 @@ static void _update_style_label(dt_lib_export_t *d, const char *name)
   dt_conf_set_string(CONFIG_PREFIX "style", d->style_name);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _update_style(const dt_stylemenu_data_t *menu_data)
 {
   _update_style_label(menu_data->user_data,menu_data->name);
 }
 
-static void _apply_style_activate_callback(GtkMenuItem *menuitem,
+static void _apply_style_activate_callback(GtkWidget *menuitem,
                                            const dt_stylemenu_data_t *menu_data)
 {
-  if(dt_gui_menuitem_activated_by_keyboard(GTK_WIDGET(menuitem)))
+  if(dt_gui_menuitem_activated_by_keyboard(menuitem))
     _update_style(menu_data);
 }
 
@@ -1207,26 +1206,20 @@ static void _apply_style_button_callback(GtkGestureSingle *gesture,
     //??? dt_shortcut_copy_lua(NULL, name);
   }
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _style_popupmenu_callback(GtkWidget *w, gpointer user_data)
 {
-#if !GTK_CHECK_VERSION(4, 0, 0)
   /* if we got any styles, lets popup menu for selection */
-  GtkMenuShell *menu = dtgtk_build_style_menu_hierarchy(TRUE,
-                                                        _apply_style_activate_callback,
-                                                        _apply_style_button_callback,
-                                                        user_data);
+  GtkWidget *menu = dtgtk_build_style_menu_hierarchy(TRUE,
+                                                     _apply_style_activate_callback,
+                                                     _apply_style_button_callback,
+                                                     user_data);
   if(menu)
   {
-    dt_gui_menu_popup(GTK_MENU(menu), w, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST);
+    dt_gui_menu_popup(menu, w);
   }
   else
     dt_control_log(_("no styles have been created yet"));
-#else
-  // TODO P2: GtkMenu->GtkPopoverMenu migration
-  dt_control_log(_("no styles have been created yet"));
-#endif
 }
 
 int position(const dt_lib_module_t *self)
@@ -1279,8 +1272,7 @@ static void _on_storage_list_changed(gpointer instance,
   dt_bauhaus_combobox_set(d->storage, dt_imageio_get_index_of_storage(storage));
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _menuitem_preferences(GtkMenuItem *menuitem, dt_lib_module_t *self)
+static void _menuitem_preferences(GtkWidget *menuitem, dt_lib_module_t *self)
 {
   dt_lib_export_t *d = self->data;
   const gchar *name = dt_bauhaus_combobox_get_text(d->storage);
@@ -1289,7 +1281,6 @@ static void _menuitem_preferences(GtkMenuItem *menuitem, dt_lib_module_t *self)
   d->metadata_export =
     dt_lib_export_metadata_configuration_dialog(d->metadata_export, ondisk);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static gboolean _batch_preset_active(dt_lib_module_t *self)
 {
@@ -1431,12 +1422,10 @@ static void _export_presets_changed_callback(gpointer instance, gpointer module,
 
 void set_preferences(void *menu, dt_lib_module_t *self)
 {
-#if !GTK_CHECK_VERSION(4, 0, 0)
-  GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
-  g_signal_connect(G_OBJECT(mi), "activate",
+  GtkWidget *mi = dt_gui_menu_item_new(_("preferences..."));
+  g_signal_connect(G_OBJECT(mi), "clicked",
                    G_CALLBACK(_menuitem_preferences), self);
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
-#endif
+  dt_gui_menu_append(menu, mi);
 }
 
 void gui_init(dt_lib_module_t *self)

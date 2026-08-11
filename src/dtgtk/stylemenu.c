@@ -25,11 +25,10 @@
 #include "gui/gtk.h"
 #include "gui/styles.h"
 
-/* GtkMenu/GtkMenuItem/GtkMenuShell are removed from GTK4's installed
- * headers; the style menu hierarchy needs the GtkMenu->GtkPopoverMenu
- * migration (TODO P2, with the export/print_settings/darkroom callers).
- * Guarded GTK3-only like the other GtkMenu subsystems. */
-#if !GTK_CHECK_VERSION(4, 0, 0)
+/* The style menu hierarchy is a popover menu (see the shared dt_gui_menu_*
+ * layer in gui/gtk.h): items are GtkButtons, submenus are popovers pointed
+ * at their triggering item, the hierarchy reuses existing submenus by
+ * walking the item list like GTK3's gtk_menu_shell children walk. */
 
 static gboolean _styles_tooltip_callback(GtkWidget* self,
                                          const gint x,
@@ -93,7 +92,7 @@ static void _free_button_conn(gpointer data)
   g_free(conn);
 }
 
-static void _build_style_submenus(GtkMenuShell *menu,
+static void _build_style_submenus(GtkWidget *menu,
                                   const gchar *style_name,
                                   gchar **splits,
                                   const int index,
@@ -103,48 +102,47 @@ static void _build_style_submenus(GtkMenuShell *menu,
 {
   // localize the name of the current level in the hierarchy
   const char *split0 = dt_util_localize_string(splits[index]);
-  GtkMenuItem *mi = GTK_MENU_ITEM(gtk_menu_item_new_with_label(split0[0] ? split0 : _("none")));
+  GtkWidget *mi = dt_gui_menu_item_new(split0[0] ? split0 : _("none"));
 
   // check if we already have an item or sub-menu with this name
-  GtkMenu *sm = NULL;
-  GList *children = gtk_container_get_children(GTK_CONTAINER(menu));
-  for(const GList *child = children; child; child = g_list_next(child))
+  GtkWidget *sm = NULL;
+  GtkWidget *box = gtk_popover_get_child(GTK_POPOVER(menu));
+  for(GtkWidget *child = gtk_widget_get_first_child(box); child;
+      child = gtk_widget_get_next_sibling(child))
   {
-    GtkMenuItem *smi = (GtkMenuItem *)child->data;
-    if(g_strcmp0(split0,gtk_menu_item_get_label(smi)) == 0)
+    if(g_strcmp0(split0, dt_gui_menu_item_get_label(child)) == 0)
     {
-      sm = (GtkMenu *)gtk_menu_item_get_submenu(smi);
+      sm = dt_gui_menu_item_get_submenu(child);
       break;
     }
   }
-  g_list_free(children);
 
   if(!splits[index+1])
   {
     // we've reached the bottom level, so build a final menu item with preview popup
     // need a tooltip for the signal below to be raised
-    gtk_menu_shell_append(menu, GTK_WIDGET(mi));
+    dt_gui_menu_append(menu, mi);
     if(style_name && style_name[0]) // don't add tooltip for "none" style
     {
-      gtk_widget_set_has_tooltip(GTK_WIDGET(mi), TRUE);
+      gtk_widget_set_has_tooltip(mi, TRUE);
       g_signal_connect_data(mi, "query-tooltip",
                             G_CALLBACK(_styles_tooltip_callback),
                             g_strdup(style_name), (GClosureNotify)g_free, 0);
-      dt_action_define(&darktable.control->actions_global, "styles", style_name, GTK_WIDGET(mi), NULL);
+      dt_action_define(&darktable.control->actions_global, "styles", style_name, mi, NULL);
     }
     else
-      gtk_widget_set_has_tooltip(GTK_WIDGET(mi), FALSE);
+      gtk_widget_set_has_tooltip(mi, FALSE);
   }
   else
   {
     if(!sm)
     {
       // we need a sub-menu, but it doesn't exist yet
-      sm = (GtkMenu*)gtk_menu_new();
-      gtk_menu_item_set_submenu(mi, GTK_WIDGET(sm));
-      gtk_menu_shell_append(menu, GTK_WIDGET(mi));
+      sm = dt_gui_menu_new();
+      dt_gui_menu_item_set_submenu(mi, sm);
+      dt_gui_menu_append(menu, mi);
     }
-    _build_style_submenus(GTK_MENU_SHELL(sm), style_name, splits, index+1,
+    _build_style_submenus(sm, style_name, splits, index+1,
                           activate_callback, button_callback, user_data);
   }
 
@@ -155,7 +153,7 @@ static void _build_style_submenus(GtkMenuShell *menu,
     {
       menu_data->name = g_strdup(style_name);
       menu_data->user_data = user_data;
-      g_signal_connect_data(G_OBJECT(mi), "activate",
+      g_signal_connect_data(G_OBJECT(mi), "clicked",
                             G_CALLBACK(activate_callback),
                             menu_data, (GClosureNotify)_free_menu_data, 0);
     }
@@ -170,29 +168,27 @@ static void _build_style_submenus(GtkMenuShell *menu,
     // pressed is the direct replacement of the old button-press-event
     // connection; the closure notify keeps owning the data.  the wrapper
     // additionally marks the item as mouse-handled (see above).
-    GtkGesture *gesture = gtk_gesture_multi_press_new(GTK_WIDGET(mi));
+    GtkGesture *gesture = gtk_gesture_click_new();
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
-    dt_gui_add_controller(GTK_WIDGET(mi), gesture);
+    dt_gui_add_controller(mi, gesture);
     g_signal_connect_data(gesture, "pressed",
                           G_CALLBACK(_style_menu_button_pressed),
                           conn, (GClosureNotify)_free_button_conn, 0);
   }
-
-  gtk_widget_show(GTK_WIDGET(mi));
 }
 
 
-GtkMenuShell *dtgtk_build_style_menu_hierarchy(gboolean allow_none,
-                                               dtgtk_menuitem_activate_callback_fn *activate_callback,
-                                               dtgtk_menuitem_button_callback_fn *button_callback,
-                                               gpointer user_data)
+GtkWidget *dtgtk_build_style_menu_hierarchy(gboolean allow_none,
+                                            dtgtk_menuitem_activate_callback_fn *activate_callback,
+                                            dtgtk_menuitem_button_callback_fn *button_callback,
+                                            gpointer user_data)
 {
-  GtkMenuShell *menu = NULL;
+  GtkWidget *menu = NULL;
 
   GList *styles = dt_styles_get_list("");
   if(styles || allow_none)
   {
-    menu = GTK_MENU_SHELL(gtk_menu_new());
+    menu = dt_gui_menu_new();
     if(allow_none)
     {
       const char *none = "";
@@ -211,8 +207,6 @@ GtkMenuShell *dtgtk_build_style_menu_hierarchy(gboolean allow_none,
   }
   return menu;
 }
-
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

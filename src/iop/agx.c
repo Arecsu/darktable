@@ -2090,8 +2090,7 @@ static void _add_exposure_box(dt_iop_module_t *self, dt_iop_agx_gui_data_t *g, d
   dt_gui_box_add(self->widget, g->range_exposure_picker_group);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _apply_primaries_from_menu_callback(GtkMenuItem *menuitem, dt_iop_module_t *self)
+static void _apply_primaries_from_menu_callback(GtkWidget *menuitem, dt_iop_module_t *self)
 {
   const char *preset_id = gtk_widget_get_name(GTK_WIDGET(menuitem));
   dt_iop_agx_params_t *p = self->params;
@@ -2106,35 +2105,25 @@ static void _apply_primaries_from_menu_callback(GtkMenuItem *menuitem, dt_iop_mo
 
 static void _primaries_popupmenu_callback(GtkWidget *button, dt_iop_module_t *self)
 {
-  GtkWidget *menu = gtk_menu_new();
+  GtkWidget *menu = dt_gui_menu_new();
 
-  GtkWidget *blender_item = gtk_menu_item_new_with_mnemonic(_("blender-like"));
+  GtkWidget *blender_item = dt_gui_menu_item_new(_("blender-like"));
   gtk_widget_set_name(blender_item, "blender");
-  g_signal_connect(blender_item, "activate", G_CALLBACK(_apply_primaries_from_menu_callback), self);
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), blender_item);
+  g_signal_connect(blender_item, "clicked", G_CALLBACK(_apply_primaries_from_menu_callback), self);
+  dt_gui_menu_append(menu, blender_item);
 
-  GtkWidget *smooth_item = gtk_menu_item_new_with_mnemonic(_("smooth"));
+  GtkWidget *smooth_item = dt_gui_menu_item_new(_("smooth"));
   gtk_widget_set_name(smooth_item, "smooth");
-  g_signal_connect(smooth_item, "activate", G_CALLBACK(_apply_primaries_from_menu_callback), self);
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), smooth_item);
+  g_signal_connect(smooth_item, "clicked", G_CALLBACK(_apply_primaries_from_menu_callback), self);
+  dt_gui_menu_append(menu, smooth_item);
 
-  GtkWidget *unmodified_item = gtk_menu_item_new_with_mnemonic(_("unmodified"));
+  GtkWidget *unmodified_item = dt_gui_menu_item_new(_("unmodified"));
   gtk_widget_set_name(unmodified_item, "unmodified");
-  g_signal_connect(unmodified_item, "activate", G_CALLBACK(_apply_primaries_from_menu_callback), self);
-  gtk_menu_shell_append(GTK_MENU_SHELL(menu), unmodified_item);
+  g_signal_connect(unmodified_item, "clicked", G_CALLBACK(_apply_primaries_from_menu_callback), self);
+  dt_gui_menu_append(menu, unmodified_item);
 
-  gtk_widget_show_all(menu);
-  dt_gui_menu_popup(GTK_MENU(menu), button, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST);
+  dt_gui_menu_popup(menu, button);
 }
-#else
-// TODO P2: GtkMenu->GtkPopoverMenu migration; the primaries popup is a no-op
-// on GTK4 until then.
-static void _primaries_popupmenu_callback(GtkWidget *button, dt_iop_module_t *self)
-{
-  (void)button;
-  (void)self;
-}
-#endif
 
 static void _set_post_curve_primaries_from_pre_callback(GtkWidget *widget, dt_iop_module_t *self)
 {

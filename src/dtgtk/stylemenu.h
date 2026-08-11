@@ -20,20 +20,17 @@
 
 G_BEGIN_DECLS
 
-/* GtkMenu/GtkMenuItem/GtkMenuShell are removed from GTK4's installed
- * headers.  The style menu is a GtkMenu hierarchy used by export.c,
- * print_settings.c and darkroom.c -- part of the GtkMenu->GtkPopoverMenu
- * migration (TODO P2); guarded GTK3-only like the other GtkMenu
- * subsystems.  The callers' popup callbacks are GTK3-guarded as well and
- * degrade to the "no styles" log path on GTK4. */
-#if !GTK_CHECK_VERSION(4, 0, 0)
+/* The style menu hierarchy is built as a popover menu (see the shared
+ * dt_gui_menu_* layer in gui/gtk.h): items are GtkButtons, submenus are
+ * popovers pointed at their triggering item.  Used by export.c,
+ * print_settings.c and darkroom.c to pick a style by name. */
 
 typedef struct {
   gchar *name;
   gpointer user_data;
 } dt_stylemenu_data_t;
 
-typedef void dtgtk_menuitem_activate_callback_fn(GtkMenuItem *menuitem,
+typedef void dtgtk_menuitem_activate_callback_fn(GtkWidget *menuitem,
                                                  const dt_stylemenu_data_t *menu_data);
 typedef void dtgtk_menuitem_button_callback_fn(GtkGestureSingle *gesture,
                                                gint n_press,
@@ -41,12 +38,13 @@ typedef void dtgtk_menuitem_button_callback_fn(GtkGestureSingle *gesture,
                                                gdouble y,
                                                const dt_stylemenu_data_t *menu_data);
 
-GtkMenuShell *dtgtk_build_style_menu_hierarchy(gboolean allow_none,
-                                               dtgtk_menuitem_activate_callback_fn *activate_callback,
-                                               dtgtk_menuitem_button_callback_fn *button_callback,
-                                               gpointer user_data);
-
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
+/* builds the full style hierarchy (group|sub|preset paths) as a popover
+ * menu and returns it; NULL when there are no styles and @allow_none is
+ * FALSE.  The caller pops it up with dt_gui_menu_popup(). */
+GtkWidget *dtgtk_build_style_menu_hierarchy(gboolean allow_none,
+                                            dtgtk_menuitem_activate_callback_fn *activate_callback,
+                                            dtgtk_menuitem_button_callback_fn *button_callback,
+                                            gpointer user_data);
 
 G_END_DECLS
 
