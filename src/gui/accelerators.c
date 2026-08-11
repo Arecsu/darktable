@@ -2373,21 +2373,12 @@ static gboolean _action_find_and_expand(GtkTreeModel *model,
   return FALSE;
 }
 
-/* Claim the event sequence in CAPTURE phase so the treeview's internal
- * GtkGestureMultiPress (GTK_PHASE_BUBBLE) does NOT process clicks.
- * The pre-migration button-press-event handler consumed the events
+/* The treeview's internal bubble-phase GtkGestureClick does NOT process
+ * clicks: the pre-migration button-press-event handler consumed the events
  * (return TRUE), which suppressed the internal gesture; the gesture
  * controller replacement must do the same, otherwise the two gestures
- * fight over row selection and expansion.
- *
- * GTK4 migration: the pattern is the same — just rename
- * GtkGestureMultiPress to GtkGestureClick. */
-static void _gesture_begin_claim(GtkGesture *gesture,
-                                  GdkEventSequence *sequence,
-                                  gpointer user_data)
-{
-  gtk_gesture_set_sequence_state(gesture, sequence, GTK_EVENT_SEQUENCE_CLAIMED);
-}
+ * fight over row selection and expansion.  The sequence is claimed at
+ * "pressed" time (dt_gui_gesture_claim_pressed), see A2.10. */
 
 static void _action_view_click_cb(GtkGestureSingle *gesture, int n_press, double x, double y, GtkTreeStore *model_data)
 {
@@ -3234,8 +3225,8 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
                                                GTK_PHASE_CAPTURE);
     dt_gui_add_controller(GTK_WIDGET(actions_view), gesture);
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
+    g_signal_connect(gesture, "pressed", G_CALLBACK(dt_gui_gesture_claim_pressed), NULL);
     g_signal_connect(gesture, "pressed", G_CALLBACK(_action_view_click_cb), _actions_store);
-    g_signal_connect(gesture, "begin", G_CALLBACK(_gesture_begin_claim), NULL);
   }
 
   dt_gui_connect_key(actions_view, _view_key_pressed_cb, search_actions);

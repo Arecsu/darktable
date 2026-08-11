@@ -531,10 +531,10 @@ static GtkWidget *_color_picker_new(dt_iop_module_t *module,
                                                GTK_PHASE_CAPTURE);
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
     dt_gui_add_controller(button, gesture);
+    g_signal_connect(gesture, "pressed", G_CALLBACK(dt_gui_gesture_claim_pressed), NULL);
     g_signal_connect_data(gesture, "pressed",
                           G_CALLBACK(_color_picker_clicked),
                           color_picker, (GClosureNotify)_color_picker_destroy, 0);
-    g_signal_connect(gesture, "begin", G_CALLBACK(dt_gui_gesture_claim), NULL);
     g_object_set_data(G_OBJECT(button), DT_COLOR_PICKER_INSTANCE_KEY, color_picker);
     if(w)
     {

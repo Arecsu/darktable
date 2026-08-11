@@ -242,21 +242,16 @@ GtkWidget *dt_bauhaus_toggle_from_params(dt_iop_module_t *self, const char *para
 }
 
 /* Claim the event sequence in CAPTURE phase so the togglebutton's
- * internal GtkGestureMultiPress (GTK_PHASE_BUBBLE) does NOT process
- * the event.  This prevents GtkButton from emitting "clicked" and
+ * internal GtkGestureClick (GTK_PHASE_BUBBLE) does NOT process the
+ * event.  This prevents GtkButton from emitting "clicked" and
  * toggling the button state behind our callback, which would conflict
  * with callbacks that implement radio-button behaviour by explicitly
  * managing all toggle states.
  *
- * GTK4 migration: the pattern is the same — just rename
- * GtkGestureMultiPress to GtkGestureClick. */
-static void _gesture_begin_claim(GtkGesture *gesture,
-                                  GdkEventSequence *sequence,
-                                  gpointer user_data)
-{
-  gtk_gesture_set_sequence_state(gesture, sequence, GTK_EVENT_SEQUENCE_CLAIMED);
-}
-
+ * The claim runs at "pressed" time (dt_gui_gesture_claim_pressed), not
+ * in "begin": the press is still claimed before any bubble-phase
+ * gesture sees it, but the sequence is not stolen from parent/child
+ * controllers earlier than necessary (A2.10). */
 GtkWidget *dt_iop_togglebutton_new(dt_iop_module_t *self, const char *section, const gchar *label, const gchar *ctrl_label,
                                    GCallback callback, gboolean local, guint accel_key, GdkModifierType mods,
                                    DTGTKCairoPaintIconFunc paint, GtkWidget *box)
@@ -273,8 +268,8 @@ GtkWidget *dt_iop_togglebutton_new(dt_iop_module_t *self, const char *section, c
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
                                                GTK_PHASE_CAPTURE);
     dt_gui_add_controller(w, gesture);
+    g_signal_connect(gesture, "pressed", G_CALLBACK(dt_gui_gesture_claim_pressed), NULL);
     g_signal_connect_data(gesture, "pressed", callback, self, NULL, 0);
-    g_signal_connect(gesture, "begin", G_CALLBACK(_gesture_begin_claim), NULL);
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
     /* shortcut activation routes through this gesture (DT_ACTION_GESTURE_KEY,
      * see _action_process_toggle in accelerators.c) */
