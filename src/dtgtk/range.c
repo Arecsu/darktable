@@ -1168,7 +1168,6 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
   gtk_popover_set_child(GTK_POPOVER(pop->popup), vbox);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _popup_item_activate(GtkWidget *w, gpointer user_data)
 {
   GtkDarktableRangeSelect *range = (GtkDarktableRangeSelect *)user_data;
@@ -1195,8 +1194,8 @@ static void _popup_item_activate(GtkWidget *w, gpointer user_data)
 
 static GtkWidget *_popup_get_numeric_menu(GtkDarktableRangeSelect *range, GtkWidget *w)
 {
-  GtkMenuShell *pop = GTK_MENU_SHELL(gtk_menu_new());
-  gtk_widget_set_size_request(GTK_WIDGET(pop), 200, -1);
+  GtkWidget *pop = dt_gui_menu_new();
+  gtk_widget_set_size_request(pop, 200, -1);
 
   // we first show all the predefined items
   int nb = 0;
@@ -1215,17 +1214,17 @@ static GtkWidget *_popup_get_numeric_menu(GtkDarktableRangeSelect *range, GtkWid
 
     gchar *txt = (blo->txt) ? g_strdup(blo->txt) : range->print(blo->value_r, TRUE);
     if(blo->nb > 0) dt_util_str_cat(&txt, " (%d)", blo->nb);
-    GtkWidget *smt = gtk_menu_item_new_with_label(txt);
+    GtkWidget *smt = dt_gui_menu_item_new(txt);
     g_free(txt);
     g_object_set_data(G_OBJECT(smt), "range_block", blo);
     g_object_set_data(G_OBJECT(smt), "source_widget", w);
-    g_signal_connect(G_OBJECT(smt), "activate", G_CALLBACK(_popup_item_activate), range);
+    g_signal_connect(G_OBJECT(smt), "clicked", G_CALLBACK(_popup_item_activate), range);
 
-    gtk_menu_shell_append(pop, smt);
+    dt_gui_menu_append(pop, smt);
     nb++;
   }
 
-  if(nb > 0 && g_list_length(range->blocks) - nb > 0) gtk_menu_shell_append(pop, gtk_separator_menu_item_new());
+  if(nb > 0 && g_list_length(range->blocks) - nb > 0) dt_gui_menu_append(pop, dt_gui_menu_separator_new());
 
   // and the classic ones
   for(const GList *bl = range->blocks; bl; bl = g_list_next(bl))
@@ -1242,27 +1241,24 @@ static GtkWidget *_popup_get_numeric_menu(GtkDarktableRangeSelect *range, GtkWid
 
     gchar *txt = (blo->txt) ? g_strdup(blo->txt) : range->print(blo->value_r, TRUE);
     if(blo->nb > 0) dt_util_str_cat(&txt, " (%d)", blo->nb);
-    GtkWidget *smt = gtk_menu_item_new_with_label(txt);
+    GtkWidget *smt = dt_gui_menu_item_new(txt);
     g_free(txt);
     g_object_set_data(G_OBJECT(smt), "range_block", blo);
     g_object_set_data(G_OBJECT(smt), "source_widget", w);
-    g_signal_connect(G_OBJECT(smt), "activate", G_CALLBACK(_popup_item_activate), range);
+    g_signal_connect(G_OBJECT(smt), "clicked", G_CALLBACK(_popup_item_activate), range);
 
-    gtk_menu_shell_append(pop, smt);
+    dt_gui_menu_append(pop, smt);
   }
 
-  return GTK_WIDGET(pop);
+  return pop;
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _popup_show(GtkDarktableRangeSelect *range, GtkWidget *w)
 {
   if(range->type == DT_RANGE_TYPE_NUMERIC)
   {
-#if !GTK_CHECK_VERSION(4, 0, 0)
     GtkWidget *pop = _popup_get_numeric_menu(range, w);
-    dt_gui_menu_popup(GTK_MENU(pop), NULL, GDK_GRAVITY_SOUTH, GDK_GRAVITY_NORTH);
-#endif
+    dt_gui_menu_popup(pop, w);
   }
   else if(range->type == DT_RANGE_TYPE_DATETIME)
   {

@@ -822,7 +822,6 @@ static void _event_rule_change_type(GtkWidget *widget, dt_lib_module_t *self)
                                     darktable.view_manager->proxy.module_collect.module);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _event_append_rule(GtkWidget *widget, dt_lib_module_t *self)
 {
   // add new rule
@@ -856,36 +855,35 @@ static void _event_append_rule(GtkWidget *widget, dt_lib_module_t *self)
     dt_collection_update_query(darktable.collection, DT_COLLECTION_CHANGE_RELOAD, mode, NULL);
   }
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
-static void _popup_add_item(GtkMenuShell *pop, const gchar *name, const int id, const gboolean title,
+// defined further down; the sort popup items share the collect popup builder
+static void _sort_append_sort(GtkWidget *widget, dt_lib_module_t *self);
+
+static void _popup_add_item(GtkWidget *pop, const gchar *name, const int id, const gboolean title,
                             GCallback callback, gpointer data, dt_lib_module_t *self, const float xalign)
 {
   // we first verify that the filter is defined
   if(callback != G_CALLBACK(_sort_append_sort) && !title && !_filters_get(id)) return;
 
-  GtkWidget *smt = gtk_menu_item_new_with_label(name);
+  GtkWidget *smt = dt_gui_menu_item_new(name);
+  // align the label like the GTK3 title/entry distinction did
+  GtkWidget *label = gtk_button_get_child(GTK_BUTTON(smt));
+  if(GTK_IS_LABEL(label))
+    gtk_widget_set_halign(label, xalign < 0.25f ? GTK_ALIGN_START
+                             : xalign > 0.75f ? GTK_ALIGN_END
+                                              : GTK_ALIGN_CENTER);
   if(title)
-  {
-    GtkWidget *child = gtk_bin_get_child(GTK_BIN(smt));
-    gtk_label_set_xalign(GTK_LABEL(child), xalign);
     gtk_widget_set_sensitive(smt, FALSE);
-  }
   else
   {
-    GtkWidget *child = gtk_bin_get_child(GTK_BIN(smt));
-    gtk_label_set_xalign(GTK_LABEL(child), xalign);
     g_object_set_data(G_OBJECT(smt), "collect_id", GINT_TO_POINTER(id));
     g_object_set_data(G_OBJECT(smt), "topbar", GINT_TO_POINTER(0));
     if(data) g_object_set_data(G_OBJECT(smt), "collect_data", data);
-    g_signal_connect_data(G_OBJECT(smt), "activate", callback, self, NULL, 0);
+    g_signal_connect_data(G_OBJECT(smt), "clicked", callback, self, NULL, 0);
   }
-  gtk_menu_shell_append(pop, smt);
+  dt_gui_menu_append(pop, smt);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _rule_show_popup(GtkWidget *widget, dt_lib_filtering_rule_t *rule, dt_lib_module_t *self)
 {
 #define ADD_COLLECT_ENTRY(menu, value)                                                                            \
@@ -893,8 +891,8 @@ static gboolean _rule_show_popup(GtkWidget *widget, dt_lib_filtering_rule_t *rul
 
   // we show a popup with all the possible rules
   // note that only rules with defined filters will be shown
-  GtkMenuShell *spop = GTK_MENU_SHELL(gtk_menu_new());
-  gtk_widget_set_size_request(GTK_WIDGET(spop), 200, -1);
+  GtkWidget *spop = dt_gui_menu_new();
+  gtk_widget_set_size_request(spop, 200, -1);
 
   // the different categories
   _popup_add_item(spop, _("files"), 0, TRUE, NULL, NULL, self, 0.0);
@@ -942,11 +940,10 @@ static gboolean _rule_show_popup(GtkWidget *widget, dt_lib_filtering_rule_t *rul
   ADD_COLLECT_ENTRY(spop, DT_COLLECTION_PROP_MODULE);
   ADD_COLLECT_ENTRY(spop, DT_COLLECTION_PROP_ORDER);
 
-  dt_gui_menu_popup(GTK_MENU(spop), widget, GDK_GRAVITY_SOUTH, GDK_GRAVITY_NORTH);
+  dt_gui_menu_popup(spop, widget);
   return TRUE;
 #undef ADD_COLLECT_ENTRY
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _rule_populate_prop_combo_add(GtkWidget *w, const dt_collection_properties_t prop)
 {
@@ -1032,19 +1029,10 @@ static void _rule_populate_prop_combo(dt_lib_filtering_rule_t *rule)
   rule->manual_widget_set--;
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _event_rule_append(GtkWidget *widget, gpointer user_data)
 {
   _rule_show_popup(widget, NULL, (dt_lib_module_t *)user_data);
 }
-#else
-// TODO P2: GtkMenu->GtkPopoverMenu migration; the rule-append popup is a no-op on GTK4.
-static void _event_rule_append(GtkWidget *widget, gpointer user_data)
-{
-  (void)widget;
-  (void)user_data;
-}
-#endif
 
 static void _topbar_reset(dt_lib_module_t *self)
 {
@@ -1056,18 +1044,21 @@ static void _topbar_reset(dt_lib_module_t *self)
   dt_collection_update_query(darktable.collection, DT_COLLECTION_CHANGE_RELOAD, DT_COLLECTION_PROP_UNDEF, NULL);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _topbar_reset_press_cb(GtkGestureSingle *gesture, int n_press,
                                       double x, double y,
                                       dt_lib_module_t *self)
 {
   //reset the filters
   _topbar_reset(self);
-  //close the popup
+  //close the popup: the popover is parented to the toolbar button, so
+  //unparenting finalizes it (no other refs)
   dt_lib_filtering_t *d = self->data;
-  gtk_widget_destroy(d->topbar_popup);
+  if(d->topbar_popup)
+  {
+    gtk_widget_unparent(d->topbar_popup);
+    d->topbar_popup = NULL;
+  }
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _topbar_label_press_cb(GtkGestureSingle *gesture, int n_press,
                                       double x, double y,
@@ -1487,7 +1478,11 @@ static void _dt_collection_updated(gpointer instance, dt_collection_change_t que
   }
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
+// pretty-print helpers are defined in the filters/*.c files #included at
+// the bottom of this TU
+static gchar *_colors_pretty_print(const gchar *raw_txt);
+static gchar *_month_pretty_print(const gchar *raw_txt);
+
 static void _history_pretty_print(const char *buf, char *out, size_t outsize)
 {
   memset(out, 0, outsize);
@@ -1568,9 +1563,7 @@ static void _history_pretty_print(const char *buf, char *out, size_t outsize)
     if(buf[0] == '$') buf++;
   }
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _event_history_apply(GtkWidget *widget, dt_lib_module_t *self)
 {
   const int hid = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "history"));
@@ -1586,14 +1579,12 @@ static void _event_history_apply(GtkWidget *widget, dt_lib_module_t *self)
   }
   g_free(line);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _event_history_show(GtkWidget *widget, dt_lib_module_t *self)
 {
   // we show a popup with all the history entries
-  GtkMenuShell *pop = GTK_MENU_SHELL(gtk_menu_new());
-  gtk_widget_set_size_request(GTK_WIDGET(pop), 200, -1);
+  GtkWidget *pop = dt_gui_menu_new();
+  gtk_widget_set_size_request(pop, 200, -1);
 
   const int maxitems = dt_conf_get_int("plugins/lighttable/filtering/history_max");
 
@@ -1606,13 +1597,11 @@ static void _event_history_show(GtkWidget *widget, dt_lib_module_t *self)
     {
       char str[2048] = { 0 };
       _history_pretty_print(line, str, sizeof(str));
-      GtkWidget *smt = gtk_menu_item_new_with_label(str);
+      GtkWidget *smt = dt_gui_menu_item_new_markup(str);
       gtk_widget_set_tooltip_markup(smt, str);
-      GtkWidget *child = gtk_bin_get_child(GTK_BIN(smt));
-      gtk_label_set_use_markup(GTK_LABEL(child), TRUE);
       g_object_set_data(G_OBJECT(smt), "history", GINT_TO_POINTER(i));
-      g_signal_connect(G_OBJECT(smt), "activate", G_CALLBACK(_event_history_apply), self);
-      gtk_menu_shell_append(pop, smt);
+      g_signal_connect(G_OBJECT(smt), "clicked", G_CALLBACK(_event_history_apply), self);
+      dt_gui_menu_append(pop, smt);
       g_free(line);
     }
     else
@@ -1622,18 +1611,9 @@ static void _event_history_show(GtkWidget *widget, dt_lib_module_t *self)
     }
   }
 
-  dt_gui_menu_popup(GTK_MENU(pop), widget, GDK_GRAVITY_SOUTH, GDK_GRAVITY_NORTH);
+  dt_gui_menu_popup(pop, widget);
 }
-#else
-// TODO P2: GtkMenu->GtkPopoverMenu migration; the history popup is a no-op on GTK4.
-static void _event_history_show(GtkWidget *widget, dt_lib_module_t *self)
-{
-  (void)widget;
-  (void)self;
-}
-#endif
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _topbar_populate_prop_combo_add(GtkWidget *w, const dt_collection_properties_t prop,
                                             dt_lib_filtering_t *d)
 {
@@ -1648,9 +1628,7 @@ static void _topbar_populate_prop_combo_add(GtkWidget *w, const dt_collection_pr
   dt_bauhaus_combobox_add_full(w, dt_collection_name(prop), DT_BAUHAUS_COMBOBOX_ALIGN_RIGHT,
                                GUINT_TO_POINTER(prop), NULL, TRUE);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _topbar_populate_rules_combo(GtkWidget *w, dt_lib_filtering_t *d)
 {
   dt_bauhaus_combobox_add_full(w, "", DT_BAUHAUS_COMBOBOX_ALIGN_LEFT, GUINT_TO_POINTER(-1), NULL, TRUE);
@@ -1708,9 +1686,7 @@ static void _topbar_populate_rules_combo(GtkWidget *w, dt_lib_filtering_t *d)
 
 #undef ADD_COLLECT_ENTRY
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _topbar_rule_remove_cb(GtkGestureSingle *gesture, int n_press,
                                        double x, double y,
                                        dt_lib_module_t *self)
@@ -1727,30 +1703,28 @@ static void _topbar_rule_remove_cb(GtkGestureSingle *gesture, int n_press,
   // remove the rule
   _rule_remove_config_entries(self, rule);
 
-  // reconstruct the combobox
+  // reconstruct the combobox (the last child of the popover vbox)
   GtkWidget *hb = gtk_widget_get_parent(widget);
   GtkWidget *popover_vbox = gtk_widget_get_parent(hb);
-  GList *childs = gtk_container_get_children(GTK_CONTAINER(popover_vbox));
-  GtkWidget *combo = g_list_last(childs)->data;
-  g_list_free(childs);
+  GtkWidget *combo = gtk_widget_get_last_child(popover_vbox);
   dt_bauhaus_combobox_clear(combo);
   _topbar_populate_rules_combo(combo, d);
 
   // remove the entry from the popover
-  gtk_container_remove(GTK_CONTAINER(popover_vbox), hb);
+  g_object_ref(hb);
+  gtk_widget_unparent(hb);
+  g_object_unref(hb);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static GtkWidget *_topbar_menu_new_rule(dt_lib_filtering_rule_t *rule, dt_lib_module_t *self)
 {
   GtkWidget *hb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   GtkWidget *lb = gtk_label_new(dt_collection_name(rule->prop));
-  gtk_box_pack_start(GTK_BOX(hb), lb, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), lb);
   GtkWidget *btr = dtgtk_button_new(dtgtk_cairo_paint_remove, 0, NULL);
   g_object_set_data(G_OBJECT(btr), "rule", rule);
   dt_gui_connect_click_all(btr, _topbar_rule_remove_cb, NULL, self);
-  gtk_box_pack_start(GTK_BOX(hb), btr, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), btr);
   return hb;
 }
 
@@ -1779,36 +1753,36 @@ static void _topbar_rule_add(GtkWidget *widget, dt_lib_module_t *self)
   dt_bauhaus_combobox_clear(widget);
   _topbar_populate_rules_combo(widget, d);
 
-  // add a new item to the popover list
-  gtk_box_pack_start(GTK_BOX(gtk_widget_get_parent(widget)),
-                     _topbar_menu_new_rule(&d->rule[d->nb_rules - 1], self), TRUE, TRUE, 0);
-  gtk_widget_show_all(gtk_widget_get_parent(widget));
+  // add a new item to the popover list, right before the combobox (the
+  // last child): the rule rows must stay above the "new filter" entry
+  GtkWidget *vbox2 = gtk_widget_get_parent(widget);
+  GtkWidget *prev = gtk_widget_get_prev_sibling(widget);
+  gtk_box_insert_child_after(GTK_BOX(vbox2),
+                             _topbar_menu_new_rule(&d->rule[d->nb_rules - 1], self),
+                             prev);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _topbar_show_pref_menu(dt_lib_module_t *self, GtkWidget *bt)
 {
   dt_lib_filtering_t *d = self->data;
 
   // initialize the popover
-  d->topbar_popup = gtk_popover_new(bt);
+  d->topbar_popup = gtk_popover_new();
+  dt_gui_popover_attach(d->topbar_popup, bt);
 
   GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  gtk_container_add(GTK_CONTAINER(d->topbar_popup), vbox);
+  gtk_popover_set_child(GTK_POPOVER(d->topbar_popup), vbox);
 
   // fill the popover with all pinned rules
   GtkWidget *vbox2 = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *lb = gtk_label_new(_("shown filters"));
   dt_gui_add_class(lb, "dt_section_label");
-  gtk_box_pack_start(GTK_BOX(vbox2), lb, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(vbox2), lb);
 
   for(int i = 0; i < d->nb_rules; i++)
   {
     if(d->rule[i].topbar)
-    {
-      gtk_box_pack_start(GTK_BOX(vbox2), _topbar_menu_new_rule(&d->rule[i], self), TRUE, TRUE, 0);
-    }
+      gtk_box_append(GTK_BOX(vbox2), _topbar_menu_new_rule(&d->rule[i], self));
   }
 
   // the "add new rule" part
@@ -1817,44 +1791,21 @@ static void _topbar_show_pref_menu(dt_lib_module_t *self, GtkWidget *bt)
   dt_bauhaus_widget_set_label(nr, NULL, _("new filter"));
   _topbar_populate_rules_combo(nr, d);
   g_signal_connect(G_OBJECT(nr), "value-changed", G_CALLBACK(_topbar_rule_add), self);
-  gtk_box_pack_end(GTK_BOX(vbox2), nr, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(vbox2), nr);
 
-  gtk_box_pack_start(GTK_BOX(vbox), vbox2, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(vbox), vbox2);
   // the actions part of the popover
   lb = gtk_label_new(_("actions"));
   dt_gui_add_class(lb, "dt_section_label");
-  gtk_box_pack_start(GTK_BOX(vbox), lb, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(vbox), lb);
   GtkWidget *btr = gtk_button_new_with_label(_("reset quickfilters"));
   dt_gui_add_class(btr, "dt_transparent_background");
   dt_gui_connect_click_all(btr, _topbar_reset_press_cb, NULL, self);
-  gtk_box_pack_start(GTK_BOX(vbox), btr, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(vbox), btr);
 
   // show the popover
-  GdkDevice *pointer = gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default()));
-
-  int x, y;
-  GdkWindow *pointer_window = gdk_device_get_window_at_position(pointer, &x, &y);
-  gpointer pointer_widget = NULL;
-  if(pointer_window) gdk_window_get_user_data(pointer_window, &pointer_widget);
-
-  GdkRectangle rect = { gtk_widget_get_allocated_width(bt) / 2, gtk_widget_get_allocated_height(bt), 1, 1 };
-
-  if(pointer_widget && bt != pointer_widget)
-    gtk_widget_translate_coordinates(pointer_widget, bt, x, y, &rect.x, &rect.y);
-
-  gtk_popover_set_pointing_to(GTK_POPOVER(d->topbar_popup), &rect);
-
-  gtk_widget_show_all(d->topbar_popup);
+  gtk_widget_set_visible(d->topbar_popup, TRUE);
 }
-#else
-// TODO P2: GtkMenu->GtkPopoverMenu migration; the topbar preferences popup is a no-op on GTK4.
-static void _topbar_show_pref_menu(dt_lib_module_t *self, GtkWidget *bt)
-{
-  (void)self;
-  (void)bt;
-}
-#endif
-
 // save a sort rule inside the conf
 static void _conf_update_sort(_widgets_sort_t *sort)
 {
@@ -2109,7 +2060,6 @@ static void _sort_gui_update(dt_lib_module_t *self)
   DT_LEAVE_GUI_UPDATE();
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _sort_append_sort(GtkWidget *widget, dt_lib_module_t *self)
 {
   // add new rule
@@ -2137,32 +2087,19 @@ static void _sort_append_sort(GtkWidget *widget, dt_lib_module_t *self)
     dt_collection_update_query(darktable.collection, DT_COLLECTION_CHANGE_RELOAD, DT_COLLECTION_PROP_SORT, NULL);
   }
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _sort_show_add_popup(GtkWidget *widget, dt_lib_module_t *self)
 {
   // we show a popup with all the possible sort
-  GtkMenuShell *spop = GTK_MENU_SHELL(gtk_menu_new());
-  gtk_widget_set_size_request(GTK_WIDGET(spop), 200, -1);
+  GtkWidget *spop = dt_gui_menu_new();
+  gtk_widget_set_size_request(spop, 200, -1);
 
   for(const dt_introspection_type_enum_tuple_t *list = _collection_sort_names; list->name; list++)
     _popup_add_item(spop, Q_(list->name), list->value, FALSE, G_CALLBACK(_sort_append_sort), NULL, self, 0.0);
 
-  dt_gui_menu_popup(GTK_MENU(spop), widget, GDK_GRAVITY_SOUTH, GDK_GRAVITY_NORTH);
-#undef ADD_SORT_ENTRY
-
+  dt_gui_menu_popup(spop, widget);
 }
-#else
-// TODO P2: GtkMenu->GtkPopoverMenu migration; the sort-add popup is a no-op on GTK4.
-static void _sort_show_add_popup(GtkWidget *widget, dt_lib_module_t *self)
-{
-  (void)widget;
-  (void)self;
-}
-#endif
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _sort_history_pretty_print(const char *buf, char *out, size_t outsize)
 {
   memset(out, 0, outsize);
@@ -2194,9 +2131,7 @@ static void _sort_history_pretty_print(const char *buf, char *out, size_t outsiz
     if(buf[0] == '$') buf++;
   }
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _sort_history_apply(GtkWidget *widget, dt_lib_module_t *self)
 {
   const int hid = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "history"));
@@ -2212,7 +2147,6 @@ static void _sort_history_apply(GtkWidget *widget, dt_lib_module_t *self)
   }
   g_free(line);
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _dt_images_order_change(gpointer instance, gpointer order, gpointer self)
 {
@@ -2224,12 +2158,11 @@ static void _dt_images_order_change(gpointer instance, gpointer order, gpointer 
   }
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _sort_history_show(GtkWidget *widget, dt_lib_module_t *self)
 {
   // we show a popup with all the history entries
-  GtkMenuShell *pop = GTK_MENU_SHELL(gtk_menu_new());
-  gtk_widget_set_size_request(GTK_WIDGET(pop), 200, -1);
+  GtkWidget *pop = dt_gui_menu_new();
+  gtk_widget_set_size_request(pop, 200, -1);
 
   const int maxitems = dt_conf_get_int("plugins/lighttable/filtering/sort_history_max");
 
@@ -2242,11 +2175,11 @@ static void _sort_history_show(GtkWidget *widget, dt_lib_module_t *self)
     {
       char str[2048] = { 0 };
       _sort_history_pretty_print(line, str, sizeof(str));
-      GtkWidget *smt = gtk_menu_item_new_with_label(str);
+      GtkWidget *smt = dt_gui_menu_item_new(str);
       gtk_widget_set_tooltip_text(smt, str);
       g_object_set_data(G_OBJECT(smt), "history", GINT_TO_POINTER(i));
-      g_signal_connect(G_OBJECT(smt), "activate", G_CALLBACK(_sort_history_apply), self);
-      gtk_menu_shell_append(pop, smt);
+      g_signal_connect(G_OBJECT(smt), "clicked", G_CALLBACK(_sort_history_apply), self);
+      dt_gui_menu_append(pop, smt);
       g_free(line);
     }
     else
@@ -2256,16 +2189,8 @@ static void _sort_history_show(GtkWidget *widget, dt_lib_module_t *self)
     }
   }
 
-  dt_gui_menu_popup(GTK_MENU(pop), widget, GDK_GRAVITY_SOUTH, GDK_GRAVITY_NORTH);
+  dt_gui_menu_popup(pop, widget);
 }
-#else
-// TODO P2: GtkMenu->GtkPopoverMenu migration; the sort-history popup is a no-op on GTK4.
-static void _sort_history_show(GtkWidget *widget, dt_lib_module_t *self)
-{
-  (void)widget;
-  (void)self;
-}
-#endif
 
 void gui_init(dt_lib_module_t *self)
 {

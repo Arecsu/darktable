@@ -106,7 +106,6 @@ static void _month_set_mask(dt_lib_filtering_rule_t *rule, const int mask, const
   g_free(txt);
 }
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static gchar *_month_pretty_print(const gchar *raw_txt)
 {
   const int mask = _month_get_mask(raw_txt);
@@ -125,7 +124,6 @@ static gchar *_month_pretty_print(const gchar *raw_txt)
   }
   return txt ? txt : g_strdup(_("all"));
 }
-#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _month_widget_changed(GtkToggleButton *button, gpointer user_data)
 {

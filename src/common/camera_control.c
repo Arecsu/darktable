@@ -1664,9 +1664,8 @@ const char *dt_camctl_camera_get_model(const dt_camctl_t *c,
 }
 
 
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _camera_build_property_menu(CameraWidget *widget,
-                                        GtkMenu *menu,
+                                        GtkWidget *menu,
                                         GCallback item_activate,
                                         gpointer user_data)
 {
@@ -1687,23 +1686,18 @@ static void _camera_build_property_menu(CameraWidget *widget,
       if(gp_widget_count_children(child) > 0)
       {
         /* create submenu item */
-        GtkMenuItem *item = GTK_MENU_ITEM(gtk_menu_item_new_with_label(sk));
-        gtk_menu_item_set_submenu(item, gtk_menu_new());
+        GtkWidget *item = dt_gui_menu_item_new(sk);
+        GtkWidget *submenu = dt_gui_menu_new();
+        dt_gui_menu_item_set_submenu(item, submenu);
 
         /* recurse into submenu */
-        _camera_build_property_menu(child,
-                                    GTK_MENU(gtk_menu_item_get_submenu(item)),
-                                    item_activate,
-                                    user_data);
+        _camera_build_property_menu(child, submenu, item_activate, user_data);
 
-        /* add submenu item to menu if not empty*/
-        GList *children =
-          gtk_container_get_children(GTK_CONTAINER(gtk_menu_item_get_submenu(item)));
-        if(children)
-        {
-          gtk_menu_shell_append(GTK_MENU_SHELL(menu), GTK_WIDGET(item));
-          g_list_free(children);
-        }
+        /* add submenu item to menu if not empty: the submenu popover's
+         * child is the item box, so non-empty means it has a child widget */
+        GtkWidget *box = gtk_popover_get_child(GTK_POPOVER(submenu));
+        if(gtk_widget_get_first_child(box))
+          dt_gui_menu_append(menu, item);
       }
       else
       {
@@ -1715,21 +1709,19 @@ static void _camera_build_property_menu(CameraWidget *widget,
         {
           /* construct menu item for property */
           gp_widget_get_name(child, &sk);
-          GtkMenuItem *item = GTK_MENU_ITEM(gtk_menu_item_new_with_label(sk));
-          g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(item_activate), user_data);
+          GtkWidget *item = dt_gui_menu_item_new(sk);
+          g_signal_connect(G_OBJECT(item), "clicked", G_CALLBACK(item_activate), user_data);
           /* add submenu item to menu */
-          gtk_menu_shell_append(GTK_MENU_SHELL(menu), GTK_WIDGET(item));
+          dt_gui_menu_append(menu, item);
         }
       }
     }
   }
 }
 
-// GtkMenu is removed in GTK4; the camera property popup is deferred to the
-// GtkMenu->GtkPopoverMenu migration (TODO P2).
 void dt_camctl_camera_build_property_menu(const dt_camctl_t *c,
                                           const dt_camera_t *cam,
-                                          GtkMenu **menu,
+                                          GtkWidget **menu,
                                           GCallback item_activate,
                                           gpointer user_data)
 {
@@ -1750,12 +1742,10 @@ void dt_camctl_camera_build_property_menu(const dt_camctl_t *c,
   /* lock camera config mutex while recursive building property menu */
   dt_camera_t *camera = (dt_camera_t *)cam;
   dt_pthread_mutex_lock(&camera->config_lock);
-  *menu = GTK_MENU(gtk_menu_new());
+  *menu = dt_gui_menu_new();
   _camera_build_property_menu(camera->configuration, *menu, item_activate, user_data);
-  gtk_widget_show_all(GTK_WIDGET(*menu));
   dt_pthread_mutex_unlock(&camera->config_lock);
 }
-#endif
 
 
 
