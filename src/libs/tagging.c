@@ -1932,13 +1932,13 @@ static void _pop_menu_dictionary_create_tag(GtkWidget *menuitem,
 
   text = g_strdup_printf(_("add to: \"%s\" "), path);
   parent = gtk_check_button_new_with_label(text);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(parent), TRUE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(parent), TRUE);
   g_free(text);
 
   category = gtk_check_button_new_with_label(_("category"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(category), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(category), FALSE);
   private = gtk_check_button_new_with_label(_("private"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(private), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(private), FALSE);
 
   GtkWidget *synonyms = gtk_text_view_new();
   gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(synonyms), GTK_WRAP_WORD);
@@ -1961,7 +1961,7 @@ static void _pop_menu_dictionary_create_tag(GtkWidget *menuitem,
     if(!newtag[0])
       message = _("empty tag is not allowed, aborting");
     char *new_tagname = NULL;
-    const gboolean root = !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(parent));
+    const gboolean root = !gtk_check_button_get_active(GTK_CHECK_BUTTON(parent));
     if(!root)
     {
       new_tagname = g_strdup(path);
@@ -1986,10 +1986,10 @@ static void _pop_menu_dictionary_create_tag(GtkWidget *menuitem,
     guint new_tagid = 0;
     if(dt_tag_new(new_tagname, &new_tagid))
     {
-      const gint new_flags = ((gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(category))
+      const gint new_flags = ((gtk_check_button_get_active(GTK_CHECK_BUTTON(category))
                                ? DT_TF_CATEGORY
                                : 0)
-                              | (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(private))
+                              | (gtk_check_button_get_active(GTK_CHECK_BUTTON(private))
                                  ? DT_TF_PRIVATE
                                  : 0));
       if(new_tagid)
@@ -2087,9 +2087,9 @@ static void _pop_menu_dictionary_edit_tag(GtkWidget *menuitem,
   {
     flags = dt_tag_get_flags(tagid);
     category = gtk_check_button_new_with_label(_("category"));
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(category), flags & DT_TF_CATEGORY);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(category), flags & DT_TF_CATEGORY);
     private = gtk_check_button_new_with_label(_("private"));
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(private), flags & DT_TF_PRIVATE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(private), flags & DT_TF_PRIVATE);
 
     GtkWidget *synonyms = gtk_text_view_new();
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(synonyms), GTK_WRAP_WORD);
@@ -2219,10 +2219,10 @@ static void _pop_menu_dictionary_edit_tag(GtkWidget *menuitem,
 
     if(tagid)
     {
-      gint new_flags = ((gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(category))
+      gint new_flags = ((gtk_check_button_get_active(GTK_CHECK_BUTTON(category))
                          ? DT_TF_CATEGORY
                          : 0)
-                        | (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(private))
+                        | (gtk_check_button_get_active(GTK_CHECK_BUTTON(private))
                            ? DT_TF_PRIVATE
                            : 0));
       GtkTextIter start, end;

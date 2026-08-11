@@ -2114,7 +2114,7 @@ static void _blendif_options_callback(GtkButton *button,
       }
       g_object_set_data_full(G_OBJECT(row), "dt-blend-cst",
                              GINT_TO_POINTER(DEVELOP_BLEND_CS_LAB), NULL);
-      g_signal_connect(G_OBJECT(row), "clicked",
+      g_signal_connect(G_OBJECT(row), "activate",
                        G_CALLBACK(_blendif_select_colorspace), module);
       gtk_box_append(GTK_BOX(vb), row);
     }
@@ -2128,7 +2128,7 @@ static void _blendif_options_callback(GtkButton *button,
     }
     g_object_set_data_full(G_OBJECT(row), "dt-blend-cst",
                            GINT_TO_POINTER(DEVELOP_BLEND_CS_RGB_DISPLAY), NULL);
-    g_signal_connect(G_OBJECT(row), "clicked",
+    g_signal_connect(G_OBJECT(row), "activate",
                      G_CALLBACK(_blendif_select_colorspace), module);
     gtk_box_append(GTK_BOX(vb), row);
 
@@ -2141,7 +2141,7 @@ static void _blendif_options_callback(GtkButton *button,
     }
     g_object_set_data_full(G_OBJECT(row), "dt-blend-cst",
                            GINT_TO_POINTER(DEVELOP_BLEND_CS_RGB_SCENE), NULL);
-    g_signal_connect(G_OBJECT(row), "clicked",
+    g_signal_connect(G_OBJECT(row), "activate",
                      G_CALLBACK(_blendif_select_colorspace), module);
     gtk_box_append(GTK_BOX(vb), row);
 

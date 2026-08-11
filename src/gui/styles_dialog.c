@@ -307,7 +307,7 @@ static void _gui_styles_edit_style_response(GtkDialog *dialog,
 
     if(newname && *newname)
     {
-      if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->duplicate)))
+      if(gtk_check_button_get_active(GTK_CHECK_BUTTON(g->duplicate)))
       {
         dt_styles_create_from_style(g->nameorig,
                                     newname,

@@ -208,6 +208,29 @@ void dt_gui_remove_class(GtkWidget *widget, const gchar *class_name);
  * ignore the synthetic crossing events GDK generates for those grabs */
 gboolean dt_gui_pointer_is_grabbed(void);
 
+/** Configuration for dt_gui_check_button_new().
+ *
+ * GTK4's GtkCheckButton derives directly from GtkWidget — it is NOT a
+ * GtkToggleButton nor a GtkButton (unlike GTK3) — so the toggle/button API
+ * and the "clicked" signal do not apply to it: use gtk_check_button_* and
+ * the "toggled" signal instead.  This factory is the single place that
+ * encodes that rule; it also kills the GTK3 habit of scattering
+ * create + tooltip + set_active + signal-connect across four lines.
+ *
+ * All fields are optional (zero/NULL = default); pass _() from the call site.
+ */
+typedef struct dt_gui_check_button_t
+{
+  const gchar *label;      /* button text; NULL for an empty check button */
+  const gchar *tooltip;    /* hover tooltip; NULL for none */
+  gboolean active;         /* initial state */
+  gboolean inconsistent;   /* tri-state display */
+  GCallback toggled;       /* "toggled" handler, fired on every state change */
+  gpointer user_data;      /* data passed to toggled */
+} dt_gui_check_button_t;
+
+GtkWidget *dt_gui_check_button_new(const dt_gui_check_button_t cfg);
+
 void dt_open_url(const char *url);
 int dt_gui_theme_init(dt_gui_gtk_t *gui);
 int dt_gui_gtk_init(dt_gui_gtk_t *gui);

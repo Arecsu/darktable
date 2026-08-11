@@ -962,7 +962,7 @@ static void preserve_color_callback(GtkWidget *widget, dt_iop_module_t *self)
 {
   DT_GUARD_GUI_UPDATE();
   dt_iop_filmic_params_t *p = self->params;
-  p->preserve_color = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+  p->preserve_color = gtk_check_button_get_active(GTK_CHECK_BUTTON(widget));
   dt_dev_add_history_item(darktable.develop, self, TRUE);
 }
 
@@ -1277,7 +1277,7 @@ void gui_update(dt_iop_module_t *self)
   dt_bauhaus_slider_set(g->balance, p->balance);
 
   dt_bauhaus_combobox_set(g->interpolator, p->interpolator);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->preserve_color), p->preserve_color);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(g->preserve_color), p->preserve_color);
 
   dtgtk_expander_set_expanded(DTGTK_EXPANDER(g->extra_expander),
                               gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->extra_toggle)));
@@ -1590,13 +1590,15 @@ void gui_init(dt_iop_module_t *self)
   g_signal_connect(G_OBJECT(g->interpolator), "value-changed", G_CALLBACK(interpolator_callback), self);
 
   // Preserve color
-  g->preserve_color = gtk_check_button_new_with_label(_("preserve the chrominance"));
-  gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(g->preserve_color), p->preserve_color);
-  gtk_widget_set_tooltip_text(g->preserve_color,
-                              _("ensure the original color are preserved.\n"
-                                "may reinforce chromatic aberrations.\n"
-                                "you need to manually tune the saturation when using this mode."));
-  g_signal_connect(G_OBJECT(g->preserve_color), "toggled", G_CALLBACK(preserve_color_callback), self);
+  g->preserve_color = dt_gui_check_button_new((dt_gui_check_button_t){
+      .label   = _("preserve the chrominance"),
+      .tooltip = _("ensure the original color are preserved.\n"
+                    "may reinforce chromatic aberrations.\n"
+                    "you need to manually tune the saturation when using this mode."),
+      .active  = p->preserve_color,
+      .toggled = G_CALLBACK(preserve_color_callback),
+      .user_data = self,
+    });
 
   // Black slider
   g->black_point_target = dt_bauhaus_slider_new_with_range(self, 0.0, 100.0, 0, p->black_point_target, 2);

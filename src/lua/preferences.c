@@ -378,7 +378,7 @@ static void response_callback_bool(GtkDialog *dialog, gint response_id, pref_ele
   {
     char pref_name[1024];
     get_pref_name(pref_name, sizeof(pref_name), cur_elt->script, cur_elt->name);
-    dt_conf_set_bool(pref_name, gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(cur_elt->widget)));
+    dt_conf_set_bool(pref_name, gtk_check_button_get_active(GTK_CHECK_BUTTON(cur_elt->widget)));
   }
 }
 
@@ -480,7 +480,7 @@ static void click_widget_bool_cb(GtkGestureSingle *gesture, gint n_press, gdoubl
   }
   else if(n_press == 2)
   {
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cur_elt->widget),
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(cur_elt->widget),
                                  cur_elt->type_data.bool_data.default_value);
   }
 }
@@ -595,7 +595,7 @@ static void update_widget_bool(pref_element* cur_elt, GtkWidget* dialog, GtkWidg
   get_pref_name(pref_name, sizeof(pref_name), cur_elt->script, cur_elt->name);
   dt_gui_connect_click(labelev, click_widget_bool_cb, NULL, cur_elt);
   g_signal_connect(G_OBJECT(dialog), "response", G_CALLBACK(response_callback_bool), cur_elt);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cur_elt->widget), dt_conf_get_bool(pref_name));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(cur_elt->widget), dt_conf_get_bool(pref_name));
 }
 
 
@@ -757,7 +757,7 @@ static int register_pref_sub(lua_State *L)
         dt_conf_set_bool(pref_name, built_elt->type_data.bool_data.default_value);
 
       built_elt->widget = gtk_check_button_new();
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(built_elt->widget), dt_conf_get_bool(pref_name));
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(built_elt->widget), dt_conf_get_bool(pref_name));
       g_object_ref_sink(G_OBJECT(built_elt->widget));
       built_elt->tooltip_reset = g_strdup_printf(  _("double-click to reset to `%s'"),
           built_elt->type_data.bool_data.default_value ? "true" : "false");

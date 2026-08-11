@@ -323,7 +323,7 @@ static void _shape_button_clicked(GtkButton *button, dt_lib_module_t *self)
   dt_conf_set_int("plugins/map/locationshape", shape);
 
   g_signal_handler_block (d->shape_button, d->shape_button_handler);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->shape_button), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->shape_button), FALSE);
   dtgtk_togglebutton_set_paint((GtkDarktableToggleButton *)d->shape_button, location_shapes[shape], 0, NULL);
   g_signal_handler_unblock (d->shape_button, d->shape_button_handler);
 }
@@ -332,7 +332,7 @@ static void _show_all_button_clicked(GtkButton *button, dt_lib_module_t *self)
 {
   dt_lib_map_locations_t *d = self->data;
   dt_conf_set_bool("plugins/map/showalllocations",
-                  gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->show_all_button)));
+                  gtk_check_button_get_active(GTK_CHECK_BUTTON(d->show_all_button)));
   dt_view_map_location_action(darktable.view_manager, MAP_LOCATION_ACTION_UPDATE_OTHERS);
 }
 
@@ -966,7 +966,7 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_tooltip_text(d->show_all_button,
                               _("show all locations which are on the visible map"));
   gtk_box_pack_end(hbox, d->show_all_button, FALSE, FALSE, 8);
-  g_signal_connect(G_OBJECT(d->show_all_button), "clicked", G_CALLBACK(_show_all_button_clicked), self);
+  g_signal_connect(G_OBJECT(d->show_all_button), "toggled", G_CALLBACK(_show_all_button_clicked), self);
 
   gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(hbox), FALSE, TRUE, 0);
 

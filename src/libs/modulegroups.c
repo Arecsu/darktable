@@ -2180,9 +2180,9 @@ static void _manage_editor_save(dt_lib_module_t *self)
 
   // get all the values
   d->edit_show_search =
-    gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->edit_search_cb));
+    gtk_check_button_get_active(GTK_CHECK_BUTTON(d->edit_search_cb));
   d->edit_full_active =
-    gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->edit_full_active_cb));
+    gtk_check_button_get_active(GTK_CHECK_BUTTON(d->edit_full_active_cb));
   gchar *params = _preset_to_string(self, TRUE);
 
   // update the preset in the database

@@ -605,10 +605,10 @@ static char *get_export_filename(dt_lut_t *self, const char *extension, char **n
   GtkWidget *cb_colorin = gtk_check_button_new_with_label("input color profile");
   GtkWidget *cb_tonecurve = gtk_check_button_new_with_label("tone curve");
 
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb_basecurve), TRUE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb_colorchecker), TRUE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb_colorin), TRUE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb_tonecurve), TRUE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(cb_basecurve), TRUE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(cb_colorchecker), TRUE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(cb_colorin), TRUE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(cb_tonecurve), TRUE);
 
   if(basecurve)
   {
@@ -636,10 +636,10 @@ static char *get_export_filename(dt_lut_t *self, const char *extension, char **n
     if(basecurve)
     {
       // either request all of them or none ...
-      *basecurve = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(cb_basecurve));
-      *colorchecker = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(cb_colorchecker));
-      *colorin = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(cb_colorin));
-      *tonecurve = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(cb_tonecurve));
+      *basecurve = gtk_check_button_get_active(GTK_CHECK_BUTTON(cb_basecurve));
+      *colorchecker = gtk_check_button_get_active(GTK_CHECK_BUTTON(cb_colorchecker));
+      *colorin = gtk_check_button_get_active(GTK_CHECK_BUTTON(cb_colorin));
+      *tonecurve = gtk_check_button_get_active(GTK_CHECK_BUTTON(cb_tonecurve));
     }
   }
   gtk_widget_destroy(dialog);

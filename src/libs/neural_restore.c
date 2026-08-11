@@ -4220,19 +4220,19 @@ static void _profile_combo_changed(GtkWidget *w,
   _update_info_label((dt_lib_neural_restore_t *)self->data);
 }
 
-static void _catalog_toggle_changed(GtkWidget *w,
+static void _catalog_toggle_changed(GtkCheckButton *w,
                                     dt_lib_module_t *self)
 {
   const gboolean active
-    = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
+    = gtk_check_button_get_active(w);
   dt_conf_set_bool(CONF_ADD_CATALOG, active);
 }
 
-static void _preserve_wide_gamut_toggled(GtkWidget *w,
+static void _preserve_wide_gamut_toggled(GtkCheckButton *w,
                                          dt_lib_module_t *self)
 {
   const gboolean active
-    = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
+    = gtk_check_button_get_active(w);
   dt_conf_set_bool(CONF_PRESERVE_WIDE_GAMUT, active);
   _update_info_label((dt_lib_neural_restore_t *)self->data);
 }
@@ -4472,8 +4472,8 @@ void gui_init(dt_lib_module_t *self)
   // only affects denoise; upscale always uses the model output.
   d->preserve_wide_gamut_toggle
     = gtk_check_button_new_with_label(_("preserve wide-gamut colors"));
-  gtk_toggle_button_set_active(
-    GTK_TOGGLE_BUTTON(d->preserve_wide_gamut_toggle),
+  gtk_check_button_set_active(
+    GTK_CHECK_BUTTON(d->preserve_wide_gamut_toggle),
     dt_conf_key_exists(CONF_PRESERVE_WIDE_GAMUT)
       ? dt_conf_get_bool(CONF_PRESERVE_WIDE_GAMUT)
       : TRUE);
@@ -4488,7 +4488,7 @@ void gui_init(dt_lib_module_t *self)
   // add to catalog
   GtkWidget *catalog_box = dt_gui_hbox();
   d->catalog_toggle = gtk_check_button_new_with_label(_("add to the current collection"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->catalog_toggle),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->catalog_toggle),
                                dt_conf_key_exists(CONF_ADD_CATALOG)
                                  ? dt_conf_get_bool(CONF_ADD_CATALOG)
                                  : TRUE);

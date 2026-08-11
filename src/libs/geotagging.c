@@ -422,7 +422,7 @@ static void _refresh_displayed_images(dt_lib_module_t *self)
   dt_lib_geotagging_t *d = self->data;
   GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(d->map.gpx_view));
   GtkTreeIter iter;
-  const gboolean preview = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->map.preview_button));
+  const gboolean preview = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->map.preview_button));
   gboolean valid = gtk_tree_model_get_iter_first(model, &iter);
   for(int segid = 0; valid && segid < d->map.nb_tracks; segid++)
   {
@@ -599,7 +599,7 @@ static void _track_seg_toggled(GtkCellRendererToggle *cell_renderer, gchar *path
                                                        d->map.map_box.lon2, d->map.map_box.lat2);
   }
 
-  const gboolean preview = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->map.preview_button));
+  const gboolean preview = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->map.preview_button));
   _refresh_images_displayed_on_track(segid, active && preview, self);
   _update_nb_images(self);
   _update_buttons(self);
@@ -609,8 +609,8 @@ static void _all_tracks_toggled(GtkTreeViewColumn *column, dt_lib_module_t *self
 {
   dt_lib_geotagging_t *d = self->data;
   GtkWidget *toggle = gtk_tree_view_column_get_widget(column);
-  gboolean active = !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(toggle), active);
+  gboolean active = !gtk_check_button_get_active(GTK_CHECK_BUTTON(toggle));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(toggle), active);
 
   GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(d->map.gpx_view));
   GtkTreeIter iter;
@@ -706,8 +706,8 @@ static void _show_gpx_tracks(dt_lib_module_t *self)
     ((dt_sel_img_t *)i->data)->segid = -1;
 
   int segid = 0;
-  const gboolean active = gtk_toggle_button_get_active(
-                          GTK_TOGGLE_BUTTON(gtk_tree_view_column_get_widget(d->map.sel_tracks)));
+  const gboolean active = gtk_check_button_get_active(
+                          GTK_CHECK_BUTTON(gtk_tree_view_column_get_widget(d->map.sel_tracks)));
   for(GList *ts = trkseg; ts; ts = g_list_next(ts))
   {
     dt_gpx_track_segment_t *t = ts->data;
@@ -750,7 +750,7 @@ static void _apply_gpx(GtkWidget *widget, dt_lib_module_t *self)
     dt_control_gpx_apply(gtk_label_get_text(GTK_LABEL(d->map.gpx_file)), -1, tz, imgs);
   }
   g_free(tz);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->map.preview_button), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->map.preview_button), FALSE);
 }
 
 static void _update_layout(dt_lib_module_t *self)
@@ -1286,7 +1286,7 @@ static void _display_offset(const GTimeSpan offset_int, const gboolean valid, dt
     for(int i = 2; i < DT_GEOTAG_PARTS_NB; i++)
       gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->of.widget[i])), "-");
   }
-  const gboolean locked = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->lock_offset));
+  const gboolean locked = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->lock_offset));
   gtk_widget_set_sensitive(d->apply_offset, d->imgid && valid && !off2 && offset_int);
   gtk_widget_set_sensitive(d->lock_offset, locked || (d->imgid && valid && !off2 && offset_int));
   gtk_widget_set_sensitive(d->apply_datetime, d->imgid && !locked);
@@ -1398,7 +1398,7 @@ static GDateTime *_get_image_datetime(dt_lib_module_t *self)
 static void _refresh_image_datetime(dt_lib_module_t *self)
 {
   dt_lib_geotagging_t *d = self->data;
-  const gboolean locked = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->lock_offset));
+  const gboolean locked = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->lock_offset));
   GDateTime *datetime = _get_image_datetime(self);
   if(d->datetime0)
     g_date_time_unref(d->datetime0);
@@ -1795,7 +1795,7 @@ static void _dt_pref_change_callback(gpointer instance, dt_lib_module_t *self)
 void gui_reset(dt_lib_module_t *self)
 {
   dt_lib_geotagging_t *d = self->data;
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->lock_offset), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->lock_offset), FALSE);
   _refresh_image_datetime(self);
 
 #ifdef HAVE_MAP
@@ -1957,7 +1957,7 @@ void gui_init(dt_lib_module_t *self)
   d->map.sel_tracks = column;
   GtkWidget *button = gtk_check_button_new();
   gtk_widget_show(button);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(button), FALSE);
   gtk_tree_view_column_set_widget(column, button);
   gtk_tree_view_column_set_alignment(column, 0.5);
   g_signal_connect(column, "clicked", G_CALLBACK(_all_tracks_toggled), self);
@@ -1998,12 +1998,12 @@ void gui_init(dt_lib_module_t *self)
   line = 0;
 
   d->map.preview_button = gtk_check_button_new_with_label(_("preview images"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->map.preview_button), TRUE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->map.preview_button), TRUE);
   gtk_widget_set_sensitive(d->map.preview_button, FALSE);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(d->map.preview_button))), PANGO_ELLIPSIZE_END);
+  gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(d->map.preview_button))), PANGO_ELLIPSIZE_END);
   gtk_grid_attach(grid, d->map.preview_button, 0, line, 1, 1);
   gtk_widget_set_tooltip_text(d->map.preview_button, _("show on map matching images"));
-  g_signal_connect(GTK_TOGGLE_BUTTON(d->map.preview_button), "toggled", G_CALLBACK(_images_preview_toggled), self);
+  g_signal_connect(GTK_CHECK_BUTTON(d->map.preview_button), "toggled", G_CALLBACK(_images_preview_toggled), self);
 
   d->map.select_button = dt_action_button_new(self, N_("select images"), _select_images, self,
                                               _("select matching images"), 0, 0);

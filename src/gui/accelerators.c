@@ -243,12 +243,21 @@ static inline gint _action_effect_button_state(const dt_action_effect_t effect,
   }
 }
 
+/* toggle-type action targets: GTK4's GtkCheckButton is no longer a
+ * GtkToggleButton, so accept both kinds. */
+static gboolean _action_target_is_active(gpointer target)
+{
+  if(GTK_IS_TOGGLE_BUTTON(target))
+    return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(target));
+  return gtk_check_button_get_active(GTK_CHECK_BUTTON(target));
+}
+
 static float _action_process_toggle(gpointer target,
                                     dt_action_element_t element,
                                     dt_action_effect_t effect,
                                     float move_size)
 {
-  float value = gtk_toggle_button_get_active(target);
+  float value = _action_target_is_active(target);
 
   if(DT_ACTION_TOGGLE_NEEDED(effect, move_size, value)
      && gtk_widget_get_ancestor(target, GTK_TYPE_WINDOW))
@@ -298,7 +307,7 @@ static float _action_process_toggle(gpointer target,
       }
     }
 
-    value = gtk_toggle_button_get_active(target);
+    value = _action_target_is_active(target);
 
     if(!gtk_widget_is_visible(target))
       dt_action_widget_toast(NULL, target, value ? _("on") : _("off"));
@@ -2635,10 +2644,10 @@ static void _shortcuts_load(const gchar *shortcuts_file,
                             const dt_input_device_t load_dev,
                             const gboolean clear);
 
-static void _fallbacks_toggled(GtkToggleButton *button, gpointer data)
+static void _fallbacks_toggled(GtkCheckButton *button, gpointer data)
 {
   dt_conf_set_bool("accel/enable_fallbacks",
-                   (darktable.control->enable_fallbacks = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button))));
+                   (darktable.control->enable_fallbacks = gtk_check_button_get_active(GTK_CHECK_BUTTON(button))));
 
   GtkTreeView *shortcuts_view = GTK_TREE_VIEW(data);
   gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER
@@ -2678,7 +2687,7 @@ static void _restore_clicked(GtkButton *button, gpointer user_data)
   gtk_widget_show_all(dialog);
 
   const int resp = dt_gui_dialog_run(GTK_DIALOG(dialog));
-  const gboolean wipe = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(clear));
+  const gboolean wipe = gtk_check_button_get_active(GTK_CHECK_BUTTON(clear));
 
   gtk_widget_destroy(dialog);
 
@@ -2863,7 +2872,7 @@ static void _import_clicked(GtkButton *button, gpointer user_data)
                        gtk_combo_box_get_active(GTK_COMBO_BOX(combo_from_id)) + (dev-1) * 10;
   const gint to_id = dev == 1 ? 0 :
                      gtk_combo_box_get_active(GTK_COMBO_BOX(combo_to_id)) + (dev-1) * 10;
-  const gboolean wipe = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(clear));
+  const gboolean wipe = gtk_check_button_get_active(GTK_CHECK_BUTTON(clear));
 
   gtk_widget_destroy(dialog);
 
@@ -3280,7 +3289,7 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
   GtkWidget *btn_fallbacks = gtk_check_button_new_with_label(_("enable fallbacks"));
   gtk_widget_set_tooltip_text(btn_fallbacks, _("enables default meanings for additional buttons, modifiers or moves\n"
                                                "when used in combination with a base shortcut"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(btn_fallbacks),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(btn_fallbacks),
                                darktable.control->enable_fallbacks);
   g_signal_connect(btn_fallbacks, "toggled", G_CALLBACK(_fallbacks_toggled), shortcuts_view);
 

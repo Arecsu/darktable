@@ -94,9 +94,9 @@ static void _metadata_reset_all(dt_import_metadata_t *metadata,
     for(unsigned int i = DT_META_META_VALUE; i < metadata->num_grid_rows + DT_META_TAGS_VALUE; i++)
     {
       GtkWidget *w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 2, i);
-      if(GTK_IS_TOGGLE_BUTTON(w))
+      if(GTK_IS_CHECK_BUTTON(w))
       {
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), TRUE);
+        gtk_check_button_set_active(GTK_CHECK_BUTTON(w), TRUE);
       }
     }
   }
@@ -121,14 +121,14 @@ static void _import_metadata_toggled(GtkWidget *widget,
     const char *tagname = g_object_get_data(G_OBJECT(widget), "tagname");
     const char *metadata_name = dt_metadata_get_tag_subkey(tagname);
     char *setting = g_strdup_printf("plugins/lighttable/metadata/%s_flag", metadata_name);
-    const gboolean imported = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+    const gboolean imported = gtk_check_button_get_active(GTK_CHECK_BUTTON(widget));
     const uint32_t flag = dt_conf_get_int(setting);
     dt_conf_set_int(setting, imported ? flag | DT_METADATA_FLAG_IMPORTED : flag & ~DT_METADATA_FLAG_IMPORTED);
     g_free(setting);
   }
   else
   {
-    const gboolean imported = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+    const gboolean imported = gtk_check_button_get_active(GTK_CHECK_BUTTON(widget));
     dt_conf_set_bool("ui_last/import_last_tags_imported", imported);
   }
 }
@@ -179,7 +179,7 @@ static void _apply_metadata_toggled(GtkWidget *widget,
                                     dt_import_metadata_t *metadata)
 {
   // activate widgets as needed
-  const gboolean default_metadata = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+  const gboolean default_metadata = gtk_check_button_get_active(GTK_CHECK_BUTTON(widget));
 
   for(int i = DT_META_META_HEADER; i < metadata->num_grid_rows + DT_META_TAGS_VALUE; i++)
   {
@@ -408,7 +408,7 @@ static void _set_up_toggle_button(GtkWidget *button,
                                   dt_import_metadata_t *metadata)
 {
   gtk_widget_set_name(button, name);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), state);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(button), state);
   gtk_grid_attach(GTK_GRID(metadata->grid), button, 2, line, 1, 1);
   gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
 }
@@ -450,7 +450,7 @@ static void _fill_metadata_grid(dt_import_metadata_t *metadata)
     g_object_set_data(G_OBJECT(metadata_imported), "tagname", md->tagname);
     _set_up_toggle_button(metadata_imported, flag & DT_METADATA_FLAG_IMPORTED,
                           metadata_name, i + DT_META_META_VALUE, metadata);
-    g_signal_connect(GTK_TOGGLE_BUTTON(metadata_imported), "toggled",
+    g_signal_connect(GTK_CHECK_BUTTON(metadata_imported), "toggled",
                      G_CALLBACK(_import_metadata_toggled), metadata);
     i++;
   }
@@ -521,7 +521,7 @@ void dt_import_metadata_init(dt_import_metadata_t *metadata)
   GtkWidget *tags_imported = gtk_check_button_new();
   _set_up_toggle_button(tags_imported, dt_conf_get_bool("ui_last/import_last_tags_imported"),
                         "tags", metadata->num_grid_rows + DT_META_TAGS_HEADER, metadata);
-  g_signal_connect(GTK_TOGGLE_BUTTON(tags_imported), "toggled",
+  g_signal_connect(GTK_CHECK_BUTTON(tags_imported), "toggled",
                    G_CALLBACK(_import_metadata_toggled), metadata);
 
   // overall
@@ -563,7 +563,7 @@ void dt_import_metadata_update(dt_import_metadata_t *metadata)
     setting = g_strdup_printf("plugins/lighttable/metadata/%s_flag", metadata_name);
     const uint32_t flag = dt_conf_get_int(setting);
     g_signal_handlers_block_by_func(w, _import_metadata_toggled, metadata);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), flag & DT_METADATA_FLAG_IMPORTED);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(w), flag & DT_METADATA_FLAG_IMPORTED);
     g_signal_handlers_unblock_by_func(w, _import_metadata_toggled, metadata);
     g_free(setting);
     i++;
@@ -578,7 +578,7 @@ void dt_import_metadata_update(dt_import_metadata_t *metadata)
   w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 2, metadata->num_grid_rows + DT_META_TAGS_HEADER);
   const gboolean imported = dt_conf_get_bool("ui_last/import_last_tags_imported");
   g_signal_handlers_block_by_func(w, _import_metadata_toggled, metadata);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), imported);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(w), imported);
   g_signal_handlers_unblock_by_func(w, _import_metadata_toggled, metadata);
 
   w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 1, DT_META_META_HEADER);

@@ -248,7 +248,7 @@ static void _styles_row_activated_callback(GtkTreeView *view,
       {
         GList *styles = g_list_prepend(NULL, g_strdup(name));
         const gboolean duplicate =
-          gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->duplicate));
+          gtk_check_button_get_active(GTK_CHECK_BUTTON(d->duplicate));
         dt_control_apply_styles(imgs, styles, duplicate);
       }
       else
@@ -310,7 +310,7 @@ static void _apply_clicked(GtkWidget *w, dt_lib_styles_t *d)
     if(!g_list_is_empty(imgs))
     {
       const gboolean duplicate =
-        gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->duplicate));
+        gtk_check_button_get_active(GTK_CHECK_BUTTON(d->duplicate));
       dt_control_apply_styles(imgs, style_names, duplicate);
     }
     else
@@ -529,7 +529,7 @@ static void _export_clicked(GtkWidget *w, dt_lib_styles_t *d)
 #endif
 
             overwrite_dialog_res = dt_gui_dialog_run(GTK_DIALOG(dialog_overwrite_export));
-            overwrite_dialog_check_button_res = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overwrite_dialog_check_button));
+            overwrite_dialog_check_button_res = gtk_check_button_get_active(GTK_CHECK_BUTTON(overwrite_dialog_check_button));
             gtk_widget_destroy(dialog_overwrite_export);
           }
 
@@ -689,7 +689,7 @@ static void _import_clicked(GtkWidget *w, dt_lib_styles_t *d)
 #endif
 
             overwrite_dialog_res = dt_gui_dialog_run(GTK_DIALOG(dialog_overwrite_import));
-            overwrite_dialog_check_button_res = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overwrite_dialog_check_button));
+            overwrite_dialog_check_button_res = gtk_check_button_get_active(GTK_CHECK_BUTTON(overwrite_dialog_check_button));
             gtk_widget_destroy(dialog_overwrite_import);
           }
 
@@ -760,7 +760,7 @@ static void _entry_activated(GtkEntry *entry, dt_lib_styles_t *d)
     if(imgs)
     {
       GList *styles = g_list_prepend(NULL, g_strdup(name));
-      gboolean duplicate = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->duplicate));
+      gboolean duplicate = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->duplicate));
       dt_control_apply_styles(imgs, styles, duplicate);
     }
   }
@@ -769,13 +769,13 @@ static void _entry_activated(GtkEntry *entry, dt_lib_styles_t *d)
 static void _duplicate_callback(GtkWidget *widget, dt_lib_styles_t *d)
 {
   dt_conf_set_bool("ui_last/styles_create_duplicate",
-                   gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->duplicate)));
+                   gtk_check_button_get_active(GTK_CHECK_BUTTON(d->duplicate)));
 }
 
 static void _hide_preview_callback(GtkWidget *widget, dt_lib_styles_t *d)
 {
   dt_conf_set_bool("ui_last/styles_hide_preview",
-                   gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->hide_preview)));
+                   gtk_check_button_get_active(GTK_CHECK_BUTTON(d->hide_preview)));
 }
 
 static void _applymode_combobox_changed(GtkWidget *widget, gpointer user_data)
@@ -846,14 +846,14 @@ void view_enter(struct dt_lib_module_t *self,
     // keep current checkbox state, so we can restore it after switching off,
     // otherwise it will always be unchecked when returning to lighttable.
     const gboolean old_state = dt_conf_get_bool("ui_last/styles_create_duplicate");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->duplicate), FALSE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(d->duplicate), FALSE);
     gtk_widget_hide(d->duplicate);
     dt_conf_set_bool("ui_last/styles_create_duplicate", old_state);
   }
   else
   {
     gtk_widget_show(d->duplicate);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->duplicate),
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(d->duplicate),
                                  dt_conf_get_bool("ui_last/styles_create_duplicate"));
   }
 }
@@ -901,9 +901,9 @@ void gui_init(dt_lib_module_t *self)
   d->hide_preview = gtk_check_button_new_with_label(_("hide preview"));
   dt_action_define(DT_ACTION(self), NULL, N_("hide preview"),
                    d->hide_preview, &dt_action_def_toggle);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(d->hide_preview))), PANGO_ELLIPSIZE_START);
+  gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(d->hide_preview))), PANGO_ELLIPSIZE_START);
   g_signal_connect(d->hide_preview, "toggled", G_CALLBACK(_hide_preview_callback), d);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->hide_preview),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->hide_preview),
                                dt_conf_get_bool("ui_last/styles_hide_preview"));
   gtk_widget_set_tooltip_text(d->hide_preview,
                               _("hide preview of style on tooltip"));
@@ -911,9 +911,9 @@ void gui_init(dt_lib_module_t *self)
   d->duplicate = gtk_check_button_new_with_label(_("create duplicate"));
   dt_action_define(DT_ACTION(self), NULL, N_("create duplicate"),
                    d->duplicate, &dt_action_def_toggle);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(d->duplicate))), PANGO_ELLIPSIZE_START);
+  gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(d->duplicate))), PANGO_ELLIPSIZE_START);
   g_signal_connect(d->duplicate, "toggled", G_CALLBACK(_duplicate_callback), d);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->duplicate),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->duplicate),
                                dt_conf_get_bool("ui_last/styles_create_duplicate"));
   gtk_widget_set_tooltip_text(d->duplicate,
                               _("creates a duplicate of the image before applying style"));

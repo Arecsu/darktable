@@ -174,7 +174,7 @@ static void theme_callback(GtkWidget *widget, gpointer user_data)
 static void usercss_callback(GtkWidget *widget, gpointer user_data)
 {
   dt_conf_set_bool("themes/usercss",
-                   gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)));
+                   gtk_check_button_get_active(GTK_CHECK_BUTTON(widget)));
   reload_ui_last_theme();
 }
 
@@ -202,7 +202,7 @@ static void use_sys_font_callback(GtkWidget *widget,
                                   gpointer user_data)
 {
   dt_conf_set_bool("use_system_font",
-                   gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)));
+                   gtk_check_button_get_active(GTK_CHECK_BUTTON(widget)));
 
   if(dt_conf_get_bool("use_system_font"))
     gtk_widget_set_state_flags(GTK_WIDGET(user_data), GTK_STATE_FLAG_INSENSITIVE, TRUE);
@@ -245,7 +245,7 @@ static void save_usercss_callback(GtkWidget *widget,
 
   save_usercss(buffer);
 
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(tw->apply_toggle)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(tw->apply_toggle)))
   {
     // reload the theme
     reload_ui_last_theme();
@@ -253,7 +253,7 @@ static void save_usercss_callback(GtkWidget *widget,
   else
   {
     // toggle the apply button, which will also reload the theme
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(tw->apply_toggle), TRUE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(tw->apply_toggle), TRUE);
   }
 }
 
@@ -441,7 +441,7 @@ static void init_tab_general(GtkWidget *dialog,
   gtk_grid_attach(GTK_GRID(grid), labelev, i, i?2:line++, 1, 1);
   gtk_grid_attach_next_to(GTK_GRID(grid), usesysfont, labelev, GTK_POS_RIGHT, 1, 1);
   gtk_widget_set_tooltip_text(usesysfont, _("use system font size"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(usesysfont),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(usesysfont),
                                dt_conf_get_bool("use_system_font"));
   g_signal_connect(G_OBJECT(usesysfont), "toggled",
                    G_CALLBACK(use_sys_font_callback), (gpointer)fontsize);
@@ -508,7 +508,7 @@ static void init_tab_general(GtkWidget *dialog,
   gtk_grid_attach_next_to(GTK_GRID(grid), tw->apply_toggle, labelev, GTK_POS_RIGHT, 1, 1);
   gtk_widget_set_tooltip_text(tw->apply_toggle,
                               _("modify theme with CSS keyed below (saved to user.css)"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(tw->apply_toggle),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(tw->apply_toggle),
                                dt_conf_get_bool("themes/usercss"));
   g_signal_connect(G_OBJECT(tw->apply_toggle), "toggled",
                    G_CALLBACK(usercss_callback), 0);
@@ -1383,14 +1383,14 @@ _gui_preferences_bool_callback(GtkWidget *widget,
                                gpointer data)
 {
   dt_conf_set_bool((char *)data,
-                   gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)));
+                   gtk_check_button_get_active(GTK_CHECK_BUTTON(widget)));
 }
 
 void dt_gui_preferences_bool_reset(GtkWidget *widget)
 {
   const char *key = gtk_widget_get_name(widget);
   const gboolean def = dt_confgen_get_bool(key, DT_DEFAULT);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), def);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(widget), def);
 }
 
 static void
@@ -1402,8 +1402,8 @@ gui_preferences_bool_click_cb(GtkGestureSingle *gesture,
 {
   if(n_press == 1)
   {
-    const gboolean cur = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), !cur);
+    const gboolean cur = gtk_check_button_get_active(GTK_CHECK_BUTTON(widget));
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(widget), !cur);
   }
   else if(n_press == 2)
   {
@@ -1415,7 +1415,7 @@ void dt_gui_preferences_bool_update(GtkWidget *widget)
 {
   const char *key = gtk_widget_get_name(widget);
   const gboolean val = dt_conf_get_bool(key);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), val);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(widget), val);
 }
 
 GtkWidget *dt_gui_preferences_bool(GtkGrid *grid,
@@ -1431,7 +1431,7 @@ GtkWidget *dt_gui_preferences_bool(GtkGrid *grid,
   gtk_box_append(GTK_BOX(labelev), w_label);
   GtkWidget *w = gtk_check_button_new();
   gtk_widget_set_name(w, key);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), dt_conf_get_bool(key));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(w), dt_conf_get_bool(key));
 
   gtk_grid_attach(GTK_GRID(grid), labelev, swap ? (col + 1) : col, line, 1, 1);
   gtk_grid_attach(GTK_GRID(grid), w, swap ? col : (col + 1), line, 1, 1);

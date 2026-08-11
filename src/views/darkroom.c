@@ -3521,7 +3521,7 @@ void gui_init(dt_view_t *self)
     dt_bauhaus_combobox_set_entries_ellipsis(histogram_profile, PANGO_ELLIPSIZE_MIDDLE);
 
     GtkWidget *display2_color_assessment = gtk_check_button_new_with_label(_("second preview window color assessment"));
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(display2_color_assessment),
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(display2_color_assessment),
                                  dev->preview2.color_assessment);
     ac = dt_action_define(DT_ACTION(self), NULL, N_("color assessment second preview"),
                           display2_color_assessment, &dt_action_def_toggle);

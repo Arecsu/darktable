@@ -267,7 +267,7 @@ static void _refresh_model_list(dt_prefs_ai_data_t *data)
 
   // reset select-all toggle
   if(data->select_all_toggle)
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(data->select_all_toggle), FALSE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(data->select_all_toggle), FALSE);
 
 #ifdef HAVE_AI_DOWNLOAD
   _update_download_selected_sensitivity(data);
@@ -312,7 +312,7 @@ static void _update_controls_sensitivity(dt_prefs_ai_data_t *data, gboolean enab
 static void _on_enable_toggled(GtkWidget *widget, gpointer user_data)
 {
   dt_prefs_ai_data_t *data = (dt_prefs_ai_data_t *)user_data;
-  const gboolean enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+  const gboolean enabled = gtk_check_button_get_active(GTK_CHECK_BUTTON(widget));
   dt_conf_set_bool("plugins/ai/enabled", enabled);
   if(darktable.ai_registry)
   {
@@ -614,7 +614,7 @@ static void _reset_enable_click_cb(GtkGestureSingle *gesture, int n_press,
 {
   if(n_press < 2) return;
   const gboolean def = dt_confgen_get_bool("plugins/ai/enabled", DT_DEFAULT);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), def);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(widget), def);
 }
 
 // double-click on label resets the provider combo to default
@@ -702,10 +702,10 @@ static void _on_enabled_toggled(GtkCellRendererToggle *cell,
   DT_CONTROL_SIGNAL_RAISE(DT_SIGNAL_AI_MODELS_CHANGED);
 }
 
-static void _on_select_all_toggled(GtkToggleButton *toggle, gpointer user_data)
+static void _on_select_all_toggled(GtkCheckButton *toggle, gpointer user_data)
 {
   dt_prefs_ai_data_t *data = (dt_prefs_ai_data_t *)user_data;
-  const gboolean select_all = gtk_toggle_button_get_active(toggle);
+  const gboolean select_all = gtk_check_button_get_active(toggle);
 
   GtkTreeIter iter;
   gboolean valid
@@ -728,15 +728,15 @@ static void _on_select_all_header_clicked(GtkWidget *button, gpointer user_data)
   // block the toggled signal to prevent double-fire, then toggle manually
   g_signal_handlers_block_by_func(data->select_all_toggle, _on_select_all_toggled, data);
   const gboolean active
-    = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(data->select_all_toggle));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(data->select_all_toggle), !active);
+    = gtk_check_button_get_active(GTK_CHECK_BUTTON(data->select_all_toggle));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(data->select_all_toggle), !active);
   g_signal_handlers_unblock_by_func(
     data->select_all_toggle,
     _on_select_all_toggled,
     data);
 
   // now manually apply the selection since we blocked the signal
-  _on_select_all_toggled(GTK_TOGGLE_BUTTON(data->select_all_toggle), data);
+  _on_select_all_toggled(GTK_CHECK_BUTTON(data->select_all_toggle), data);
 }
 
 // collect selected model IDs from the list store
@@ -1540,8 +1540,8 @@ void init_tab_ai(GtkWidget *dialog, GtkWidget *stack)
 
   data->enable_indicator = _create_indicator("plugins/ai/enabled");
   data->enable_toggle = gtk_check_button_new();
-  gtk_toggle_button_set_active(
-    GTK_TOGGLE_BUTTON(data->enable_toggle),
+  gtk_check_button_set_active(
+    GTK_CHECK_BUTTON(data->enable_toggle),
     dt_conf_get_bool("plugins/ai/enabled"));
   g_signal_connect(
     data->enable_toggle,

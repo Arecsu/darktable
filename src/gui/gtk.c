@@ -170,6 +170,20 @@ void dt_gui_remove_class(GtkWidget *widget, const gchar *class_name)
   gtk_style_context_remove_class(context, class_name);
 }
 
+GtkWidget *dt_gui_check_button_new(const dt_gui_check_button_t cfg)
+{
+  GtkWidget *cb = cfg.label ? gtk_check_button_new_with_label(cfg.label) : gtk_check_button_new();
+  if(cfg.tooltip) gtk_widget_set_tooltip_text(cb, cfg.tooltip);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(cb), cfg.active);
+  if(cfg.inconsistent) gtk_check_button_set_inconsistent(GTK_CHECK_BUTTON(cb), TRUE);
+  if(cfg.toggled)
+    /* direct connect: the factory is the type-checking layer for toggled
+     * (the g_signal_connect macro's DISABLINGPREFIX##handler trick would
+     * try to token-paste our cfg member name) */
+    g_signal_connect_data(G_OBJECT(cb), "toggled", cfg.toggled, cfg.user_data, NULL, 0);
+  return cb;
+}
+
 gboolean dt_gui_pointer_is_grabbed()
 {
 #if GTK_CHECK_VERSION(4, 0, 0)

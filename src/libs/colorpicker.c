@@ -688,23 +688,23 @@ static void _add_sample(GtkButton *widget,
   dt_control_queue_redraw_center();
 }
 
-static void _display_samples_changed(GtkToggleButton *button,
+static void _display_samples_changed(GtkCheckButton *button,
                                      gpointer data)
 {
   dt_conf_set_bool("ui_last/colorpicker_display_samples",
-                   gtk_toggle_button_get_active(button));
-  darktable.lib->proxy.colorpicker.display_samples = gtk_toggle_button_get_active(button);
+                   gtk_check_button_get_active(button));
+  darktable.lib->proxy.colorpicker.display_samples = gtk_check_button_get_active(button);
   dt_dev_invalidate_all(darktable.develop);
   dt_control_queue_redraw_center();
 }
 
-static void _restrict_histogram_changed(GtkToggleButton *button,
+static void _restrict_histogram_changed(GtkCheckButton *button,
                                         gpointer data)
 {
   dt_conf_set_bool("ui_last/colorpicker_restrict_histogram",
-                   gtk_toggle_button_get_active(button));
+                   gtk_check_button_get_active(button));
   darktable.lib->proxy.colorpicker.restrict_histogram =
-    gtk_toggle_button_get_active(button);
+    gtk_check_button_get_active(button);
   dt_dev_invalidate_all(darktable.develop);
   dt_control_queue_redraw_center();
 }
@@ -844,9 +844,9 @@ void gui_init(dt_lib_module_t *self)
   dt_action_define(DT_ACTION(self), NULL, N_("display samples"),
                    data->display_samples_check_box, &dt_action_def_toggle);
   gtk_label_set_ellipsize
-    (GTK_LABEL(gtk_button_get_child(GTK_BUTTON(data->display_samples_check_box))),
+    (GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(data->display_samples_check_box))),
      PANGO_ELLIPSIZE_MIDDLE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(data->display_samples_check_box),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(data->display_samples_check_box),
                                dt_conf_get_bool("ui_last/colorpicker_display_samples"));
   g_signal_connect(G_OBJECT(data->display_samples_check_box), "toggled",
                    G_CALLBACK(_display_samples_changed), NULL);
@@ -856,10 +856,10 @@ void gui_init(dt_lib_module_t *self)
   dt_action_define(DT_ACTION(self), NULL, N_("restrict scope"),
                    restrict_button, &dt_action_def_toggle);
   gtk_label_set_ellipsize
-    (GTK_LABEL(gtk_button_get_child(GTK_BUTTON(restrict_button))),
+    (GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(restrict_button))),
      PANGO_ELLIPSIZE_MIDDLE);
   gboolean restrict_histogram = dt_conf_get_bool("ui_last/colorpicker_restrict_histogram");
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(restrict_button), restrict_histogram);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(restrict_button), restrict_histogram);
   darktable.lib->proxy.colorpicker.restrict_histogram = restrict_histogram;
   g_signal_connect(G_OBJECT(restrict_button), "toggled",
                    G_CALLBACK(_restrict_histogram_changed), NULL);
@@ -931,8 +931,8 @@ void gui_reset(dt_lib_module_t *self)
   // Resetting GUI elements
   dt_bauhaus_combobox_set(data->statistic_selector, 0);
   dt_bauhaus_combobox_set(data->color_mode_selector, 0);
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(data->display_samples_check_box)))
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(data->display_samples_check_box), FALSE);
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(data->display_samples_check_box)))
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(data->display_samples_check_box), FALSE);
   else
     dt_dev_invalidate_all(darktable.develop);
 

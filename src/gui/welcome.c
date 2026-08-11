@@ -144,11 +144,11 @@ static GtkWidget *_get_logo(void)
 
 // ── checkbox callback ─────────────────────────────────────────────────────────
 
-static void _on_answer_toggled(GtkToggleButton *btn, gpointer data)
+static void _on_answer_toggled(GtkCheckButton *btn, gpointer data)
 {
   const _dt_welcome_action_t *action = data;
   if(action->type == DT_WELCOME_ACTION_SET_BOOL)
-    dt_conf_set_bool(action->key, gtk_toggle_button_get_active(btn));
+    dt_conf_set_bool(action->key, gtk_check_button_get_active(btn));
 }
 
 // ── dirchooser callbacks ──────────────────────────────────────────────────────
@@ -458,7 +458,7 @@ static GtkWidget *_build_page_widget(_dt_page_t *pg)
 
       GtkWidget *cb = gtk_check_button_new();
       gtk_widget_set_name(cb, "welcome-answer");
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb), q->default_active);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(cb), q->default_active);
       gtk_widget_set_valign(cb, GTK_ALIGN_CENTER);
       if(q->action.type != DT_WELCOME_ACTION_NONE)
         g_signal_connect(G_OBJECT(cb), "toggled",

@@ -1100,7 +1100,7 @@ static gboolean _delete_dialog_main_thread(gpointer user_data)
   if(!modal_dialog->send_to_trash)
     modal_dialog->dialog_result |= _DT_DELETE_DIALOG_CHOICE_PHYSICAL;
 
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(check)))
     modal_dialog->dialog_result |= _DT_DELETE_DIALOG_CHOICE_ALL;
 
   gtk_widget_destroy(dialog);

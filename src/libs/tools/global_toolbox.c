@@ -89,20 +89,20 @@ static void _overlays_toggle_button(GtkWidget *w, dt_lib_module_t *self)
   if(d->disable_over_events) return;
 
   dt_thumbnail_overlay_t over = DT_THUMBNAIL_OVERLAYS_HOVER_NORMAL;
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_r0)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_r0)))
     over = DT_THUMBNAIL_OVERLAYS_NONE;
-  else if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_r2)))
+  else if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_r2)))
     over = DT_THUMBNAIL_OVERLAYS_HOVER_EXTENDED;
-  else if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_r3)))
+  else if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_r3)))
     over = DT_THUMBNAIL_OVERLAYS_ALWAYS_NORMAL;
-  else if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_r4)))
+  else if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_r4)))
     over = DT_THUMBNAIL_OVERLAYS_ALWAYS_EXTENDED;
-  else if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_r5)))
+  else if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_r5)))
     over = DT_THUMBNAIL_OVERLAYS_MIXED;
-  else if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_r6)))
+  else if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_r6)))
     over = DT_THUMBNAIL_OVERLAYS_HOVER_BLOCK;
 
-  dt_ui_thumbtable(darktable.gui->ui)->show_tooltips = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_tt));
+  dt_ui_thumbtable(darktable.gui->ui)->show_tooltips = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_tt));
   dt_thumbtable_set_overlays_mode(dt_ui_thumbtable(darktable.gui->ui), over);
 
   gtk_widget_set_sensitive(d->over_timeout, (over == DT_THUMBNAIL_OVERLAYS_HOVER_BLOCK));
@@ -124,11 +124,11 @@ static void _overlays_toggle_culling_button(GtkWidget *w, dt_lib_module_t *self)
   if(d->disable_over_events) return;
 
   dt_thumbnail_overlay_t over = DT_THUMBNAIL_OVERLAYS_HOVER_BLOCK;
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_culling_r0)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_culling_r0)))
     over = DT_THUMBNAIL_OVERLAYS_NONE;
-  else if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_culling_r3)))
+  else if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_culling_r3)))
     over = DT_THUMBNAIL_OVERLAYS_ALWAYS_NORMAL;
-  else if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_culling_r4)))
+  else if(gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_culling_r4)))
     over = DT_THUMBNAIL_OVERLAYS_ALWAYS_EXTENDED;
 
   dt_culling_mode_t cmode = DT_CULLING_MODE_CULLING;
@@ -137,7 +137,7 @@ static void _overlays_toggle_culling_button(GtkWidget *w, dt_lib_module_t *self)
   dt_conf_set_int(txt, over);
   g_free(txt);
   txt = g_strdup_printf("plugins/lighttable/tooltips/culling/%d", cmode);
-  dt_conf_set_bool(txt, gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->over_culling_tt)));
+  dt_conf_set_bool(txt, gtk_check_button_get_active(GTK_CHECK_BUTTON(d->over_culling_tt)));
   g_free(txt);
   dt_view_lighttable_culling_preview_reload_overlays(darktable.view_manager);
 
@@ -225,22 +225,22 @@ static void _overlays_show_popup(GtkWidget *button, dt_lib_module_t *self)
     gtk_widget_set_sensitive(d->over_timeout, FALSE);
 
     if(mode == DT_THUMBNAIL_OVERLAYS_NONE)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_r0), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_r0), TRUE);
     else if(mode == DT_THUMBNAIL_OVERLAYS_HOVER_EXTENDED)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_r2), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_r2), TRUE);
     else if(mode == DT_THUMBNAIL_OVERLAYS_ALWAYS_NORMAL)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_r3), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_r3), TRUE);
     else if(mode == DT_THUMBNAIL_OVERLAYS_ALWAYS_EXTENDED)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_r4), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_r4), TRUE);
     else if(mode == DT_THUMBNAIL_OVERLAYS_MIXED)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_r5), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_r5), TRUE);
     else if(mode == DT_THUMBNAIL_OVERLAYS_HOVER_BLOCK)
     {
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_r6), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_r6), TRUE);
       gtk_widget_set_sensitive(d->over_timeout, TRUE);
     }
     else
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_r1), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_r1), TRUE);
 
     if(mode == DT_THUMBNAIL_OVERLAYS_HOVER_BLOCK)
     {
@@ -253,7 +253,7 @@ static void _overlays_show_popup(GtkWidget *button, dt_lib_module_t *self)
       gtk_widget_set_tooltip_text(d->over_timeout, _("timeout only available for block overlay"));
     }
 
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_tt), dt_ui_thumbtable(darktable.gui->ui)->show_tooltips);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_tt), dt_ui_thumbtable(darktable.gui->ui)->show_tooltips);
 
     gtk_widget_show_all(d->thumbnails_box);
     show = TRUE;
@@ -295,14 +295,14 @@ static void _overlays_show_popup(GtkWidget *button, dt_lib_module_t *self)
     gtk_widget_set_sensitive(d->over_culling_timeout, FALSE);
 
     if(mode == DT_THUMBNAIL_OVERLAYS_NONE)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_culling_r0), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_culling_r0), TRUE);
     else if(mode == DT_THUMBNAIL_OVERLAYS_ALWAYS_NORMAL)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_culling_r3), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_culling_r3), TRUE);
     else if(mode == DT_THUMBNAIL_OVERLAYS_ALWAYS_EXTENDED)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_culling_r4), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_culling_r4), TRUE);
     else
     {
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_culling_r6), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_culling_r6), TRUE);
       gtk_widget_set_sensitive(d->over_culling_timeout, TRUE);
     }
 
@@ -318,7 +318,7 @@ static void _overlays_show_popup(GtkWidget *button, dt_lib_module_t *self)
     }
 
     otxt = g_strdup_printf("plugins/lighttable/tooltips/culling/%d", cmode);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->over_culling_tt), dt_conf_get_bool(otxt));
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(d->over_culling_tt), dt_conf_get_bool(otxt));
     g_free(otxt);
 
     gtk_widget_show_all(d->culling_box);
@@ -390,7 +390,7 @@ void gui_init(dt_lib_module_t *self)
     gtk_widget_set_tooltip_text(d->grouping_button, _("expand grouped images"));
   else
     gtk_widget_set_tooltip_text(d->grouping_button, _("collapse grouped images"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->grouping_button), darktable.gui->grouping);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->grouping_button), darktable.gui->grouping);
   g_signal_connect(G_OBJECT(d->grouping_button), "clicked", G_CALLBACK(_lib_filter_grouping_button_clicked),
                    NULL);
 
@@ -427,7 +427,7 @@ void gui_init(dt_lib_module_t *self)
   else                                                                          \
     rb_leader = rb;                                                             \
   dt_action_define(ac, NULL, label, rb, &dt_action_def_button);                 \
-  g_signal_connect(G_OBJECT(rb), "clicked", G_CALLBACK(callback), self);        \
+  g_signal_connect(G_OBJECT(rb), "toggled", G_CALLBACK(callback), self);        \
   gtk_box_append(GTK_BOX(box), rb);                                             \
   gtk_widget_set_hexpand(rb, TRUE);                                             \
   gtk_widget_set_vexpand(rb, TRUE);                                             \
@@ -575,7 +575,7 @@ void _lib_preferences_button_clicked(GtkWidget *widget, gpointer user_data)
 static void _lib_filter_grouping_button_clicked(GtkWidget *widget, gpointer user_data)
 {
 
-  darktable.gui->grouping = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+  darktable.gui->grouping = gtk_check_button_get_active(GTK_CHECK_BUTTON(widget));
   if(darktable.gui->grouping)
     gtk_widget_set_tooltip_text(widget, _("expand grouped images"));
   else
@@ -625,7 +625,7 @@ static void _main_do_event_help(GdkEvent *event, gpointer data)
     case GDK_BUTTON_RELEASE:
     {
       // reset GTK to normal behaviour
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->help_button), FALSE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->help_button), FALSE);
 
       handled = TRUE;
     }
@@ -803,7 +803,7 @@ static void _main_do_event_keymap(GdkEvent *event, gpointer data)
       if(event_widget && !strcmp(gtk_widget_get_name(event_widget), "module-header"))
         break;
 
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->keymap_button), FALSE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->keymap_button), FALSE);
       _show_shortcuts_prefs(event_widget);
     }
 
@@ -815,7 +815,7 @@ static void _main_do_event_keymap(GdkEvent *event, gpointer data)
     if(dt_gui_long_click(dt_gdk_event_get_time(event), click_time))
       dt_shortcut_copy_lua(NULL, NULL);
     else
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->keymap_button), FALSE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->keymap_button), FALSE);
 
     return;
   default:
@@ -830,9 +830,9 @@ static void _lib_help_button_clicked(GtkWidget *widget, gpointer user_data)
 {
 #if GTK_CHECK_VERSION(4, 0, 0)
   // TODO P3: the help-cursor event filter is GTK3-only (gdk_event_handler_set).
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(widget), FALSE);
 #else
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(widget)))
   {
     dt_control_set_temp_cursor("not-allowed");
     dt_control_forbid_change_cursor();
@@ -851,9 +851,9 @@ static void _lib_keymap_button_clicked(GtkWidget *widget, gpointer user_data)
 {
 #if GTK_CHECK_VERSION(4, 0, 0)
   // TODO P3: the keymap event filter is GTK3-only (gdk_event_handler_set).
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(widget), FALSE);
 #else
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(widget)))
   {
     dt_control_forbid_change_cursor();
     _set_mapping_mode_cursor(widget);
@@ -910,7 +910,7 @@ static int grouping_member(lua_State *L)
     gboolean value = lua_toboolean(L, 3);
     if(darktable.gui->grouping != value)
     {
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->grouping_button), value);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->grouping_button), value);
     }
   }
   return 0;
@@ -930,7 +930,7 @@ static int show_overlays_member(lua_State *L)
     gboolean value = lua_toboolean(L, 3);
     if(darktable.gui->show_overlays != value)
     {
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->overlays_button), value);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->overlays_button), value);
     }
   }
   return 0;

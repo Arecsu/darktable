@@ -251,7 +251,7 @@ static void _property_changed(GtkWidget *widget, dt_masks_property_t prop)
 
   const gboolean is_bool = _masks_properties[prop].boolean;
   const float value = is_bool
-    ? (float)gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))
+    ? (float)gtk_check_button_get_active(GTK_CHECK_BUTTON(widget))
     : dt_bauhaus_slider_get(widget);
 
   // a size/feather/rotation edit reshapes the path and drops its shrink/grow
@@ -350,10 +350,10 @@ static void _property_changed(GtkWidget *widget, dt_masks_property_t prop)
 
     if(is_bool)
     {
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(widget),
                                    (sum / count) > 0.5f);
       d->last_value[prop] =
-        (float)gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+        (float)gtk_check_button_get_active(GTK_CHECK_BUTTON(widget));
     }
     else
     {
@@ -2435,7 +2435,7 @@ void gui_init(dt_lib_module_t *self)
       w = gtk_check_button_new_with_label(_(_masks_properties[i].name));
       dt_action_define(DT_ACTION(self), N_("properties"),
                        _masks_properties[i].name, w, &dt_action_def_toggle);
-      d->last_value[i] = (float)gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
+      d->last_value[i] = (float)gtk_check_button_get_active(GTK_CHECK_BUTTON(w));
       g_signal_connect(G_OBJECT(w), "toggled",
                        G_CALLBACK(_property_changed), GINT_TO_POINTER(i));
     }

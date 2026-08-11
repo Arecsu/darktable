@@ -207,10 +207,10 @@ static void _workspace_sanitize_copied_settings(const char *dest_label,
   g_free(contents);
 }
 
-static void _workspace_template_radio_toggled(GtkToggleButton *radio,
+static void _workspace_template_radio_toggled(GtkCheckButton *radio,
                                               dt_workspace_t *session)
 {
-  if(!gtk_toggle_button_get_active(radio)) return;
+  if(!gtk_check_button_get_active(radio)) return;
 
   const gchar *template_name = g_object_get_data(G_OBJECT(radio),
                                                  "template-name");
@@ -227,7 +227,7 @@ static void _workspace_selected_template_sync_from_radios(dt_workspace_t *sessio
   for(GSList *l = session->template_radios; l; l = l->next)
   {
     GtkWidget *const radio = GTK_WIDGET(l->data);
-    if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(radio))) continue;
+    if(!gtk_check_button_get_active(GTK_CHECK_BUTTON(radio))) continue;
 
     const gchar *const template_name =
       g_object_get_data(G_OBJECT(radio), "template-name");
@@ -260,8 +260,8 @@ static void _workspace_entry_changed(GtkWidget *entry,
   if(strlen(label) == 0)
   {
     _workspace_template_radios_set_visible(session, FALSE);
-    gtk_toggle_button_set_active
-      (GTK_TOGGLE_BUTTON(session->copy_template_check), FALSE);
+    gtk_check_button_set_active
+      (GTK_CHECK_BUTTON(session->copy_template_check), FALSE);
   }
 }
 
@@ -272,16 +272,16 @@ static void _workspace_radio_shell_sync_active(GObject *radio_gobj,
   GtkWidget *const radio = GTK_WIDGET(radio_gobj);
   GtkWidget *const shell = g_object_get_data(G_OBJECT(radio), "dt-workspace-shell");
   if(!shell) return;
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(radio)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(radio)))
     dt_gui_add_class(shell, "dt_workspace_template_radio_on");
   else
     dt_gui_remove_class(shell, "dt_workspace_template_radio_on");
 }
 
-static void _workspace_copy_template_toggled(GtkToggleButton *check,
+static void _workspace_copy_template_toggled(GtkCheckButton *check,
                                              dt_workspace_t *session)
 {
-  const gboolean copy = gtk_toggle_button_get_active(check);
+  const gboolean copy = gtk_check_button_get_active(check);
   _workspace_template_radios_set_visible(session, copy);
   gtk_widget_set_sensitive(session->memory_workspace_button, !copy);
   if(copy)
@@ -353,12 +353,12 @@ static void _workspace_delete_db(GtkWidget *button, dt_workspace_t *session)
 static void _workspace_select_db(GtkWidget *button,
                                  dt_workspace_t *session)
 {
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(session->copy_template_check)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(session->copy_template_check)))
   {
     GtkWidget *const radio = g_object_get_data(G_OBJECT(button), "radio");
     if(radio)
     {
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(radio), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(radio), TRUE);
       return;
     }
   }
@@ -383,7 +383,7 @@ static void _workspace_select_db(GtkWidget *button,
     g_free(dbname);
   }
 
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(session->remember_selection_check)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(session->remember_selection_check)))
     dt_conf_set_bool("database/multiple_workspace", FALSE);
 
   _workspace_screen_destroy(session);
@@ -430,7 +430,7 @@ static void _workspace_new_db(GtkWidget *button,
   dt_conf_set_string("workspace/label", label);
   g_free(dbname);
 
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(session->copy_template_check)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(session->copy_template_check)))
   {
     _workspace_selected_template_sync_from_radios(session);
     if(session->selected_template && strlen(session->selected_template) > 0)
@@ -440,7 +440,7 @@ static void _workspace_new_db(GtkWidget *button,
     }
   }
 
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(session->remember_selection_check)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(session->remember_selection_check)))
     dt_conf_set_bool("database/multiple_workspace", FALSE);
 
   g_free(label);
@@ -617,7 +617,7 @@ gboolean dt_workspace_create(const char *datadir)
   session->remember_selection_check =
     gtk_check_button_new_with_label(_("remember selection and don't ask again"));
   gtk_widget_set_valign(session->remember_selection_check, GTK_ALIGN_CENTER);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(session->remember_selection_check), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(session->remember_selection_check), FALSE);
   dt_gui_box_add(remember_box, session->remember_selection_check);
   dt_gui_dialog_add(session->db_screen, remember_box);
 
@@ -656,7 +656,7 @@ gboolean dt_workspace_create(const char *datadir)
     gtk_check_button_new_with_label(_("copy settings from existing workspace"));
   gtk_widget_set_valign(session->copy_template_check, GTK_ALIGN_CENTER);
   gtk_widget_set_sensitive(session->copy_template_check, FALSE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(session->copy_template_check), FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(session->copy_template_check), FALSE);
   g_signal_connect(G_OBJECT(session->copy_template_check), "toggled",
                    G_CALLBACK(_workspace_copy_template_toggled), session);
   dt_gui_box_add(copy_check_box, session->copy_template_check);
@@ -668,7 +668,7 @@ gboolean dt_workspace_create(const char *datadir)
   gtk_widget_show_all(session->db_screen);
   _workspace_template_radios_set_visible
     (session,
-     gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(session->copy_template_check)));
+     gtk_check_button_get_active(GTK_CHECK_BUTTON(session->copy_template_check)));
   while(dt_gui_dialog_run(GTK_DIALOG(session->db_screen)) == GTK_RESPONSE_ACCEPT);
 
   _workspace_screen_destroy(session);

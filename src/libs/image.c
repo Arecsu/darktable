@@ -444,7 +444,7 @@ static void _rating_flag_callback(GtkWidget *widget,
                                   dt_lib_module_t *self)
 {
   dt_lib_image_t *d = self->data;
-  const gboolean flag = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->rating_flag));
+  const gboolean flag = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->rating_flag));
   dt_conf_set_bool("plugins/lighttable/copy_metadata/rating", flag);
 }
 
@@ -452,7 +452,7 @@ static void _colors_flag_callback(GtkWidget *widget,
                                   dt_lib_module_t *self)
 {
   dt_lib_image_t *d = self->data;
-  const gboolean flag = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->colors_flag));
+  const gboolean flag = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->colors_flag));
   dt_conf_set_bool("plugins/lighttable/copy_metadata/colors", flag);
 }
 
@@ -460,7 +460,7 @@ static void _metadata_flag_callback(GtkWidget *widget,
                                     dt_lib_module_t *self)
 {
   dt_lib_image_t *d = self->data;
-  const gboolean flag = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->metadata_flag));
+  const gboolean flag = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->metadata_flag));
   dt_conf_set_bool("plugins/lighttable/copy_metadata/metadata", flag);
 }
 
@@ -468,7 +468,7 @@ static void _geotags_flag_callback(GtkWidget *widget,
                                    dt_lib_module_t *self)
 {
   dt_lib_image_t *d = self->data;
-  const gboolean flag = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->geotags_flag));
+  const gboolean flag = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->geotags_flag));
   dt_conf_set_bool("plugins/lighttable/copy_metadata/geotags", flag);
 }
 
@@ -476,7 +476,7 @@ static void _tags_flag_callback(GtkWidget *widget,
                                 dt_lib_module_t *self)
 {
   dt_lib_image_t *d = self->data;
-  const gboolean flag = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->tags_flag));
+  const gboolean flag = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->tags_flag));
   dt_conf_set_bool("plugins/lighttable/copy_metadata/tags", flag);
 }
 
@@ -487,7 +487,7 @@ static void _pastemode_combobox_changed(GtkWidget *widget,
   dt_conf_set_int("plugins/lighttable/copy_metadata/pastemode", mode);
 }
 
-#define ellipsize_button(button) gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(button))), PANGO_ELLIPSIZE_END);
+#define ellipsize_button(button) gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(button))), PANGO_ELLIPSIZE_END);
 
 void gui_init(dt_lib_module_t *self)
 {
@@ -612,11 +612,11 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_tooltip_text(flag, tooltip);                     \
   ellipsize_button(flag);                                         \
   gtk_grid_attach(grid, flag, left, !left ? ++line : line, 3, 1); \
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(flag),           \
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(flag),           \
     dt_conf_get_bool("plugins/lighttable/copy_metadata/" #item)); \
   dt_action_define(DT_ACTION(meta), N_("flags"),                  \
                    label, flag, &dt_action_def_toggle);           \
-  g_signal_connect(G_OBJECT(flag), "clicked",                     \
+  g_signal_connect(G_OBJECT(flag), "toggled",                     \
                    G_CALLBACK(_##item##_flag_callback), self); }
 
   META_FLAG_BUTTON(N_("ratings"),  rating,   0, _("select ratings metadata"));

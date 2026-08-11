@@ -1333,7 +1333,7 @@ _printer_bpc_callback(GtkWidget *widget, dt_lib_module_t *self)
 {
   dt_lib_print_settings_t *ps = self->data;
   ps->v_black_point_compensation =
-    gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(ps->black_point_compensation));
+    gtk_check_button_get_active(GTK_CHECK_BUTTON(ps->black_point_compensation));
   dt_conf_set_bool(PRINT_CONFIG_PREFIX "black_point_compensation",
                    ps->v_black_point_compensation);
 }
@@ -1584,7 +1584,7 @@ static void _snap_to_grid(dt_lib_print_settings_t *ps,
                           float *x,
                           float *y)
 {
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(ps->snap_grid)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(ps->snap_grid)))
   {
     // V lines
     const float step =
@@ -1940,7 +1940,7 @@ void gui_post_expose(struct dt_lib_module_t *self,
     gtk_spin_button_get_value(GTK_SPIN_BUTTON(ps->grid_size)) / units[ps->unit];
 
   // only display grid if spacing more than 5 pixels
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(ps->grid))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(ps->grid))
      && (int)_mm_to_hscreen(ps, step, FALSE) > DT_PIXEL_APPLY_DPI(5))
   {
     const double dash[] = { DT_PIXEL_APPLY_DPI(5.0), DT_PIXEL_APPLY_DPI(5.0) };
@@ -2311,9 +2311,9 @@ void gui_post_expose(struct dt_lib_module_t *self,
   }
 
   if(ps->imgs.screen.borderless)
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ps->borderless), TRUE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(ps->borderless), TRUE);
   else
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ps->borderless), FALSE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(ps->borderless), FALSE);
 }
 
 static void _width_changed(GtkWidget *widget, gpointer user_data)
@@ -2594,7 +2594,7 @@ void gui_init(dt_lib_module_t *self)
 
   d->v_black_point_compensation =
     dt_conf_get_bool(PRINT_CONFIG_PREFIX "black_point_compensation");
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->black_point_compensation),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->black_point_compensation),
                                d->v_black_point_compensation);
 
   gtk_widget_set_tooltip_text
@@ -3372,7 +3372,7 @@ int set_params(dt_lib_module_t *self,
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(ps->b_right), b_right * units[ps->unit]);
 
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ps->dtba[alignment]), TRUE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ps->black_point_compensation), bpc);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(ps->black_point_compensation), bpc);
 
   dt_control_queue_redraw_center();
 
@@ -3394,8 +3394,8 @@ void *get_params(dt_lib_module_t *self, int *size)
   const int32_t pprofile_pos = dt_bauhaus_combobox_get(ps->pprofile);
   const int32_t pintent =  dt_bauhaus_combobox_get(ps->pintent);
   const int32_t landscape = dt_bauhaus_combobox_get(ps->orientation);
-  const int32_t bpc = gtk_toggle_button_get_active
-    (GTK_TOGGLE_BUTTON(ps->black_point_compensation));
+  const int32_t bpc = gtk_check_button_get_active
+    (GTK_CHECK_BUTTON(ps->black_point_compensation));
   const double b_top = ps->prt.page.margin_top;
   const double b_bottom = ps->prt.page.margin_bottom;
   const double b_left = ps->prt.page.margin_left;
@@ -3549,7 +3549,7 @@ void gui_reset(dt_lib_module_t *self)
   dt_bauhaus_combobox_set(ps->pintent, 0);
   _update_style_label(ps,"");
   dt_bauhaus_combobox_set(ps->intent, 0);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ps->black_point_compensation), TRUE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(ps->black_point_compensation), TRUE);
   gtk_widget_set_sensitive(GTK_WIDGET(ps->pintent), TRUE);
   gtk_widget_set_sensitive(GTK_WIDGET(ps->black_point_compensation), FALSE);
   gtk_widget_set_sensitive(GTK_WIDGET(ps->style_mode), FALSE);

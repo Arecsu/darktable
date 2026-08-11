@@ -316,7 +316,7 @@ static void _edit_preset_response(GtkDialog *dialog,
 
     // commit all the user input fields
     const gboolean is_auto_init =
-      gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->autoinit));
+      gtk_check_button_get_active(GTK_CHECK_BUTTON(g->autoinit));
 
     DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db), query, -1, &stmt, NULL);
     g_free(query);
@@ -366,14 +366,14 @@ static void _edit_preset_response(GtkDialog *dialog,
        gtk_spin_button_get_value(GTK_SPIN_BUTTON(g->focal_length_max)));
     DT_DEBUG_SQLITE3_BIND_INT
       (stmt, 14,
-       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->autoapply)));
+       gtk_check_button_get_active(GTK_CHECK_BUTTON(g->autoapply)));
     DT_DEBUG_SQLITE3_BIND_INT
       (stmt, 15,
-       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->filter)));
+       gtk_check_button_get_active(GTK_CHECK_BUTTON(g->filter)));
 
     int format = 0;
     for(int k = 0; k < 5; k++)
-      format += gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->format_btn[k]))
+      format += gtk_check_button_get_active(GTK_CHECK_BUTTON(g->format_btn[k]))
         * _gui_presets_format_flag[k];
 
     format ^= DT_PRESETS_FOR_NOT;
@@ -516,8 +516,8 @@ gboolean dt_gui_presets_confirm_and_delete(const char *name,
 static void _check_buttons_activated(GtkCheckButton *button,
                                      dt_gui_presets_edit_dialog_t *g)
 {
-  if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->autoapply))
-     || gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->filter)))
+  if(gtk_check_button_get_active(GTK_CHECK_BUTTON(g->autoapply))
+     || gtk_check_button_get_active(GTK_CHECK_BUTTON(g->filter)))
   {
     gtk_widget_set_visible(GTK_WIDGET(g->details), TRUE);
     gtk_widget_set_no_show_all(GTK_WIDGET(g->details), FALSE);
@@ -539,13 +539,13 @@ static void _format_toggled(GtkToggleButton *button, gpointer data)
   // second group (hdr, color, monochrome).
 
   const gboolean raw_col =
-    gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->format_btn[0]))
-    || gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->format_btn[1]));
+    gtk_check_button_get_active(GTK_CHECK_BUTTON(g->format_btn[0]))
+    || gtk_check_button_get_active(GTK_CHECK_BUTTON(g->format_btn[1]));
 
   const gboolean kind_col =
-    gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->format_btn[2]))
-    || gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->format_btn[3]))
-    || gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(g->format_btn[4]));
+    gtk_check_button_get_active(GTK_CHECK_BUTTON(g->format_btn[2]))
+    || gtk_check_button_get_active(GTK_CHECK_BUTTON(g->format_btn[3]))
+    || gtk_check_button_get_active(GTK_CHECK_BUTTON(g->format_btn[4]));
 
   const gboolean ok_active = !g->iop || (raw_col && kind_col);
 
@@ -841,17 +841,17 @@ static void _presets_show_edit_dialog(dt_gui_presets_edit_dialog_t *g,
                               sqlite3_column_double(stmt, 11));
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(g->focal_length_max),
                               sqlite3_column_double(stmt, 12));
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->autoapply),
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(g->autoapply),
                                  sqlite3_column_int(stmt, 13));
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->filter),
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(g->filter),
                                  sqlite3_column_int(stmt, 14));
     const int format = (sqlite3_column_int(stmt, 15)) ^ DT_PRESETS_FOR_NOT;
     for(k = 0; k < 5; k++)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->format_btn[k]),
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(g->format_btn[k]),
                                    format & (_gui_presets_format_flag[k]));
 
     const int op_params_length = sqlite3_column_bytes(stmt, 16);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->autoinit),
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(g->autoinit),
                                  (op_params_length == 0));
   }
   else
@@ -870,12 +870,12 @@ static void _presets_show_edit_dialog(dt_gui_presets_edit_dialog_t *g,
 
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(g->focal_length_min), 0);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(g->focal_length_max), MAX_FOCAL_LEN);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->autoapply), FALSE);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->filter), FALSE);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->autoinit), FALSE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(g->autoapply), FALSE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(g->filter), FALSE);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(g->autoinit), FALSE);
 
     for(int k = 0; k < 5; k++)
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->format_btn[k]), TRUE);
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(g->format_btn[k]), TRUE);
   }
   sqlite3_finalize(stmt);
 

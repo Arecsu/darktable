@@ -144,9 +144,9 @@ static gboolean _key_press_on_list(GtkEventControllerKey *controller,
   return FALSE;
 }
 
-static void _tags_toggled(GtkToggleButton *dttag, dt_lib_export_metadata_t *d)
+static void _tags_toggled(GtkCheckButton *dttag, dt_lib_export_metadata_t *d)
 {
-  const gboolean tags = gtk_toggle_button_get_active(dttag);
+  const gboolean tags = gtk_check_button_get_active(dttag);
   gtk_widget_set_sensitive(d->private, tags);
   gtk_widget_set_sensitive(d->synonyms, tags);
   gtk_widget_set_sensitive(d->omithierarchy, tags);
@@ -200,7 +200,7 @@ char *dt_lib_export_metadata_configuration_dialog(char *metadata_presets, const 
 
   GtkWidget *dttag = gtk_check_button_new_with_label(_("tags"));
   gtk_widget_set_tooltip_text(dttag, _("export tags (to Xmp.dc.Subject)"));
-  g_signal_connect(G_OBJECT(dttag), "clicked", G_CALLBACK(_tags_toggled), (gpointer)d);
+  g_signal_connect(G_OBJECT(dttag), "toggled", G_CALLBACK(_tags_toggled), (gpointer)d);
 
   d->private = gtk_check_button_new_with_label(_("private tags"));
   gtk_widget_set_tooltip_text(d->private, _("export private tags"));
@@ -268,18 +268,18 @@ char *dt_lib_export_metadata_configuration_dialog(char *metadata_presets, const 
   }
   g_list_free_full(list, g_free);
 
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(exiftag), flags & DT_META_EXIF);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dtmetadata), flags & DT_META_METADATA);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(geotag), flags & DT_META_GEOTAG);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dttag), flags & DT_META_TAG);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->private), flags & DT_META_PRIVATE_TAG);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->synonyms), flags & DT_META_SYNONYMS_TAG);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->omithierarchy), flags & DT_META_OMIT_HIERARCHY);
-  _tags_toggled(GTK_TOGGLE_BUTTON(dttag), d);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(hierarchical), flags & DT_META_HIERARCHICAL_TAG);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dthistory), flags & DT_META_DT_HISTORY);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(exiftag), flags & DT_META_EXIF);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(dtmetadata), flags & DT_META_METADATA);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(geotag), flags & DT_META_GEOTAG);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(dttag), flags & DT_META_TAG);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->private), flags & DT_META_PRIVATE_TAG);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->synonyms), flags & DT_META_SYNONYMS_TAG);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->omithierarchy), flags & DT_META_OMIT_HIERARCHY);
+  _tags_toggled(GTK_CHECK_BUTTON(dttag), d);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(hierarchical), flags & DT_META_HIERARCHICAL_TAG);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(dthistory), flags & DT_META_DT_HISTORY);
   if(!ondisk)
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(calculated), flags & DT_META_CALCULATED);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(calculated), flags & DT_META_CALCULATED);
 
   GtkWidget *plus = dtgtk_button_new_full(dtgtk_cairo_paint_plus_simple, 0, NULL,
       &(dtgtk_button_config_t){
@@ -319,16 +319,16 @@ char *dt_lib_export_metadata_configuration_dialog(char *metadata_presets, const 
       gtk_cell_editable_editing_done(active_editable);
 
     const gint newflags = (
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(exiftag)) ? DT_META_EXIF : 0) |
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dtmetadata)) ? DT_META_METADATA : 0) |
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(geotag)) ? DT_META_GEOTAG : 0) |
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dttag)) ? DT_META_TAG : 0) |
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->private)) ? DT_META_PRIVATE_TAG : 0) |
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->synonyms)) ? DT_META_SYNONYMS_TAG : 0) |
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->omithierarchy)) ? DT_META_OMIT_HIERARCHY : 0) |
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(hierarchical)) ? DT_META_HIERARCHICAL_TAG : 0) |
-                    (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dthistory)) ? DT_META_DT_HISTORY : 0) |
-                    (!ondisk  ? (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(calculated)) ? DT_META_CALCULATED : 0) : 0)
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(exiftag)) ? DT_META_EXIF : 0) |
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(dtmetadata)) ? DT_META_METADATA : 0) |
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(geotag)) ? DT_META_GEOTAG : 0) |
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(dttag)) ? DT_META_TAG : 0) |
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(d->private)) ? DT_META_PRIVATE_TAG : 0) |
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(d->synonyms)) ? DT_META_SYNONYMS_TAG : 0) |
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(d->omithierarchy)) ? DT_META_OMIT_HIERARCHY : 0) |
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(hierarchical)) ? DT_META_HIERARCHICAL_TAG : 0) |
+                    (gtk_check_button_get_active(GTK_CHECK_BUTTON(dthistory)) ? DT_META_DT_HISTORY : 0) |
+                    (!ondisk  ? (gtk_check_button_get_active(GTK_CHECK_BUTTON(calculated)) ? DT_META_CALCULATED : 0) : 0)
                     );
 
     newlist = g_strdup_printf("%x", newflags);
