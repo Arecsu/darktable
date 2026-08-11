@@ -155,6 +155,7 @@ static void _colors_operator_clicked(GtkWidget *w, _widgets_colors_t *colors)
   _colors_update(rule);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gchar *_colors_pretty_print(const gchar *raw_txt)
 {
   gchar *txt = NULL;
@@ -210,6 +211,7 @@ static gchar *_colors_pretty_print(const gchar *raw_txt)
   }
   return txt;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static gboolean _colors_update(dt_lib_filtering_rule_t *rule)
 {

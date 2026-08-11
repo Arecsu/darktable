@@ -224,7 +224,14 @@ int main(int argc, char *arg[])
   dt_loc_get_localedir(localedir, sizeof(localedir));
   bindtextdomain(GETTEXT_PACKAGE, localedir);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
   if(!gtk_parse_args(&argc, &arg)) exit(1);
+#else
+  // GTK4 removed gtk_parse_args(); gtk_init() opens the default display and
+  // terminates on failure, so a headless CLI uses gtk_init_check() and keeps
+  // going when no display is available (same as the old display-less parse).
+  gtk_init_check();
+#endif
 
   // parse command line arguments
   char *input_filename = NULL;

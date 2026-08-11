@@ -920,6 +920,7 @@ static void _update_sel_on_tree(GtkTreeModel *model)
 }
 
 // delete a tag in the tree (tree or list)
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _delete_tree_tag(GtkTreeModel *model,
                              GtkTreeIter *iter,
                              const gboolean tree)
@@ -945,8 +946,10 @@ static void _delete_tree_tag(GtkTreeModel *model,
     gtk_list_store_remove(GTK_LIST_STORE(model), iter);
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 // delete a branch of the tag tree
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _delete_tree_path(GtkTreeModel *model,
                               GtkTreeIter *iter,
                               const gboolean root,
@@ -1009,6 +1012,7 @@ static void _delete_tree_path(GtkTreeModel *model,
     g_free(path);
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _lib_selection_changed_callback(gpointer instance,
                                             dt_lib_module_t *self)
@@ -1041,6 +1045,7 @@ static void _set_keyword(dt_lib_module_t *self)
   g_strlcpy(d->keyword, beg, sizeof(d->keyword));
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _update_tag_name_per_name(GtkTreeModel *model,
                                           GtkTreePath *path,
                                           GtkTreeIter *iter,
@@ -1092,6 +1097,7 @@ static gboolean _update_tag_name_per_name(GtkTreeModel *model,
   g_free(tagname);
   return FALSE;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _update_attached_count(const int tagid, GtkTreeView *view,
                                    const gboolean tree_flag)
@@ -1693,6 +1699,7 @@ static void _tag_name_changed(GtkEntry *entry,
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _pop_menu_dictionary_delete_tag(GtkWidget *menuitem,
                                             dt_lib_module_t *self,
                                             const gboolean branch)
@@ -1781,6 +1788,7 @@ static void _pop_menu_dictionary_delete_tag(GtkWidget *menuitem,
   g_free(tagname);
   _raise_signal_tag_changed(self);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 #if !GTK_CHECK_VERSION(4, 0, 0)
 static void _pop_menu_dictionary_delete_node(GtkWidget *menuitem,

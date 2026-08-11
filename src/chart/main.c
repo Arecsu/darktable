@@ -70,6 +70,8 @@ typedef struct dt_lut_t
   image_t source;
   image_t reference;
   char *reference_filename;
+  char *it8_filename;
+  char *reference_image_filename;
 
   // computed data
   chart_t *chart;
@@ -109,10 +111,10 @@ static gboolean open_image(image_t *image, const char *filename);
 static gboolean open_cht(dt_lut_t *self, const char *filename);
 static gboolean open_it8(dt_lut_t *self, const char *filename);
 
-static void size_allocate_callback(GtkWidget *widget, GdkRectangle *allocation, gpointer user_data)
+static void size_allocate_callback(GtkWidget *widget, int width, int height, gpointer user_data)
 {
   image_t *image = (image_t *)user_data;
-  set_offset_and_scale(image, allocation->width, allocation->height);
+  set_offset_and_scale(image, width, height);
 }
 
 static gboolean draw_image_callback(GtkWidget *widget, cairo_t *cr, gpointer user_data)
@@ -295,30 +297,54 @@ static void update_corner(image_t *image, int which, float *x, float *y)
   }
 }
 
-static void source_image_changed_callback(GtkFileChooserButton *widget, gpointer user_data)
+static char *_choose_open_file(dt_lut_t *self, const char *title)
+{
+  GtkWidget *dialog = gtk_file_chooser_dialog_new(title, GTK_WINDOW(self->window),
+                                                  GTK_FILE_CHOOSER_ACTION_OPEN,
+                                                  _("_cancel"), GTK_RESPONSE_CANCEL,
+                                                  _("_open"), GTK_RESPONSE_ACCEPT, NULL);
+  char *filename = NULL;
+  if(dt_gui_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
+  {
+    GFile *gfile = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(dialog));
+    filename = gfile ? g_file_get_path(gfile) : NULL;
+    if(gfile) g_object_unref(gfile);
+  }
+  gtk_widget_destroy(dialog);
+  return filename;
+}
+
+static void _source_image_button_clicked(GtkButton *button, gpointer user_data)
 {
   dt_lut_t *self = (dt_lut_t *)user_data;
-  char *new_filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(widget));
-  open_source_image(self, new_filename);
-  g_free(new_filename);
+  char *filename = _choose_open_file(self, _("image of a color chart"));
+  if(filename)
+  {
+    open_source_image(self, filename);
+    g_free(filename);
+  }
 }
 
 static gboolean open_source_image(dt_lut_t *self, const char *filename)
 {
   gboolean res = open_image(&self->source, filename);
   gtk_widget_set_sensitive(self->cht_button, res);
-  if(!res) gtk_file_chooser_unselect_all(GTK_FILE_CHOOSER(self->image_button));
   gtk_widget_queue_draw(self->source.drawing_area);
 
   return res;
 }
 
-static void ref_image_changed_callback(GtkFileChooserButton *widget, gpointer user_data)
+static void _reference_image_button_clicked(GtkButton *button, gpointer user_data)
 {
   dt_lut_t *self = (dt_lut_t *)user_data;
-  char *new_filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(widget));
-  open_reference_image(self, new_filename);
-  g_free(new_filename);
+  char *filename = _choose_open_file(self, _("image of a color chart"));
+  if(filename)
+  {
+    g_free(self->reference_image_filename);
+    self->reference_image_filename = g_strdup(filename);
+    open_reference_image(self, filename);
+    g_free(filename);
+  }
 }
 
 static char *get_filename_base(const char *filename)
@@ -338,7 +364,10 @@ static gboolean open_reference_image(dt_lut_t *self, const char *filename)
   gtk_widget_set_sensitive(self->export_button, FALSE);
   gtk_widget_set_sensitive(self->export_raw_button, FALSE);
   if(!res)
-    gtk_file_chooser_unselect_all(GTK_FILE_CHOOSER(self->reference_image_button));
+  {
+    g_free(self->reference_image_filename);
+    self->reference_image_filename = NULL;
+  }
   else
   {
     if(initial_loading)
@@ -401,12 +430,15 @@ static gboolean open_image(image_t *image, const char *filename)
   return TRUE;
 }
 
-static void cht_changed_callback(GtkFileChooserButton *widget, gpointer user_data)
+static void _cht_button_clicked(GtkButton *button, gpointer user_data)
 {
   dt_lut_t *self = (dt_lut_t *)user_data;
-  char *new_filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(widget));
-  open_cht(self, new_filename);
-  g_free(new_filename);
+  char *filename = _choose_open_file(self, _("description of a color chart"));
+  if(filename)
+  {
+    open_cht(self, filename);
+    g_free(filename);
+  }
 }
 
 static gboolean open_cht(dt_lut_t *self, const char *filename)
@@ -422,9 +454,10 @@ static gboolean open_cht(dt_lut_t *self, const char *filename)
   init_table(self);
 
   // reset it8/reference entry
-  if(!res) gtk_file_chooser_unselect_all(GTK_FILE_CHOOSER(self->cht_button));
-  gtk_file_chooser_unselect_all(GTK_FILE_CHOOSER(self->it8_button));
-  gtk_file_chooser_unselect_all(GTK_FILE_CHOOSER(self->reference_image_button));
+  g_free(self->it8_filename);
+  self->it8_filename = NULL;
+  g_free(self->reference_image_filename);
+  self->reference_image_filename = NULL;
 
   if(res)
   {
@@ -457,7 +490,7 @@ static void reference_mode_changed_callback(GtkComboBox *widget, gpointer user_d
     gtk_widget_show_all(self->reference_it8_box);
     gtk_widget_hide(self->reference_image_box);
     gtk_widget_hide(self->reference.drawing_area);
-    g_signal_emit_by_name(self->it8_button, "file-set", user_data);
+    if(self->it8_filename) open_it8(self, self->it8_filename);
   }
   else
   {
@@ -467,16 +500,21 @@ static void reference_mode_changed_callback(GtkComboBox *widget, gpointer user_d
     gtk_widget_show_all(self->reference_image_box);
     gtk_widget_show_all(self->reference.drawing_area);
     gtk_widget_hide(self->reference_it8_box);
-    g_signal_emit_by_name(self->reference_image_button, "file-set", user_data);
+    if(self->reference_image_filename) open_reference_image(self, self->reference_image_filename);
   }
 }
 
-static void it8_changed_callback(GtkFileChooserButton *widget, gpointer user_data)
+static void _it8_button_clicked(GtkButton *button, gpointer user_data)
 {
   dt_lut_t *self = (dt_lut_t *)user_data;
-  char *new_filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(widget));
-  open_it8(self, new_filename);
-  g_free(new_filename);
+  char *filename = _choose_open_file(self, _("reference data of a color chart"));
+  if(filename)
+  {
+    g_free(self->it8_filename);
+    self->it8_filename = g_strdup(filename);
+    open_it8(self, filename);
+    g_free(filename);
+  }
 }
 
 static gboolean open_it8(dt_lut_t *self, const char *filename)
@@ -490,7 +528,10 @@ static gboolean open_it8(dt_lut_t *self, const char *filename)
   gtk_widget_set_sensitive(self->export_button, FALSE);
   gtk_widget_set_sensitive(self->export_raw_button, FALSE);
   if(!res)
-    gtk_file_chooser_unselect_all(GTK_FILE_CHOOSER(self->it8_button));
+  {
+    g_free(self->it8_filename);
+    self->it8_filename = NULL;
+  }
   else
   {
     free(self->reference_filename);
@@ -507,10 +548,11 @@ static char *get_export_filename(dt_lut_t *self, const char *extension, char **n
 {
   GtkWidget *name_entry = NULL, *description_entry = NULL;
   GtkWidget *dialog
-      = gtk_file_chooser_dialog_new("save file", GTK_WINDOW(self->window), GTK_FILE_CHOOSER_ACTION_SAVE,
+      = gtk_dialog_new_with_buttons("save file", GTK_WINDOW(self->window), GTK_DIALOG_MODAL,
                                     _("_cancel"), GTK_RESPONSE_CANCEL, _("_save"), GTK_RESPONSE_ACCEPT, NULL);
 
-  gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), TRUE);
+  GtkWidget *chooser = gtk_file_chooser_widget_new(GTK_FILE_CHOOSER_ACTION_SAVE);
+  gtk_widget_set_size_request(chooser, 600, 400);
 
   char *reference_filename = g_strdup(self->reference_filename);
   char *last_dot = g_strrstr(reference_filename, ".");
@@ -518,7 +560,7 @@ static char *get_export_filename(dt_lut_t *self, const char *extension, char **n
   {
     *last_dot = '\0';
     char *new_filename = g_strconcat(reference_filename, extension, NULL);
-    gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), new_filename);
+    gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(chooser), new_filename);
     g_free(new_filename);
   }
   g_free(reference_filename);
@@ -579,13 +621,16 @@ static char *get_export_filename(dt_lut_t *self, const char *extension, char **n
 
   gtk_widget_show_all(grid);
 
-  gtk_file_chooser_set_extra_widget(GTK_FILE_CHOOSER(dialog), grid);
+  gtk_box_append(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), chooser);
+  gtk_box_append(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), grid);
 
   char *filename = NULL;
   int res = dt_gui_dialog_run(GTK_DIALOG(dialog));
   if(res == GTK_RESPONSE_ACCEPT)
   {
-    filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+    GFile *gfile = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(chooser));
+    filename = gfile ? g_file_get_path(gfile) : NULL;
+    if(gfile) g_object_unref(gfile);
     *name = g_strdup(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(name_entry))));
     *description = g_strdup(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(description_entry))));
     if(basecurve)
@@ -1175,29 +1220,32 @@ static GtkWidget *create_notebook_page_source(dt_lut_t *self)
   GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
 
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-  gtk_box_pack_start(GTK_BOX(page), hbox, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(page), hbox);
 
-  GtkWidget *image_button = gtk_file_chooser_button_new("image of a color chart", GTK_FILE_CHOOSER_ACTION_OPEN);
-  g_signal_connect(image_button, "file-set", G_CALLBACK(source_image_changed_callback), self);
+  GtkWidget *image_button = gtk_button_new_with_label(_("choose image..."));
+  g_signal_connect(image_button, "clicked", G_CALLBACK(_source_image_button_clicked), self);
 
-  GtkWidget *cht_button
-      = gtk_file_chooser_button_new("description of a color chart", GTK_FILE_CHOOSER_ACTION_OPEN);
-  g_signal_connect(cht_button, "file-set", G_CALLBACK(cht_changed_callback), self);
+  GtkWidget *cht_button = gtk_button_new_with_label(_("choose chart..."));
+  g_signal_connect(cht_button, "clicked", G_CALLBACK(_cht_button_clicked), self);
 
   GtkWidget *source_shrink = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0.5, 2.0, 0.01);
   gtk_scale_set_value_pos(GTK_SCALE(source_shrink), GTK_POS_RIGHT);
   g_signal_connect(source_shrink, "value-changed", G_CALLBACK(shrink_changed_callback), &self->source);
 
-  gtk_box_pack_start(GTK_BOX(hbox), gtk_label_new("image:"), FALSE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), image_button, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), gtk_label_new("chart:"), FALSE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), cht_button, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), gtk_label_new("size:"), FALSE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), source_shrink, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), gtk_label_new("image:"));
+  gtk_widget_set_hexpand(image_button, TRUE);
+  gtk_box_append(GTK_BOX(hbox), image_button);
+  gtk_box_append(GTK_BOX(hbox), gtk_label_new("chart:"));
+  gtk_widget_set_hexpand(cht_button, TRUE);
+  gtk_box_append(GTK_BOX(hbox), cht_button);
+  gtk_box_append(GTK_BOX(hbox), gtk_label_new("size:"));
+  gtk_widget_set_hexpand(source_shrink, TRUE);
+  gtk_box_append(GTK_BOX(hbox), source_shrink);
 
   init_image(self, &self->source, _motion_cb_source);
   self->source.draw_colored = TRUE;
-  gtk_box_pack_start(GTK_BOX(page), self->source.drawing_area, TRUE, TRUE, 0);
+  gtk_widget_set_vexpand(self->source.drawing_area, TRUE);
+  gtk_box_append(GTK_BOX(page), self->source.drawing_area);
 
   g_signal_connect(cht_button, "state-flags-changed", G_CALLBACK(cht_state_callback), self);
 
@@ -1213,7 +1261,7 @@ static GtkWidget *create_notebook_page_reference(dt_lut_t *self)
   GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
 
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-  gtk_box_pack_start(GTK_BOX(page), hbox, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(page), hbox);
 
   GtkWidget *reference_mode = gtk_combo_box_text_new();
   gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(reference_mode), NULL, "cie/it8 file");
@@ -1221,36 +1269,41 @@ static GtkWidget *create_notebook_page_reference(dt_lut_t *self)
   gtk_combo_box_set_active(GTK_COMBO_BOX(reference_mode), 0);
   g_signal_connect(reference_mode, "changed", G_CALLBACK(reference_mode_changed_callback), self);
 
-  GtkWidget *it8_button
-      = gtk_file_chooser_button_new("reference data of a color chart", GTK_FILE_CHOOSER_ACTION_OPEN);
-  g_signal_connect(it8_button, "file-set", G_CALLBACK(it8_changed_callback), self);
+  GtkWidget *it8_button = gtk_button_new_with_label(_("choose it8..."));
+  g_signal_connect(it8_button, "clicked", G_CALLBACK(_it8_button_clicked), self);
 
-  GtkWidget *reference_image_button
-      = gtk_file_chooser_button_new("image of a color chart", GTK_FILE_CHOOSER_ACTION_OPEN);
-  g_signal_connect(reference_image_button, "file-set", G_CALLBACK(ref_image_changed_callback), self);
+  GtkWidget *reference_image_button = gtk_button_new_with_label(_("choose image..."));
+  g_signal_connect(reference_image_button, "clicked", G_CALLBACK(_reference_image_button_clicked), self);
 
   GtkWidget *reference_shrink = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0.5, 2.0, 0.01);
   gtk_scale_set_value_pos(GTK_SCALE(reference_shrink), GTK_POS_RIGHT);
   g_signal_connect(reference_shrink, "value-changed", G_CALLBACK(shrink_changed_callback), &self->reference);
 
-  gtk_box_pack_start(GTK_BOX(hbox), gtk_label_new("mode:"), FALSE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), reference_mode, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), gtk_label_new("mode:"));
+  gtk_widget_set_hexpand(reference_mode, TRUE);
+  gtk_box_append(GTK_BOX(hbox), reference_mode);
 
   GtkWidget *reference_it8_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-  gtk_box_pack_start(GTK_BOX(reference_it8_box), gtk_label_new("reference it8:"), FALSE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(reference_it8_box), it8_button, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), reference_it8_box, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(reference_it8_box), gtk_label_new("reference it8:"));
+  gtk_widget_set_hexpand(it8_button, TRUE);
+  gtk_box_append(GTK_BOX(reference_it8_box), it8_button);
+  gtk_widget_set_hexpand(reference_it8_box, TRUE);
+  gtk_box_append(GTK_BOX(hbox), reference_it8_box);
 
   GtkWidget *reference_image_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-  gtk_box_pack_start(GTK_BOX(reference_image_box), gtk_label_new("reference image:"), FALSE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(reference_image_box), reference_image_button, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(reference_image_box), gtk_label_new("size:"), FALSE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(reference_image_box), reference_shrink, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), reference_image_box, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(reference_image_box), gtk_label_new("reference image:"));
+  gtk_widget_set_hexpand(reference_image_button, TRUE);
+  gtk_box_append(GTK_BOX(reference_image_box), reference_image_button);
+  gtk_box_append(GTK_BOX(reference_image_box), gtk_label_new("size:"));
+  gtk_widget_set_hexpand(reference_shrink, TRUE);
+  gtk_box_append(GTK_BOX(reference_image_box), reference_shrink);
+  gtk_widget_set_hexpand(reference_image_box, TRUE);
+  gtk_box_append(GTK_BOX(hbox), reference_image_box);
 
   init_image(self, &self->reference, _motion_cb_reference);
   self->reference.draw_colored = FALSE;
-  gtk_box_pack_start(GTK_BOX(page), self->reference.drawing_area, TRUE, TRUE, 0);
+  gtk_widget_set_vexpand(self->reference.drawing_area, TRUE);
+  gtk_box_append(GTK_BOX(page), self->reference.drawing_area);
 
   gtk_widget_show_all(reference_it8_box);
   gtk_widget_show_all(reference_image_box);
@@ -1330,10 +1383,9 @@ static GtkWidget *create_notebook(dt_lut_t *self)
 
 static GtkWidget *create_table(dt_lut_t *self)
 {
-  GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
+  GtkWidget *scrolled_window = gtk_scrolled_window_new();
   gtk_widget_set_size_request(scrolled_window, -1, 15);
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-  gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(scrolled_window), GTK_SHADOW_ETCHED_IN);
   //   gtk_paned_pack2(GTK_PANED(vpaned), scrolled_window, TRUE, FALSE);
 
   self->model = GTK_TREE_MODEL(gtk_list_store_new(NUM_COLUMNS,
@@ -1348,7 +1400,7 @@ static GtkWidget *create_table(dt_lut_t *self)
                                                   ));
   self->treeview = gtk_tree_view_new_with_model(self->model);
   gtk_tree_view_set_search_column(GTK_TREE_VIEW(self->treeview), COLUMN_NAME);
-  gtk_container_add(GTK_CONTAINER(scrolled_window), self->treeview);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), self->treeview);
 
   add_column(GTK_TREE_VIEW(self->treeview), "name", COLUMN_NAME, COLUMN_NAME);
   add_column(GTK_TREE_VIEW(self->treeview), "sRGB (image)", COLUMN_RGB_IN, COLUMN_RGB_IN);
@@ -1635,7 +1687,7 @@ static void init_image(dt_lut_t *self, image_t *image, void (*motion_cb)(GtkEven
   gtk_widget_set_size_request(image->drawing_area, -1, 50);
   gtk_widget_add_events(image->drawing_area,
                         GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK);
-  g_signal_connect(image->drawing_area, "size-allocate", G_CALLBACK(size_allocate_callback), image);
+  g_signal_connect(image->drawing_area, "resize", G_CALLBACK(size_allocate_callback), image);
   g_signal_connect(image->drawing_area, "draw", G_CALLBACK(draw_image_callback), image);
   dt_gui_connect_motion(image->drawing_area, motion_cb, NULL, NULL, self);
 }
@@ -1694,18 +1746,25 @@ static void gui_command_line(GApplication *app, GApplicationCommandLine* cmdline
   GtkWidget *window = gtk_application_window_new(GTK_APPLICATION(app));
   self->window = window;
   gtk_window_set_title(GTK_WINDOW(window), "darktable LUT tool");
-  gtk_container_set_border_width(GTK_CONTAINER(window), 3);
   gtk_window_set_default_size(GTK_WINDOW(window), 800, 600);
 
   // resizable container
   GtkWidget *vpaned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
-  gtk_container_add(GTK_CONTAINER(window), vpaned);
+  gtk_widget_set_margin_start(vpaned, 3);
+  gtk_widget_set_margin_end(vpaned, 3);
+  gtk_widget_set_margin_top(vpaned, 3);
+  gtk_widget_set_margin_bottom(vpaned, 3);
+  gtk_window_set_child(GTK_WINDOW(window), vpaned);
 
   // upper half
-  gtk_paned_pack1(GTK_PANED(vpaned), create_notebook(self), TRUE, FALSE);
+  gtk_paned_set_start_child(GTK_PANED(vpaned), create_notebook(self));
+  gtk_paned_set_resize_start_child(GTK_PANED(vpaned), TRUE);
+  gtk_paned_set_shrink_start_child(GTK_PANED(vpaned), FALSE);
 
   // lower half
-  gtk_paned_pack2(GTK_PANED(vpaned), create_table(self), TRUE, FALSE);
+  gtk_paned_set_end_child(GTK_PANED(vpaned), create_table(self));
+  gtk_paned_set_resize_end_child(GTK_PANED(vpaned), TRUE);
+  gtk_paned_set_shrink_end_child(GTK_PANED(vpaned), FALSE);
 
   gtk_widget_set_sensitive(self->cht_button, FALSE);
   gtk_widget_set_sensitive(self->it8_button, FALSE);
@@ -1719,15 +1778,13 @@ static void gui_command_line(GApplication *app, GApplicationCommandLine* cmdline
   // only load data now so it can fill widgets
   if(source_filename && open_source_image(self, source_filename))
   {
-    gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(self->image_button), source_filename);
     if(cht_filename && open_cht(self, cht_filename))
     {
-      gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(self->cht_button), cht_filename);
       if(it8_filename && open_it8(self, it8_filename))
-        gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(self->it8_button), it8_filename);
+        self->it8_filename = g_strdup(it8_filename);
       if(reference_filename && open_reference_image(self, reference_filename))
       {
-        gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(self->reference_image_button), reference_filename);
+        self->reference_image_filename = g_strdup(reference_filename);
         gtk_combo_box_set_active(GTK_COMBO_BOX(self->reference_mode), 1);
       }
     }
@@ -1946,6 +2003,8 @@ int main(int argc, char *argv[])
   free_chart(self->chart);
   free(self->tonecurve_encoded);
   free(self->colorchecker_encoded);
+  g_free(self->it8_filename);
+  g_free(self->reference_image_filename);
   free(self);
 
   return res;
