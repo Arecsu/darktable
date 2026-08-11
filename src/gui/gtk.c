@@ -3905,15 +3905,25 @@ void dt_gui_style_context_get(GtkStyleContext *context,
   {
     if(!strcmp(property, GTK_STYLE_PROPERTY_COLOR))
     {
-      GdkRGBA *out = va_arg(args, GdkRGBA *);
-      gtk_style_context_get_color(context, 0, out);
+      /* GTK3's variadic get returned an allocated GdkRGBA; the caller
+       * frees it with gdk_rgba_free().  The vararg is therefore the
+       * ADDRESS of the caller's GdkRGBA* (see bauhaus.c, dtgtk/thumbnail_btn.c,
+       * libs/tools/darktable.c) — read it as GdkRGBA ** and hand back a
+       * freshly allocated color.  (Reading it as GdkRGBA * and writing
+       * through it scribbled 32 bytes over the caller's uninitialized
+       * pointer slot and made gdk_rgba_free() free garbage — first-frame
+       * heap corruption.) */
+      GdkRGBA **out = va_arg(args, GdkRGBA **);
+      *out = g_new0(GdkRGBA, 1);
+      gtk_style_context_get_color(context, 0, *out);
     }
     else if(!strcmp(property, GTK_STYLE_PROPERTY_BACKGROUND_COLOR))
     {
       /* TODO P5: GTK4 exposes no background-color lookup; widgets should
        * paint it via gtk_render_background()/GtkSnapshot instead. */
-      GdkRGBA *out = va_arg(args, GdkRGBA *);
-      gdk_rgba_parse(out, "transparent");
+      GdkRGBA **out = va_arg(args, GdkRGBA **);
+      *out = g_new0(GdkRGBA, 1);
+      gdk_rgba_parse(*out, "transparent");
     }
     else if(!strcmp(property, "min-width") || !strcmp(property, "min-height"))
     {
