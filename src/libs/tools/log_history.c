@@ -184,7 +184,7 @@ void gui_init(dt_lib_module_t *self)
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay), d->badge);
 
   d->popover = gtk_popover_new();
-  gtk_widget_set_parent(d->popover, d->button);
+  dt_gui_popover_attach(d->popover, d->button);
   gtk_widget_set_name(d->popover, "log-history-popover");
   gtk_popover_set_position(GTK_POPOVER(d->popover), GTK_POS_TOP);
 

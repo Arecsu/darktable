@@ -405,7 +405,7 @@ void gui_init(dt_lib_module_t *self)
         .clicked_data = self,
       });
   d->over_popup = gtk_popover_new();
-  gtk_widget_set_parent(d->over_popup, d->overlays_button);
+  dt_gui_popover_attach(d->over_popup, d->overlays_button);
   gtk_widget_set_size_request(d->over_popup, 350, -1);
   // we register size of overlay icon to keep in sync thumbtable overlays
 #if GTK_CHECK_VERSION(4, 0, 0)

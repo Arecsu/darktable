@@ -507,7 +507,7 @@ static void _misc_widget_init(dt_lib_filtering_rule_t *rule,
 
   // the popup
   misc->pop = gtk_popover_new();
-  gtk_widget_set_parent(misc->pop, misc->name);
+  dt_gui_popover_attach(misc->pop, misc->name);
   gtk_widget_set_size_request(misc->pop, 250, 400);
   g_signal_connect(G_OBJECT(misc->pop), "closed", G_CALLBACK(_misc_popup_closed), misc);
   hb = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);

@@ -815,7 +815,7 @@ GtkWidget *dt_guides_popover(dt_view_t *self,
                              GtkWidget *button)
 {
   GtkWidget *pop = gtk_popover_new();
-  gtk_widget_set_parent(pop, button);
+  dt_gui_popover_attach(pop, button);
 
   // create a new struct for all the widgets
   _guides_settings_t *gw = g_malloc0(sizeof(_guides_settings_t));
@@ -1027,8 +1027,8 @@ static void _settings_autoshow_menu(GtkWidget *button,
   // GTK4 popovers are anchored to their parent widget (set_relative_to is
   // gone); reparent the shared popover to the opener.  The extra ref from
   // darkroom.c keeps it alive when a module header is destroyed.
-  gtk_widget_unparent(popover);
-  gtk_widget_set_parent(popover, button);
+  dt_gui_widget_reparent(popover, button);
+  dt_gui_popover_attach(popover, button);
 #else
   gtk_popover_set_relative_to(GTK_POPOVER(popover), button);
 #endif

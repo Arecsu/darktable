@@ -2829,8 +2829,8 @@ static void _quickbutton_pressed_cb(GtkGestureSingle *gesture,
   {
 #if GTK_CHECK_VERSION(4, 0, 0)
     // GTK4: popovers anchor to their parent; reparent to the opener
-    gtk_widget_unparent(popover);
-    gtk_widget_set_parent(popover, button);
+    dt_gui_widget_reparent(popover, button);
+    dt_gui_popover_attach(popover, button);
 #else
     gtk_popover_set_relative_to(GTK_POPOVER(popover), button);
 #endif
@@ -3207,7 +3207,7 @@ void gui_init(dt_view_t *self)
     dt_view_manager_module_toolbox_add(darktable.view_manager, dev->color_assessment.button, DT_VIEW_DARKROOM);
     /* add pop-up window */
     dev->color_assessment.floating_window = gtk_popover_new();
-    gtk_widget_set_parent(dev->color_assessment.floating_window, dev->color_assessment.button);
+    dt_gui_popover_attach(dev->color_assessment.floating_window, dev->color_assessment.button);
     connect_button_press_release(dev->color_assessment.button, dev->color_assessment.floating_window);
 
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -3285,7 +3285,7 @@ void gui_init(dt_view_t *self)
 
     // and the popup window
     dev->rawoverexposed.floating_window = gtk_popover_new();
-    gtk_widget_set_parent(dev->rawoverexposed.floating_window, dev->rawoverexposed.button);
+    dt_gui_popover_attach(dev->rawoverexposed.floating_window, dev->rawoverexposed.button);
     connect_button_press_release(dev->rawoverexposed.button,
                                  dev->rawoverexposed.floating_window);
 
@@ -3357,7 +3357,7 @@ void gui_init(dt_view_t *self)
 
     // and the popup window
     dev->overexposed.floating_window = gtk_popover_new();
-    gtk_widget_set_parent(dev->overexposed.floating_window, dev->overexposed.button);
+    dt_gui_popover_attach(dev->overexposed.floating_window, dev->overexposed.button);
     connect_button_press_release(dev->overexposed.button,
                                  dev->overexposed.floating_window);
 
@@ -3468,7 +3468,7 @@ void gui_init(dt_view_t *self)
     connect_button_press_release(dev->profile.gamut_button, dev->profile.floating_window);
     // randomly connect to one of the buttons, so widgets can be realized
     // (GTK4: each press reparents the popover to its opener)
-    gtk_widget_set_parent(dev->profile.floating_window, dev->second_wnd_button);
+    dt_gui_popover_attach(dev->profile.floating_window, dev->second_wnd_button);
 
     /** let's fill the encapsulating widgets */
     const int force_lcms2 = dt_conf_get_bool("plugins/lighttable/export/force_lcms2");

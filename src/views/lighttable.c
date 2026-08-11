@@ -1499,7 +1499,7 @@ void gui_init(dt_view_t *self)
 
   // and the popup window
   lib->profile_floating_window = gtk_popover_new();
-  gtk_widget_set_parent(lib->profile_floating_window, profile_button);
+  dt_gui_popover_attach(lib->profile_floating_window, profile_button);
 
   dt_gui_connect_click_all(profile_button, _profile_popup_show_cb, NULL, lib->profile_floating_window);
 

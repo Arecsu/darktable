@@ -686,7 +686,11 @@ static void _current_hide_popup(GtkDarktableRangeSelect *range)
 {
   if(!range->cur_window) return;
   darktable.gui->hide_tooltips--;
-  gtk_widget_destroy(range->cur_window);
+  // GTK4: the popover is parented to range->band (a GtkDrawingArea) —
+  // destroying it via g_object_run_dispose while parented would critical
+  // "has a parent ... during dispose" and leave it dangling in the band's
+  // children list; unparent tears it down cleanly.
+  gtk_widget_unparent(range->cur_window);
   range->cur_window = NULL;
 }
 

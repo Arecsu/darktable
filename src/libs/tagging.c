@@ -3903,7 +3903,8 @@ static gboolean _lib_tagging_tag_key_press(GtkEventControllerKey *controller,
   {
     case GDK_KEY_Escape:
       g_list_free(d->floating_tag_imgs);
-      gtk_widget_destroy(d->floating_tag_window);
+      gtk_widget_unparent(d->floating_tag_window);
+      d->floating_tag_window = NULL;
       gtk_window_present(GTK_WINDOW(dt_ui_main_window(darktable.gui->ui)));
       return TRUE;
     case GDK_KEY_Tab:
@@ -3924,7 +3925,8 @@ static gboolean _lib_tagging_tag_key_press(GtkEventControllerKey *controller,
 
       _init_treeview(self, 0);
       _init_treeview(self, 1);
-      gtk_widget_destroy(d->floating_tag_window);
+      gtk_widget_unparent(d->floating_tag_window);
+      d->floating_tag_window = NULL;
       gtk_window_present(GTK_WINDOW(dt_ui_main_window(darktable.gui->ui)));
       if(res) _raise_signal_tag_changed(self);
 
@@ -3976,7 +3978,7 @@ static void _lib_tagging_tag_show(dt_action_t *action)
   // GTK4: GtkPopover is the native popup mechanism on every backend; the
   // transient undecorated-window path (gtk_window_move, type hints) is gone.
   d->floating_tag_window = gtk_popover_new();
-  gtk_widget_set_parent(d->floating_tag_window, center);
+  dt_gui_popover_attach(d->floating_tag_window, center);
   gtk_popover_set_position(GTK_POPOVER(d->floating_tag_window), GTK_POS_LEFT);
 #else
   GtkWidget *window = dt_ui_main_window(darktable.gui->ui);

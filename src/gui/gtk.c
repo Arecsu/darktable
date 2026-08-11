@@ -5203,6 +5203,40 @@ void dt_gui_widget_reparent(GtkWidget *widget, GtkWidget *new_parent)
   g_object_unref(widget);
 }
 
+static void _dt_gui_popover_anchor_destroyed(GtkWidget *anchor, gpointer user_data)
+{
+  GtkWidget *popover = GTK_WIDGET(user_data);
+  // Only unparent when the popover is still under THIS anchor: a reparented
+  // popover (e.g. the filtering rule popovers re-anchored to the
+  // right-clicked entry) lives under its new anchor and must not be torn
+  // down by the old one's destroy.
+  if(gtk_widget_get_parent(popover) == anchor)
+    gtk_widget_unparent(popover);
+}
+
+void dt_gui_popover_attach(GtkWidget *popover, GtkWidget *anchor)
+{
+  g_return_if_fail(GTK_IS_WIDGET(popover));
+  g_return_if_fail(GTK_IS_WIDGET(anchor));
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // See gtk.h for the why.  g_signal_connect_object ties the closure to the
+  // popover: a popover finalized first (unparent elsewhere) drops the
+  // handler; the emission holds its own closure ref, so the unparent that
+  // happens here (and may finalize the popover) is safe mid-signal.
+  // Idempotent per anchor: reparent sites call this again for the new
+  // anchor, and the tag check skips the duplicate same-anchor hook.
+  if(g_object_get_data(G_OBJECT(popover), "dt-gui-popover-anchor") == anchor)
+    return;
+  g_object_set_data(G_OBJECT(popover), "dt-gui-popover-anchor", anchor);
+  g_signal_connect_object(anchor, "destroy",
+                          G_CALLBACK(_dt_gui_popover_anchor_destroyed),
+                          popover, 0);
+  gtk_widget_set_parent(popover, anchor);
+#else
+  gtk_popover_set_relative_to(GTK_POPOVER(popover), anchor);
+#endif
+}
+
 #if !GTK_CHECK_VERSION(4, 0, 0)
 static void _delete_child(GtkWidget *widget,
                           const gpointer data)

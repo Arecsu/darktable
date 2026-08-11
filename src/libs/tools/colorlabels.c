@@ -247,7 +247,7 @@ static void _lib_colorlabels_edit(dt_lib_module_t *self,
     GtkAllocation alloc = {0};
     gtk_widget_get_allocation(button, &alloc);
     d->floating_window = gtk_popover_new();
-    gtk_widget_set_parent(d->floating_window, button);
+    dt_gui_popover_attach(d->floating_window, button);
     GdkRectangle r = { 0, 0, alloc.width, alloc.height };
     gtk_popover_set_pointing_to(GTK_POPOVER(d->floating_window), &r);
     gtk_popover_set_position(GTK_POPOVER(d->floating_window), GTK_POS_TOP);

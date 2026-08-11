@@ -3565,7 +3565,7 @@ static void _manage_editor_group_icon_changed(GtkGestureSingle *gesture,
   g_free(gr->icon);
   gr->icon = g_strdup(ic);
   GtkWidget *pop = gtk_widget_get_parent(gtk_widget_get_parent(widget));
-  // GTK4: the popover is parented to the button (gtk_widget_set_parent in
+  // GTK4: the popover is parented to the button (dt_gui_popover_attach in
   // _manage_editor_group_icon_popup), so the anchor is simply its parent;
   // gtk_popover_get_relative_to is removed.
   GtkWidget *btn = gtk_widget_get_parent(pop);
@@ -3579,7 +3579,7 @@ static void _manage_editor_group_icon_popup(GtkWidget *btn,
   dt_lib_modulegroups_group_t *gr = g_object_get_data(G_OBJECT(btn), "group");
 
   GtkWidget *pop = gtk_popover_new();
-  gtk_widget_set_parent(pop, btn);
+  dt_gui_popover_attach(pop, btn);
   GtkWidget *vb = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_widget_set_name(pop, "modulegroups-icons-popup");
 

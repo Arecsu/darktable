@@ -2060,7 +2060,10 @@ static void _blendif_hide_output_channels(GtkButton *button,
 // GtkMenu is gone in GTK4; the blend-options popup is a GtkPopover whose
 // contents are rebuilt on every popup (the active row and the
 // show/hide-output-channels row depend on the current state).  The popover
-// is parented to the button (gtk_widget_set_parent) and destroyed with it.
+// is anchored to the button via dt_gui_popover_attach(), which unparents
+// it when the button is destroyed (GtkWidget.dispose does not unparent
+// children — a raw set_parent would dangle it in the button's children
+// list and corrupt the heap at teardown).
 static void _blendif_options_callback(GtkButton *button,
                                       dt_iop_module_t *module)
 {
@@ -2075,7 +2078,7 @@ static void _blendif_options_callback(GtkButton *button,
   if(!pop)
   {
     pop = gtk_popover_new();
-    gtk_widget_set_parent(pop, GTK_WIDGET(button));
+    dt_gui_popover_attach(pop, GTK_WIDGET(button));
     g_object_set_data(G_OBJECT(button), "dt-blendif-options-popover", pop);
   }
 

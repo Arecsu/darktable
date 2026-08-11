@@ -250,8 +250,8 @@ static void _filename_press(GtkGestureSingle *gesture, gint n_press, gdouble x, 
 #if GTK_CHECK_VERSION(4, 0, 0)
     // GTK4: popovers anchor to their parent; reparent to the opener
     filename->opener = w;
-    gtk_widget_unparent(filename->pop);
-    gtk_widget_set_parent(filename->pop, w);
+    dt_gui_widget_reparent(filename->pop, w);
+    dt_gui_popover_attach(filename->pop, w);
 #else
     gtk_popover_set_default_widget(GTK_POPOVER(filename->pop), w);
     gtk_popover_set_relative_to(GTK_POPOVER(filename->pop), w);
@@ -430,7 +430,7 @@ static void _filename_widget_init(dt_lib_filtering_rule_t *rule, const dt_collec
 #if GTK_CHECK_VERSION(4, 0, 0)
   filename->pop = gtk_popover_new();
   filename->opener = filename->name;
-  gtk_widget_set_parent(filename->pop, filename->name);
+  dt_gui_popover_attach(filename->pop, filename->name);
 #else
   filename->pop = gtk_popover_new(filename->name);
 #endif

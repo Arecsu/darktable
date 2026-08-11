@@ -638,6 +638,22 @@ void dt_gui_container_destroy_children(GtkWidget *container);
 // parent's set_parent() takes it over.
 void dt_gui_widget_reparent(GtkWidget *widget, GtkWidget *new_parent);
 
+// GTK4: GtkPopover anchors to its parent widget (GTK3's relative-to).
+// GtkWidget.dispose does NOT unparent children (verified in gtkwidget.c
+// finalize: it only warns "but it still has children left"), so a popover
+// parented to an anchor that dies (module probe teardown, module reload,
+// view teardown) dangles in the anchor's children list -> the popover is
+// leaked with a parent pointer into freed memory -> later teardown or a
+// reparent touches freed memory (g_atomic_ref_count_inc on a freed object,
+// snapshot recursion, "Finalizing GtkEntry ... children left: GtkPopover"
+// storms).  This helper is the single attach point: it parents the popover
+// and hooks the anchor's "destroy" so the popover is unparented before the
+// anchor dies.  The connection lives with the popover
+// (g_signal_connect_object), so a popover torn down first (unparented
+// elsewhere) disconnects the handler automatically; the parent check keeps
+// a reparented popover safe from its old anchor's destroy.
+void dt_gui_popover_attach(GtkWidget *popover, GtkWidget *anchor);
+
 #if !GTK_CHECK_VERSION(4, 0, 0)
 void dt_gui_menu_popup(GtkMenu *menu,
                        GtkWidget *button,
