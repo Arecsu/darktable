@@ -319,6 +319,17 @@ static void _overlay_size_allocate(GtkWidget *overlay,
     _responsive_buttons(self->scopes);
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: GtkWidget has no size-allocate signal; track the allocated width. */
+static void _overlay_width_changed(GObject *overlay,
+                                   GParamSpec *pspec,
+                                   gpointer user_data)
+{
+  GtkAllocation allocation = { .width = gtk_widget_get_width(GTK_WIDGET(overlay)) };
+  _overlay_size_allocate(GTK_WIDGET(overlay), &allocation, user_data);
+}
+#endif
+
 static void _split_gui_init(dt_scopes_mode_t *const self,
                            dt_scopes_t *const scopes)
 {
@@ -335,8 +346,14 @@ static void _split_add_options(dt_scopes_mode_t *const self,
   // this does result in making an empty options_box and adding it to
   // button_box_right, but that should be no harm
   // FIXME: can wait to set this up until mode_enter?
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(self->scopes->overlay), "size-allocate",
                    G_CALLBACK(_overlay_size_allocate), self);
+#else
+  /* GTK4: GtkWidget has no size-allocate signal; track the allocated width. */
+  g_signal_connect(self->scopes->overlay, "notify::width",
+                   G_CALLBACK(_overlay_width_changed), self);
+#endif
 }
 
 static void _split_gui_cleanup(dt_scopes_mode_t *const self)

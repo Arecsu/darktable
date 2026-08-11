@@ -481,6 +481,17 @@ static void _label_size_allocate_callback(GtkWidget *widget,
   }
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: GtkWidget has no size-allocate signal; track the allocated width. */
+static void _label_width_changed(GObject *label,
+                                 GParamSpec *pspec,
+                                 gpointer user_data)
+{
+  GdkRectangle allocation = { .width = gtk_widget_get_width(GTK_WIDGET(label)) };
+  _label_size_allocate_callback(GTK_WIDGET(label), &allocation, user_data);
+}
+#endif
+
 static void _sample_enter_callback(GtkEventControllerMotion *controller,
                                      gdouble x,
                                      gdouble y,
@@ -644,8 +655,13 @@ static void _add_sample(GtkButton *widget,
   gtk_widget_set_has_tooltip(sample->output_label, TRUE);
   g_signal_connect(G_OBJECT(sample->output_label), "query-tooltip",
                    G_CALLBACK(_sample_tooltip_callback), sample);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(sample->output_label), "size-allocate",
                    G_CALLBACK(_label_size_allocate_callback), sample);
+#else
+  g_signal_connect(sample->output_label, "notify::width",
+                   G_CALLBACK(_label_width_changed), sample);
+#endif
 
   GtkWidget *delete_button = dtgtk_togglebutton_new(dtgtk_cairo_paint_remove, 0, NULL);
   g_signal_connect(G_OBJECT(delete_button), "clicked",
@@ -798,8 +814,13 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_has_tooltip(label, TRUE);
   g_signal_connect(G_OBJECT(label), "query-tooltip",
                    G_CALLBACK(_sample_tooltip_callback), &data->primary_sample);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(label), "size-allocate",
                    G_CALLBACK(_label_size_allocate_callback), &data->primary_sample);
+#else
+  g_signal_connect(label, "notify::width",
+                   G_CALLBACK(_label_width_changed), &data->primary_sample);
+#endif
 
   data->add_sample_button = dtgtk_button_new_full(dtgtk_cairo_paint_square_plus, 0, NULL,
       &(dtgtk_button_config_t){

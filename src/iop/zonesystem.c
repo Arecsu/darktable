@@ -421,6 +421,18 @@ static void size_allocate_callback(GtkWidget *widget, GtkAllocation *allocation,
   }
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: GtkDrawingArea::resize replaces the GTK3 size-allocate signal. */
+static void _preview_resize_callback(GtkDrawingArea *area,
+                                     int width,
+                                     int height,
+                                     gpointer user_data)
+{
+  GtkAllocation allocation = { .width = width, .height = height };
+  size_allocate_callback(GTK_WIDGET(area), &allocation, user_data);
+}
+#endif
+
 void gui_init(dt_iop_module_t *self)
 {
   dt_iop_zonesystem_gui_data_t *g = IOP_GUI_ALLOC(zonesystem);
@@ -431,7 +443,13 @@ void gui_init(dt_iop_module_t *self)
   g->mouse_over_output_zones = FALSE;
 
   g->preview = dtgtk_drawing_area_new_with_height(0);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: GtkDrawingArea::resize replaces the GTK3 size-allocate signal. */
+  g_signal_connect(G_OBJECT(g->preview), "resize",
+                   G_CALLBACK(_preview_resize_callback), self);
+#else
   g_signal_connect(G_OBJECT(g->preview), "size-allocate", G_CALLBACK(size_allocate_callback), self);
+#endif
   dt_gui_connect_draw(g->preview, dt_iop_zonesystem_preview_draw, self);
   gtk_widget_add_events(GTK_WIDGET(g->preview), GDK_POINTER_MOTION_MASK
                                                 | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK

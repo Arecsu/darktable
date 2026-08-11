@@ -1232,6 +1232,17 @@ static void _harmony_adjust_page(GtkWidget *widget,
      alloc->height - gtk_widget_get_allocated_height(d->colorspace_button));
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: GtkWidget has no size-allocate signal; track the allocated height. */
+static void _harmony_height_changed(GObject *box,
+                                    GParamSpec *pspec,
+                                    gpointer user_data)
+{
+  GtkAllocation allocation = { .height = gtk_widget_get_height(GTK_WIDGET(box)) };
+  _harmony_adjust_page(GTK_WIDGET(box), &allocation, user_data);
+}
+#endif
+
 static void _harmony_motion(GtkEventControllerMotion *controller,
                             double x,
                             double y,
@@ -1475,8 +1486,14 @@ static void _vec_add_options(dt_scopes_mode_t *const self,
   g_signal_connect(G_OBJECT(d->colorspace_button), "clicked",
                    G_CALLBACK(_vec_colorspace_clicked), self);
   dt_gui_connect_motion(d->harmony_viewport, _harmony_motion, NULL, _harmony_leave, self);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: GtkWidget has no size-allocate signal; track the allocated height. */
+  g_signal_connect(colorspace_box, "notify::height",
+                   G_CALLBACK(_harmony_height_changed), self);
+#else
   g_signal_connect(G_OBJECT(colorspace_box), "size-allocate",
                    G_CALLBACK(_harmony_adjust_page), self);
+#endif
 
   DT_CONTROL_SIGNAL_HANDLE(DT_SIGNAL_DEVELOP_IMAGE_CHANGED, _vec_signal_image_changed);
 }

@@ -1505,7 +1505,6 @@ void gui_init(dt_view_t *self)
   lib->profile_floating_window = gtk_popover_new();
   gtk_widget_set_parent(lib->profile_floating_window, profile_button);
 
-  g_object_set(G_OBJECT(lib->profile_floating_window), "transitions-enabled", FALSE, NULL);
   dt_gui_connect_click_all(profile_button, _profile_popup_show_cb, NULL, lib->profile_floating_window);
 
   GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);

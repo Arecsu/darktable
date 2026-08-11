@@ -2588,6 +2588,12 @@ static void _channel_tabs_switch_callback(GtkNotebook *notebook,
   DT_GUARD_GUI_UPDATE();
   dt_iop_colorequal_gui_data_t *g = self->gui_data;
 
+  // GTK4 emits "switch-page" while the notebook is being destroyed; the
+  // probe instances created in dt_iop_load_modules_so() have no dev (NULL
+  // passed to dt_iop_load_module_by_so), so gui_update -> gui_changed would
+  // dereference self->dev->full.pipe.  GTK3 never fired switch-page here.
+  if(!self->dev) return;
+
   // The 4th tab is options, in which case we do nothing
   // For the first 3 tabs, update color channel and redraw the graph
   if(page_num < NUM_CHANNELS)
@@ -2792,6 +2798,19 @@ static void _area_size_callback(GtkWidget *widget,
   g->gradients_cached = FALSE;
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: GtkDrawingArea::resize replaces the GTK3 size-allocate signal. */
+static void _area_resize_callback(GtkDrawingArea *area,
+                                  int width,
+                                  int height,
+                                  gpointer user_data)
+{
+  (void)width;
+  (void)height;
+  _area_size_callback(GTK_WIDGET(area), NULL, user_data);
+}
+#endif
+
 void gui_changed(dt_iop_module_t *self, GtkWidget *w, void *previous)
 {
   dt_iop_colorequal_gui_data_t *g = self->gui_data;
@@ -2995,9 +3014,14 @@ void gui_init(dt_iop_module_t *self)
   dt_gui_connect_scroll(g->area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES
                                         | GTK_EVENT_CONTROLLER_SCROLL_DISCRETE,
                         _area_scrolled_callback, self);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(g->area), "size-allocate",
                    G_CALLBACK(_area_size_callback), self);
-
+#else
+  /* GTK4: GtkDrawingArea::resize replaces the GTK3 size-allocate signal. */
+  g_signal_connect(G_OBJECT(g->area), "resize",
+                   G_CALLBACK(_area_resize_callback), self);
+#endif
   GtkWidget *box = self->widget = dt_gui_vbox(g->notebook, g->area);
   g->hue_shift = dt_color_picker_new_with_cst(self, DT_COLOR_PICKER_POINT_AREA | DT_COLOR_PICKER_DENOISE,
                  dt_bauhaus_slider_from_params(self, "hue_shift"), IOP_CS_JZCZHZ);

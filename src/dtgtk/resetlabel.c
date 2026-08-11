@@ -59,11 +59,30 @@ static void _reset_label_size_allocate(GtkWidget *widget,
     gtk_widget_allocate(child, width, height, baseline, NULL);
 }
 
+static void dtgtk_reset_label_dispose(GObject *gobject)
+{
+  GtkDarktableResetLabel *label = DTGTK_RESET_LABEL(gobject);
+
+  // GTK4: this class derives from GTK_TYPE_WIDGET (not a container), which
+  // does not unparent its children in dispose; without this the child label
+  // is still parented when we finalize ("Finalizing ... but it still has
+  // children left").
+  if(label->lb)
+  {
+    gtk_widget_unparent(GTK_WIDGET(label->lb));
+    label->lb = NULL;
+  }
+
+  G_OBJECT_CLASS(dtgtk_reset_label_parent_class)->dispose(gobject);
+}
+
 static void dtgtk_reset_label_class_init(GtkDarktableResetLabelClass *klass)
 {
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
   widget_class->measure = _reset_label_measure;
   widget_class->size_allocate = _reset_label_size_allocate;
+
+  G_OBJECT_CLASS(klass)->dispose = dtgtk_reset_label_dispose;
 }
 
 static void dtgtk_reset_label_init(GtkDarktableResetLabel *label)

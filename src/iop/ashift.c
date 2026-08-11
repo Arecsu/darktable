@@ -58,6 +58,12 @@
 #define SHEAR_RANGE 0.2                     // allowed min/max range for shear parameter
 #define SHEAR_RANGE_SOFT 0.5                // allowed min/max range for shear parameter with manual adjustment
 #define MIN_LINE_LENGTH 5                   // the minimum length of a line in pixels to be regarded as relevant
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* defined after process(); bridges the lens-shift label refresh from the
+ * process thread to the GUI thread. */
+static gboolean _update_shift_labels_idle(gpointer user_data);
+#endif
 #define MAX_TANGENTIAL_DEVIATION 30         // by how many degrees a line may deviate from the +/-180 and +/-90 to be regarded as relevant
 #define LSD_SCALE 0.99                      // LSD: scaling factor for line detection
 #define LSD_SIGMA_SCALE 0.6                 // LSD: sigma for Gaussian filter is computed as sigma = sigma_scale/scale
@@ -3479,6 +3485,10 @@ void process(dt_iop_module_t *self,
 
     dt_iop_gui_enter_critical_section(self);
     g->isflipped = isflipped;
+#if GTK_CHECK_VERSION(4, 0, 0)
+    if(self->dev->gui_attached && dt_pipe_is_full(piece->pipe))
+      g_idle_add(_update_shift_labels_idle, self);
+#endif
 
     const size_t requested_size = (size_t)roi_in->width * roi_in->height;
 
@@ -3618,6 +3628,10 @@ int process_cl(dt_iop_module_t *self,
 
     dt_iop_gui_enter_critical_section(self);
     g->isflipped = isflipped;
+#if GTK_CHECK_VERSION(4, 0, 0)
+    if(self->dev->gui_attached && dt_pipe_is_full(piece->pipe))
+      g_idle_add(_update_shift_labels_idle, self);
+#endif
 
     const size_t requested_size = (size_t)roi_in->width * roi_in->height;
 
@@ -5795,6 +5809,7 @@ void cleanup_global(dt_iop_module_so_t *self)
 }
 
 // adjust labels of lens shift parameters according to flip status of image
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _event_draw(GtkWidget *widget,
                             cairo_t *cr,
                             dt_iop_module_t *self)
@@ -5823,6 +5838,44 @@ static gboolean _event_draw(GtkWidget *widget,
 
   return FALSE;
 }
+#endif
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: the module box has no draw signal (the GTK3 "draw" hook above only
+ * refreshed the lens-shift labels after the pixelpipe recomputed isflipped);
+ * bridge the flip-state change from the process thread with an idle, the
+ * same pattern hotpixels uses. */
+static void _update_shift_labels(dt_iop_module_t *self)
+{
+  const dt_iop_ashift_gui_data_t *g = self->gui_data;
+  if(!g) return;
+
+  dt_iop_gui_enter_critical_section(self);
+  const int isflipped = g->isflipped;
+  dt_iop_gui_leave_critical_section(self);
+
+  if(isflipped == -1) return;
+
+  char string_v[256];
+  char string_h[256];
+
+  snprintf(string_v, sizeof(string_v),
+           _("lens shift (%s)"), isflipped ? _("horizontal") : _("vertical"));
+  snprintf(string_h, sizeof(string_h),
+           _("lens shift (%s)"), isflipped ? _("vertical") : _("horizontal"));
+
+  DT_ENTER_GUI_UPDATE();
+  dt_bauhaus_widget_set_label(g->lensshift_v, NULL, string_v);
+  dt_bauhaus_widget_set_label(g->lensshift_h, NULL, string_h);
+  DT_LEAVE_GUI_UPDATE();
+}
+
+static gboolean _update_shift_labels_idle(gpointer user_data)
+{
+  _update_shift_labels(user_data);
+  return G_SOURCE_REMOVE;
+}
+#endif
 
 void gui_focus(dt_iop_module_t *self, const gboolean in)
 {
@@ -6132,7 +6185,9 @@ void gui_init(dt_iop_module_t *self)
                     dt_gui_connect_click(g->structure_lines, _event_structure_lines_clicked, NULL, self));
   g_object_set_data(G_OBJECT(g->structure_auto), DT_ACTION_GESTURE_KEY,
                     dt_gui_connect_click(g->structure_auto, _event_structure_auto_clicked, NULL, self));
+#if !GTK_CHECK_VERSION(4, 0, 0)
   dt_gui_connect_draw(self->widget, _event_draw, self);
+#endif
 
   dt_action_define_iop(self, N_("fit"),
                        N_("vertical"), g->fit_v, &dt_action_def_button);

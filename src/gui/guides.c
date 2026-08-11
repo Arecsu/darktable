@@ -1039,7 +1039,6 @@ static void _settings_autoshow_menu(GtkWidget *button,
   dt_bauhaus_widget_get_quad_rect(button, &quad);
   gtk_popover_set_pointing_to(GTK_POPOVER(popover), &quad);
 
-  g_object_set(G_OBJECT(popover), "transitions-enabled", FALSE, NULL);
 
   dt_guides_update_popover_values();
 

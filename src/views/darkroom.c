@@ -2834,7 +2834,6 @@ static void _quickbutton_pressed_cb(GtkGestureSingle *gesture,
 #else
     gtk_popover_set_relative_to(GTK_POPOVER(popover), button);
 #endif
-    g_object_set(G_OBJECT(popover), "transitions-enabled", FALSE, NULL);
     _toolbar_show_popup(popover);
   }
   else

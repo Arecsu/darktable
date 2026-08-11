@@ -240,7 +240,8 @@ static void _expander_resize(GtkWidget *widget, GdkRectangle *allocation, gpoint
   }
   else
   {
-    const gboolean is_lib_gui_module = darktable.lib->gui_module
+    const gboolean is_lib_gui_module = darktable.lib
+      && darktable.lib->gui_module
       && darktable.lib->gui_module->expander == widget;
     const gboolean last_target_is_iop = _last_expanded
       && !g_strcmp0("iop-expander", gtk_widget_get_name(_last_expanded));

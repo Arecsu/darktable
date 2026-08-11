@@ -449,6 +449,20 @@ static gboolean _key_pressed_cb(GtkEventControllerKey *controller,
         return TRUE;
       }
       break;
+    case GDK_KEY_Tab:
+    case GDK_KEY_ISO_Left_Tab:
+      /* GTK3 used the widget "focus" signal to steer Tab out of a metadata
+       * textview to the previous/next field; GTK4 has no such signal (focus
+       * is a vfunc), so intercept Tab in the key controller instead. */
+      {
+        const gboolean backward = (keyval == GDK_KEY_ISO_Left_Tab)
+          || dt_modifier_is(state, GDK_SHIFT_MASK);
+        GtkWidget *tv = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+        GtkWidget *target = g_object_get_data(G_OBJECT(tv),
+                                              backward ? "meta_prev" : "meta_next");
+        if(target) gtk_widget_grab_focus(target);
+        return TRUE;
+      }
     default:
       break;
   }
@@ -468,6 +482,7 @@ static gboolean _key_pressed_cb(GtkEventControllerKey *controller,
 #endif
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _textview_focus(GtkWidget *widget,
                                 GtkDirectionType d,
                                 gpointer user_data)
@@ -478,6 +493,7 @@ static gboolean _textview_focus(GtkWidget *widget,
   gtk_widget_grab_focus(target);
   return TRUE;
 }
+#endif
 
 int position(const dt_lib_module_t *self)
 {
@@ -668,7 +684,9 @@ static void _add_grid_row(dt_metadata_t *metadata, int row, dt_lib_module_t *sel
   gtk_text_view_set_accepts_tab(GTK_TEXT_VIEW(textview), FALSE);
   gtk_widget_add_events(textview, GDK_FOCUS_CHANGE_MASK | GDK_ENTER_NOTIFY_MASK);
   dt_gui_connect_key(textview, _key_pressed_cb, self);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(textview, "focus", G_CALLBACK(_textview_focus), self);
+#endif
 #if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(textview, "populate-popup", G_CALLBACK(_populate_popup_multi), self);
 #endif

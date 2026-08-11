@@ -185,6 +185,32 @@ static void _range_select_dispose(GObject *object)
     g_free(range->cur_help);
   range->cur_help = NULL;
 
+  // GTK4: a plain GtkWidget (this class derives from GTK_TYPE_WIDGET) does
+  // not unparent its children in dispose — GtkBox etc. do.  Unparent the
+  // range-select vbox and the popovers (the popovers are parented to
+  // range->band, a plain GtkDrawingArea, so they survive its teardown too).
+  if(range->date_popup)
+  {
+    if(range->date_popup->popup)
+    {
+      gtk_widget_unparent(range->date_popup->popup);
+      range->date_popup->popup = NULL;
+    }
+    g_free(range->date_popup);
+    range->date_popup = NULL;
+  }
+  if(range->cur_window)
+  {
+    gtk_widget_unparent(range->cur_window);
+    range->cur_window = NULL;
+  }
+  for(GtkWidget *child = gtk_widget_get_first_child(GTK_WIDGET(range)), *next;
+      child; child = next)
+  {
+    next = gtk_widget_get_next_sibling(child);
+    gtk_widget_unparent(child);
+  }
+
   G_OBJECT_CLASS(dtgtk_range_select_parent_class)->dispose(object);
 }
 
@@ -995,6 +1021,20 @@ static void _popup_date_day_selected_2click(GtkWidget *w, GtkDarktableRangeSelec
   gtk_widget_activate(range->date_popup->ok_btn);
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4 GtkCalendar has no "day_selected-double-click" signal (only
+ * "day-selected"); a click gesture reports the press count instead. */
+static void _popup_date_calendar_clicked(GtkGestureSingle *gesture,
+                                         int n_press,
+                                         double x,
+                                         double y,
+                                         GtkDarktableRangeSelect *range)
+{
+  if(n_press >= 2)
+    _popup_date_day_selected_2click(GTK_WIDGET(dt_gui_get_widget(gesture)), range);
+}
+#endif
+
 static void _popup_date_type_changed(GtkWidget *w, GtkDarktableRangeSelect *range)
 {
   if(!range->date_popup || range->date_popup->internal_change) return;
@@ -1029,8 +1069,12 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
   gtk_widget_set_tooltip_text(pop->calendar, _("click to select date\n"
                                                "double-click to use the date directly"));
   g_signal_connect(G_OBJECT(pop->calendar), "day_selected", G_CALLBACK(_popup_date_changed), range);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  dt_gui_connect_click(pop->calendar, _popup_date_calendar_clicked, NULL, range);
+#else
   g_signal_connect(G_OBJECT(pop->calendar), "day_selected-double-click",
                    G_CALLBACK(_popup_date_day_selected_2click), range);
+#endif
 
   // the relative date box
   pop->relative_date_box = gtk_grid_new();
@@ -1742,7 +1786,12 @@ GtkWidget *dtgtk_range_select_new(const gchar *property, const gboolean show_ent
                                          | GDK_STRUCTURE_MASK
                                          | GDK_LEAVE_NOTIFY_MASK | GDK_POINTER_MOTION_MASK);
   dt_gui_connect_draw(range->band, _event_band_draw, range);
+#if !GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4 applies CSS min-height/min-width natively in its own layout; the
+   * manual size_request (and the style-updated hook that fed it) is a GTK3
+   * workaround. */
   g_signal_connect(G_OBJECT(range->band), "style-updated", G_CALLBACK(_dt_pref_changed), range);
+#endif
   dt_gui_connect_click_all(range->band, _event_band_press_cb, _event_band_release_cb, range);
   dt_gui_connect_motion(range->band, _event_band_motion_cb, NULL, _event_band_leave_cb, range);
   gtk_widget_set_name(GTK_WIDGET(range->band), "dt-range-band");

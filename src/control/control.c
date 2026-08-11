@@ -595,7 +595,12 @@ void dt_control_expose(GtkWidget *widget, cairo_t *cr)
   dc->width = gtk_widget_get_allocated_width(widget);
   dc->height = gtk_widget_get_allocated_height(widget);
 
-  dt_view_manager_expose(darktable.view_manager, cr, dc->width, dc->height, pointerx, pointery);
+  // GTK4 snapshots the center drawing area eagerly during startup (splash
+  // screen progress), before darktable.view_manager exists — GTK3's
+  // expose-event only fired once the main window was mapped, after dt_init
+  // had created it.  dt_view_manager_expose would dereference the NULL vm.
+  if(darktable.view_manager)
+    dt_view_manager_expose(darktable.view_manager, cr, dc->width, dc->height, pointerx, pointery);
 
   // draw busy indicator
   dt_pthread_mutex_lock(&dc->log_mutex);

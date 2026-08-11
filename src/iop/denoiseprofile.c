@@ -48,6 +48,12 @@
 #define USE_NEW_IMPL_CL 0
 
 #define REDUCESIZE 64
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* defined after process_variance(); bridges the variance label refresh from
+ * the process thread to the GUI thread. */
+static gboolean _update_variance_labels_idle(gpointer user_data);
+#endif
 // number of intermediate buffers used by OpenCL code path.  Needs to
 //   match value in src/common/nlmeans_core.c to correctly compute
 //   tiling
@@ -1946,6 +1952,12 @@ static void process_variance(dt_iop_module_t *self,
   g->variance_R = var[0];
   g->variance_G = var[1];
   g->variance_B = var[2];
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: the module box has no draw signal; bridge the label refresh from
+   * the process thread with an idle (the hotpixels pattern). */
+  if(self->dev && self->dev->gui_attached && dt_pipe_is_full(piece->pipe))
+    g_idle_add(_update_variance_labels_idle, self);
+#endif
 
   dt_iop_image_copy_by_size(ovoid, ivoid, width, height, 4);
 }
@@ -3175,12 +3187,10 @@ static void dt_iop_denoiseprofile_get_params(dt_iop_denoiseprofile_params_t *p,
   }
 }
 
-static gboolean denoiseprofile_draw_variance(GtkWidget *widget,
-                                             cairo_t *crf,
-                                             dt_iop_module_t *self)
+static void _update_variance_labels(dt_iop_module_t *self)
 {
-  DT_GUARD_GUI_UPDATE(FALSE);
-  dt_iop_denoiseprofile_gui_data_t *g = self->gui_data;
+  const dt_iop_denoiseprofile_gui_data_t *g = self->gui_data;
+  if(!g) return;
 
   if(!dt_isnan(g->variance_R))
   {
@@ -3206,8 +3216,29 @@ static gboolean denoiseprofile_draw_variance(GtkWidget *widget,
     DT_LEAVE_GUI_UPDATE();
     g_free(str);
   }
+}
+
+#if !GTK_CHECK_VERSION(4, 0, 0)
+static gboolean denoiseprofile_draw_variance(GtkWidget *widget,
+                                             cairo_t *crf,
+                                             dt_iop_module_t *self)
+{
+  (void)widget;
+  (void)crf;
+  _update_variance_labels(self);
   return FALSE;
 }
+#endif
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: the module box has no draw signal; the labels are refreshed from
+ * the process thread via an idle instead. */
+static gboolean _update_variance_labels_idle(gpointer user_data)
+{
+  _update_variance_labels(user_data);
+  return G_SOURCE_REMOVE;
+}
+#endif
 
 static gboolean denoiseprofile_draw(GtkWidget *widget,
                                     cairo_t *crf,
@@ -3669,7 +3700,12 @@ void gui_init(dt_iop_module_t *self)
                                 dt_gui_hbox(dt_ui_label_new(_("variance green: ")), g->label_var_G),
                                 dt_gui_hbox(dt_ui_label_new(_("variance blue: ")), g->label_var_B));
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK3 drew on the module box and refreshed the variance labels from the
+   * draw handler; GTK4 has no box draw signal — see the idle bridge in
+   * process_variance(). */
   dt_gui_connect_draw(g->box_variance, denoiseprofile_draw_variance, self);
+#endif
 
   // start building top level widget
 

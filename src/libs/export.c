@@ -560,7 +560,12 @@ static void _scale_changed(GtkEntry *spin,
     }
   }
   dt_conf_set_string(CONFIG_PREFIX "resizing_factor", new_value);
-  gtk_editable_set_text(GTK_EDITABLE(spin), new_value);
+  // GTK4 gtk_editable_set_text emits "changed" even when the text is
+  // identical (GTK3 only fired on real changes), so guard against the
+  // re-entry: the delete phase also emits an intermediate "" text, which
+  // would ping-pong this handler forever (stack overflow).
+  if(g_strcmp0(gtk_editable_get_text(GTK_EDITABLE(spin)), new_value) != 0)
+    gtk_editable_set_text(GTK_EDITABLE(spin), new_value);
 }
 
 static void _width_changed(GtkEditable *entry, gpointer user_data);

@@ -1055,18 +1055,11 @@ void dt_shortcut_copy_lua(dt_action_t *action, gchar *preset_name)
   _shortcut_copy_lua(widget, &shortcut, preset_name);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _tooltip_reposition(GtkWidget *widget,
                                 GdkRectangle *allocation,
                                 gpointer user_data)
 {
-#if GTK_CHECK_VERSION(4, 0, 0)
-  // GTK4 tooltips are popovers anchored by the compositor, which already
-  // keeps them within the monitor's work area; there is no GdkWindow to
-  // move (GdkWindow is removed).
-  (void)widget;
-  (void)allocation;
-  (void)user_data;
-#else
   GdkWindow *window = gtk_widget_get_window(gtk_widget_get_toplevel(widget));
   if(!window) return;
 
@@ -1082,8 +1075,8 @@ static void _tooltip_reposition(GtkWidget *widget,
 
   if(nx != wx)
     gdk_window_move(window, nx, wy);
-#endif
 }
+#endif
 
 gboolean dt_shortcut_tooltip_callback(GtkWidget *widget,
                                       gint x,
@@ -1299,7 +1292,9 @@ gboolean dt_shortcut_tooltip_callback(GtkWidget *widget,
 
   gtk_widget_show_all(vbox);
   gtk_tooltip_set_custom(tooltip, vbox);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(vbox), "size-allocate", G_CALLBACK(_tooltip_reposition), widget);
+#endif
 
   return TRUE;
 }

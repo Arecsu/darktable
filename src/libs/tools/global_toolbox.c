@@ -343,7 +343,6 @@ static void _overlays_show_popup(GtkWidget *button, dt_lib_module_t *self)
 
 static void _main_icons_register_size(GtkWidget *widget, GdkRectangle *allocation, gpointer user_data)
 {
-
   GtkStateFlags state = gtk_widget_get_state_flags(widget);
   GtkStyleContext *context = gtk_widget_get_style_context(widget);
 
@@ -366,6 +365,17 @@ static void _main_icons_register_size(GtkWidget *widget, GdkRectangle *allocatio
   // we store the icon size in order to keep in sync thumbtable overlays
   darktable.gui->icon_size = width;
 }
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: GtkWidget has no size-allocate signal; track the allocated width. */
+static void _main_icons_width_changed(GObject *button,
+                                      GParamSpec *pspec,
+                                      gpointer user_data)
+{
+  GdkRectangle allocation = { .width = gtk_widget_get_width(GTK_WIDGET(button)) };
+  _main_icons_register_size(GTK_WIDGET(button), &allocation, user_data);
+}
+#endif
 
 void gui_init(dt_lib_module_t *self)
 {
@@ -397,9 +407,14 @@ void gui_init(dt_lib_module_t *self)
   d->over_popup = gtk_popover_new();
   gtk_widget_set_parent(d->over_popup, d->overlays_button);
   gtk_widget_set_size_request(d->over_popup, 350, -1);
-  g_object_set(G_OBJECT(d->over_popup), "transitions-enabled", FALSE, NULL);
   // we register size of overlay icon to keep in sync thumbtable overlays
+#if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4: GtkWidget has no size-allocate signal; track the allocated width. */
+  g_signal_connect(d->overlays_button, "notify::width",
+                   G_CALLBACK(_main_icons_width_changed), NULL);
+#else
   g_signal_connect(G_OBJECT(d->overlays_button), "size-allocate", G_CALLBACK(_main_icons_register_size), NULL);
+#endif
 
   GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 

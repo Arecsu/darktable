@@ -968,8 +968,13 @@ void dt_iop_gui_rename_module(dt_iop_module_t *module)
   GtkEventController *focus = gtk_event_controller_focus_new();
   g_signal_connect(focus, "leave", G_CALLBACK(_rename_module_focus_out), module);
   gtk_widget_add_controller(entry, focus);
+#if !GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK4 sizes GtkEntry from its text content natively; the manual
+   * size_request workaround (and the style-updated hook feeding it) is
+   * GTK3-only. */
   g_signal_connect(entry, "style-updated",
                    G_CALLBACK(_rename_module_resize), module);
+#endif
   g_signal_connect(entry, "changed",
                    G_CALLBACK(_rename_module_resize), module);
   dt_gui_connect_motion(entry, NULL, _header_enter_notify_callback, NULL,
@@ -2922,9 +2927,7 @@ static void _iop_plugin_header_released(GtkGestureSingle *gesture,
   }
 }
 
-static void _header_size_callback(GtkWidget *widget,
-                                  GdkRectangle *allocation,
-                                  GtkWidget *header)
+static void _header_size_apply(GtkWidget *header, const gint width)
 {
   gchar *config = dt_conf_get_string("darkroom/ui/hide_header_buttons");
 
@@ -2944,11 +2947,11 @@ static void _header_size_callback(GtkWidget *widget,
       button && GTK_IS_BUTTON(button);
       button = gtk_widget_get_prev_sibling(button)) num_buttons++;
 
-  gboolean hide_all = (allocation->width == 1);
-  int num_to_unhide = (allocation->width - 2) / button_size.width;
+  gboolean hide_all = (width == 1);
+  int num_to_unhide = (width - 2) / button_size.width;
   double opacity_leftmost = num_to_unhide > 0
     ? 1.0
-    : (double) allocation->width / button_size.width;
+    : (double) width / button_size.width;
 
   double opacity_others = 1.0;
 
@@ -3017,6 +3020,27 @@ static void _header_size_callback(GtkWidget *widget,
   dt_gui_widget_reallocate_now(header);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
+static void _header_size_callback(GtkWidget *widget,
+                                  GdkRectangle *allocation,
+                                  GtkWidget *header)
+{
+  _header_size_apply(header, allocation->width);
+}
+#endif
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: GtkDrawingArea::resize replaces the GTK3 size-allocate signal. */
+static void _header_resize_callback(GtkDrawingArea *space,
+                                    int width,
+                                    int height,
+                                    gpointer user_data)
+{
+  (void)height;
+  _header_size_apply(user_data, width);
+}
+#endif
+
 gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
                                          gboolean show_buttons,
                                          const gboolean always_hide)
@@ -3072,15 +3096,25 @@ gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
       gtk_widget_set_hexpand(space, TRUE);
       gtk_widget_set_vexpand(space, TRUE);
       gtk_widget_show(space);
+#if GTK_CHECK_VERSION(4, 0, 0)
+      /* GTK4: GtkDrawingArea::resize replaces the GTK3 size-allocate signal. */
+      g_signal_connect(G_OBJECT(space), "resize",
+                       G_CALLBACK(_header_resize_callback), header);
+#else
       g_signal_connect(G_OBJECT(space), "size-allocate",
                        G_CALLBACK(_header_size_callback), header);
+#endif
     }
   }
 
   if(dynamic && !show_buttons && !always_hide)
   {
     GdkRectangle fake_allocation = {.width = UINT16_MAX};
+#if GTK_CHECK_VERSION(4, 0, 0)
+    _header_size_apply(header, fake_allocation.width);
+#else
     _header_size_callback(NULL, &fake_allocation, header);
+#endif
   }
 
   return TRUE;

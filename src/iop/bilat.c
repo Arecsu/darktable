@@ -487,11 +487,8 @@ void gui_init(dt_iop_module_t *self)
        " increase for more powerful local contrast"));
 
   // work around multi-instance issue which calls show all a fair bit:
-  g_object_set(G_OBJECT(g->highlights), "no-show-all", TRUE, NULL);
-  g_object_set(G_OBJECT(g->shadows), "no-show-all", TRUE, NULL);
-  g_object_set(G_OBJECT(g->midtone), "no-show-all", TRUE, NULL);
-  g_object_set(G_OBJECT(g->range), "no-show-all", TRUE, NULL);
-  g_object_set(G_OBJECT(g->spatial), "no-show-all", TRUE, NULL);
+  // GTK4 has no show-all (and no "no-show-all" property); widgets are only
+  // shown explicitly, so the workaround is a no-op.
 
 }
 

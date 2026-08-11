@@ -1467,6 +1467,17 @@ static void _event_image_style_updated(GtkWidget *w,
   }
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+/* GTK4: no style-updated signal; re-read the CSS margins when the
+ * css-classes change (theme switch). */
+static void _event_image_css_changed(GObject *w,
+                                     GParamSpec *pspec,
+                                     gpointer user_data)
+{
+  _event_image_style_updated(GTK_WIDGET(w), user_data);
+}
+#endif
+
 GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
                                       const float zoom_ratio)
 {
@@ -1540,8 +1551,15 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
     // the size will be defined at the end, inside dt_thumbnail_resize
     dt_gui_connect_draw(thumb->w_image, _event_image_draw, thumb);
     dt_gui_connect_motion(thumb->w_image, _event_main_motion_cb, _event_image_enter_cb, _event_image_leave_cb, thumb);
+#if GTK_CHECK_VERSION(4, 0, 0)
+    /* GTK4 has no style-updated signal; re-read the CSS margins when the
+     * css-classes change (theme switch). */
+    g_signal_connect(thumb->w_image, "notify::css-classes",
+                     G_CALLBACK(_event_image_css_changed), thumb);
+#else
     g_signal_connect(G_OBJECT(thumb->w_image), "style-updated",
                      G_CALLBACK(_event_image_style_updated), thumb);
+#endif
     gtk_widget_show(thumb->w_image);
     gtk_overlay_add_overlay(GTK_OVERLAY(thumb->w_image_box), thumb->w_image);
     gtk_overlay_add_overlay(GTK_OVERLAY(thumb->w_main), thumb->w_image_box);
