@@ -258,10 +258,18 @@ void dt_splash_screen_destroy()
 {
   if(darktable.splash.start_screen)
   {
-    gtk_widget_destroy(darktable.splash.progress_text);
-    darktable.splash.progress_text = NULL;
+    // GTK4: never g_object_run_dispose() a parented child (the old
+    // dt_gui_widget_destroy(progress_text) did exactly that): the child's
+    // dispose hits the "has a parent during dispose" critical, NULLs only
+    // its own parent pointer, and leaves the widget dangling in the parent
+    // box's children list.  When the window is destroyed afterwards the box
+    // unparents the FREED label -> use-after-free -> infinite dispose loop
+    // (98% CPU, app never reaches the main loop).  Destroying the toplevel
+    // unparents the whole tree cleanly.
     gtk_widget_destroy(darktable.splash.start_screen);
     darktable.splash.start_screen = NULL;
+    darktable.splash.progress_text = NULL;
+    darktable.splash.remaining_text = NULL;
   }
 }
 
