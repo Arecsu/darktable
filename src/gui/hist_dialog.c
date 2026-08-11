@@ -223,6 +223,15 @@ int dt_gui_hist_dialog_new(dt_history_copy_item_t *d,
   int res;
   GtkWidget *window = dt_ui_main_window(darktable.gui->ui);
 
+  /* fetch the history items before building anything: an unaltered image
+   * must bail out without leaking the dialog, liststore or pixbufs (A1.4) */
+  GList *items = dt_history_get_items(imgid, FALSE, TRUE, TRUE);
+  if(!items)
+  {
+    dt_control_log(_("can't copy history out of unaltered image"));
+    return GTK_RESPONSE_CANCEL;
+  }
+
   GtkDialog *dialog = NULL;
 
   if(iscopy)
@@ -330,47 +339,38 @@ int dt_gui_hist_dialog_new(dt_history_copy_item_t *d,
     dt_draw_paint_to_pixbuf(GTK_WIDGET(dialog), 10, 0, dtgtk_cairo_paint_showmask);
 
   /* fill list with history items */
-  GList *items = dt_history_get_items(imgid, FALSE, TRUE, TRUE);
-  if(items)
+  for(const GList *items_iter = items; items_iter; items_iter = g_list_next(items_iter))
   {
-    for(const GList *items_iter = items; items_iter; items_iter = g_list_next(items_iter))
-    {
-      const dt_history_item_t *item = items_iter->data;
-      const int flags = dt_iop_get_module_flags(item->op);
+    const dt_history_item_t *item = items_iter->data;
+    const int flags = dt_iop_get_module_flags(item->op);
 
-      if(!(flags & IOP_FLAGS_HIDDEN))
-      {
-        gtk_list_store_insert_with_values(liststore, NULL, -1,
-           DT_HIST_ITEMS_COL_ENABLED, iscopy ? FALSE : _gui_is_set(d->selops, item->num),
-           DT_HIST_ITEMS_COL_AUTOINIT, FALSE,
-           DT_HIST_ITEMS_COL_ISACTIVE, item->enabled ? is_active_pb : is_inactive_pb,
-           DT_HIST_ITEMS_COL_NAME, item->name,
-           DT_HIST_ITEMS_COL_MASK, item->mask_mode > 0 ? mask : NULL,
-           DT_HIST_ITEMS_COL_NUM, (gint)item->num,
-           -1);
-      }
-    }
-    g_list_free_full(items, dt_history_item_free);
-
-    /* last item is for copying the module order, or if paste and was selected */
-    if(iscopy || d->copy_iop_order)
+    if(!(flags & IOP_FLAGS_HIDDEN))
     {
-      const dt_iop_order_t order = dt_ioppr_get_iop_order_version(imgid);
-      char *label = g_strdup_printf("%s (%s)", _("module order"),
-                                    dt_iop_order_string(order));
       gtk_list_store_insert_with_values(liststore, NULL, -1,
-                         DT_HIST_ITEMS_COL_ENABLED, d->copy_iop_order,
-                         DT_HIST_ITEMS_COL_ISACTIVE, is_active_pb,
-                         DT_HIST_ITEMS_COL_NAME, label,
-                         DT_HIST_ITEMS_COL_NUM, -1,
-                         -1);
-      g_free(label);
+         DT_HIST_ITEMS_COL_ENABLED, iscopy ? FALSE : _gui_is_set(d->selops, item->num),
+         DT_HIST_ITEMS_COL_AUTOINIT, FALSE,
+         DT_HIST_ITEMS_COL_ISACTIVE, item->enabled ? is_active_pb : is_inactive_pb,
+         DT_HIST_ITEMS_COL_NAME, item->name,
+         DT_HIST_ITEMS_COL_MASK, item->mask_mode > 0 ? mask : NULL,
+         DT_HIST_ITEMS_COL_NUM, (gint)item->num,
+         -1);
     }
   }
-  else
+  g_list_free_full(items, dt_history_item_free);
+
+  /* last item is for copying the module order, or if paste and was selected */
+  if(iscopy || d->copy_iop_order)
   {
-    dt_control_log(_("can't copy history out of unaltered image"));
-    return GTK_RESPONSE_CANCEL;
+    const dt_iop_order_t order = dt_ioppr_get_iop_order_version(imgid);
+    char *label = g_strdup_printf("%s (%s)", _("module order"),
+                                  dt_iop_order_string(order));
+    gtk_list_store_insert_with_values(liststore, NULL, -1,
+                       DT_HIST_ITEMS_COL_ENABLED, d->copy_iop_order,
+                       DT_HIST_ITEMS_COL_ISACTIVE, is_active_pb,
+                       DT_HIST_ITEMS_COL_NAME, label,
+                       DT_HIST_ITEMS_COL_NUM, -1,
+                       -1);
+    g_free(label);
   }
 
   g_signal_connect(GTK_TREE_VIEW(d->items), "row-activated",

@@ -872,6 +872,7 @@ static gboolean _gui_styles_dialog_run(const gboolean edit,
   gtk_widget_destroy(GTK_WIDGET(dialog));
   g_object_unref(is_active_pb);
   g_object_unref(is_inactive_pb);
+  g_object_unref(mask);
   g_free(sd);
 
   return res;
