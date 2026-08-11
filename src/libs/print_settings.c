@@ -2475,17 +2475,17 @@ void gui_init(dt_lib_module_t *self)
   d->grid_size = gtk_spin_button_new_with_range(0, 100, incr);
   gtk_spin_button_set_digits(GTK_SPIN_BUTTON(d->grid_size),  n_digits);
 
-  gtk_entry_set_alignment(GTK_ENTRY(d->b_top), 1);
-  gtk_entry_set_alignment(GTK_ENTRY(d->b_left), 1);
-  gtk_entry_set_alignment(GTK_ENTRY(d->b_right), 1);
-  gtk_entry_set_alignment(GTK_ENTRY(d->b_bottom), 1);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->b_top), 1.0f);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->b_left), 1.0f);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->b_right), 1.0f);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->b_bottom), 1.0f);
 
-  gtk_entry_set_alignment(GTK_ENTRY(d->b_x), 1);
-  gtk_entry_set_alignment(GTK_ENTRY(d->b_y), 1);
-  gtk_entry_set_alignment(GTK_ENTRY(d->b_width), 1);
-  gtk_entry_set_alignment(GTK_ENTRY(d->b_height), 1);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->b_x), 1.0f);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->b_y), 1.0f);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->b_width), 1.0f);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->b_height), 1.0f);
 
-  gtk_entry_set_alignment(GTK_ENTRY(d->grid_size), 1);
+  gtk_editable_set_alignment(GTK_EDITABLE(d->grid_size), 1.0f);
 
 
   ////////////////////////// PRINTER SETTINGS

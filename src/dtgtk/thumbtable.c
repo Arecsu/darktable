@@ -3169,10 +3169,8 @@ void dt_thumbtable_set_parent(dt_thumbtable_t *table,
         // painted in add order (last on top), so re-adding the log and toast
         // messages restores them above the just-added table overlay
         GtkWidget *overlay = GTK_WIDGET(new_parent);
-        gtk_widget_unparent(dt_ui_log_msg(darktable.gui->ui));
-        gtk_overlay_add_overlay(GTK_OVERLAY(overlay), dt_ui_log_msg(darktable.gui->ui));
-        gtk_widget_unparent(dt_ui_toast_msg(darktable.gui->ui));
-        gtk_overlay_add_overlay(GTK_OVERLAY(overlay), dt_ui_toast_msg(darktable.gui->ui));
+        dt_gui_widget_reparent(dt_ui_log_msg(darktable.gui->ui), overlay);
+        dt_gui_widget_reparent(dt_ui_toast_msg(darktable.gui->ui), overlay);
 #else
         gtk_overlay_reorder_overlay
           (GTK_OVERLAY(dt_ui_center_base(darktable.gui->ui)),

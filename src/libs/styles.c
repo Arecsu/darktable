@@ -901,7 +901,7 @@ void gui_init(dt_lib_module_t *self)
   d->hide_preview = gtk_check_button_new_with_label(_("hide preview"));
   dt_action_define(DT_ACTION(self), NULL, N_("hide preview"),
                    d->hide_preview, &dt_action_def_toggle);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(d->hide_preview))), PANGO_ELLIPSIZE_START);
+  dt_gui_check_button_ellipsize(d->hide_preview, PANGO_ELLIPSIZE_START);
   g_signal_connect(d->hide_preview, "toggled", G_CALLBACK(_hide_preview_callback), d);
   gtk_check_button_set_active(GTK_CHECK_BUTTON(d->hide_preview),
                                dt_conf_get_bool("ui_last/styles_hide_preview"));
@@ -911,7 +911,7 @@ void gui_init(dt_lib_module_t *self)
   d->duplicate = gtk_check_button_new_with_label(_("create duplicate"));
   dt_action_define(DT_ACTION(self), NULL, N_("create duplicate"),
                    d->duplicate, &dt_action_def_toggle);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(d->duplicate))), PANGO_ELLIPSIZE_START);
+  dt_gui_check_button_ellipsize(d->duplicate, PANGO_ELLIPSIZE_START);
   g_signal_connect(d->duplicate, "toggled", G_CALLBACK(_duplicate_callback), d);
   gtk_check_button_set_active(GTK_CHECK_BUTTON(d->duplicate),
                                dt_conf_get_bool("ui_last/styles_create_duplicate"));

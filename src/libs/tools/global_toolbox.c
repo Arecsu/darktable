@@ -390,7 +390,7 @@ void gui_init(dt_lib_module_t *self)
     gtk_widget_set_tooltip_text(d->grouping_button, _("expand grouped images"));
   else
     gtk_widget_set_tooltip_text(d->grouping_button, _("collapse grouped images"));
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->grouping_button), darktable.gui->grouping);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->grouping_button), darktable.gui->grouping);
   g_signal_connect(G_OBJECT(d->grouping_button), "clicked", G_CALLBACK(_lib_filter_grouping_button_clicked),
                    NULL);
 
@@ -625,7 +625,7 @@ static void _main_do_event_help(GdkEvent *event, gpointer data)
     case GDK_BUTTON_RELEASE:
     {
       // reset GTK to normal behaviour
-      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->help_button), FALSE);
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->help_button), FALSE);
 
       handled = TRUE;
     }
@@ -803,7 +803,7 @@ static void _main_do_event_keymap(GdkEvent *event, gpointer data)
       if(event_widget && !strcmp(gtk_widget_get_name(event_widget), "module-header"))
         break;
 
-      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->keymap_button), FALSE);
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->keymap_button), FALSE);
       _show_shortcuts_prefs(event_widget);
     }
 
@@ -815,7 +815,7 @@ static void _main_do_event_keymap(GdkEvent *event, gpointer data)
     if(dt_gui_long_click(dt_gdk_event_get_time(event), click_time))
       dt_shortcut_copy_lua(NULL, NULL);
     else
-      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->keymap_button), FALSE);
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->keymap_button), FALSE);
 
     return;
   default:
@@ -910,7 +910,7 @@ static int grouping_member(lua_State *L)
     gboolean value = lua_toboolean(L, 3);
     if(darktable.gui->grouping != value)
     {
-      gtk_check_button_set_active(GTK_CHECK_BUTTON(d->grouping_button), value);
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->grouping_button), value);
     }
   }
   return 0;

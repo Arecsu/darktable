@@ -5818,8 +5818,7 @@ static void _darkroom_display_second_window(dt_develop_t *dev)
 
     g_signal_connect(G_OBJECT(dev->second_wnd), "delete-event",
                      G_CALLBACK(_second_window_delete_callback), dev);
-    g_signal_connect(G_OBJECT(dev->second_wnd), "event",
-                     G_CALLBACK(dt_shortcut_dispatcher), NULL);
+    dt_gui_connect_event(dev->second_wnd, dt_shortcut_dispatcher, NULL);
 
     _darkroom_ui_second_window_init(overlay, dev);
   }

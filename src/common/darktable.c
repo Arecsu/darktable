@@ -2058,8 +2058,8 @@ int dt_init(int argc,
     dt_shortcuts_save(NULL, TRUE);
 
     // connect the shortcut dispatcher
-    g_signal_connect(dt_ui_main_window(darktable.gui->ui), "event",
-                     G_CALLBACK(dt_shortcut_dispatcher), NULL);
+    dt_gui_connect_event(dt_ui_main_window(darktable.gui->ui),
+                         dt_shortcut_dispatcher, NULL);
 
     // load image(s) specified on cmdline.  this has to happen after
     // lua is initialized as image import can run lua code

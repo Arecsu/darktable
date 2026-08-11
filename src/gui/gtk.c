@@ -184,6 +184,20 @@ GtkWidget *dt_gui_check_button_new(const dt_gui_check_button_t cfg)
   return cb;
 }
 
+void dt_gui_check_button_ellipsize(GtkWidget *button, const PangoEllipsizeMode mode)
+{
+  // gtk_check_button_get_child() returns NULL while the label owns the child
+  // slot (it only reports explicitly-set widget children), so find the label
+  // among the check button's children: the indicator comes first, the label
+  // after it (gtk_check_button_real_set_child inserts after the indicator).
+  for(GtkWidget *c = gtk_widget_get_first_child(button); c; c = gtk_widget_get_next_sibling(c))
+    if(GTK_IS_LABEL(c))
+    {
+      gtk_label_set_ellipsize(GTK_LABEL(c), mode);
+      return;
+    }
+}
+
 gboolean dt_gui_pointer_is_grabbed()
 {
 #if GTK_CHECK_VERSION(4, 0, 0)
@@ -5175,6 +5189,20 @@ void dt_gui_container_remove_children(GtkWidget *container)
 #endif
 }
 
+void dt_gui_widget_reparent(GtkWidget *widget, GtkWidget *new_parent)
+{
+  g_return_if_fail(GTK_IS_WIDGET(widget));
+  g_return_if_fail(GTK_IS_WIDGET(new_parent));
+  // GTK4: the parent owns the widget's only reference (set_parent sinks it),
+  // and unparent drops that reference again — without our own temporary ref
+  // the widget is finalized on the spot.  The new parent's set_parent()
+  // takes our ref over, so the count stays balanced (see gtk.h).
+  g_object_ref(widget);
+  gtk_widget_unparent(widget);
+  gtk_widget_set_parent(widget, new_parent);
+  g_object_unref(widget);
+}
+
 #if !GTK_CHECK_VERSION(4, 0, 0)
 static void _delete_child(GtkWidget *widget,
                           const gpointer data)
@@ -5556,6 +5584,47 @@ gulong (dt_gui_connect_draw)(GtkWidget *widget,
   return 1;
 #else
   return g_signal_connect(G_OBJECT(widget), "draw", G_CALLBACK(callback), user_data);
+#endif
+}
+
+/* GTK3 widget "event" signal shim (see gtk.h).  GtkEventController::event
+ * is emitted with the controller as first argument, so adapt it to the
+ * GTK3-style (widget, event, user_data) callback via a packed trampoline. */
+typedef struct dt_gui_event_connect_t
+{
+  dt_gui_event_callback_t callback;
+  gpointer user_data;
+} dt_gui_event_connect_t;
+
+static gboolean _dt_gui_event_trampoline(GtkEventController *controller,
+                                         GdkEvent *event,
+                                         gpointer user_data)
+{
+  const dt_gui_event_connect_t *c = user_data;
+  return c->callback(gtk_event_controller_get_widget(controller), event, c->user_data);
+}
+
+gulong (dt_gui_connect_event)(GtkWidget *widget,
+                              dt_gui_event_callback_t callback,
+                              gpointer user_data)
+{
+#if GTK_CHECK_VERSION(4, 0, 0)
+  dt_gui_event_connect_t *c = g_malloc(sizeof(*c));
+  c->callback = callback;
+  c->user_data = user_data;
+  /* GtkEventControllerLegacy::event is the GTK4 stand-in for the old
+   * per-widget "event" signal: it sees every event reaching the widget. */
+  GtkEventController *controller = gtk_event_controller_legacy_new();
+  gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+  /* the controller outlives the connection; keep the trampoline data on it */
+  g_object_set_data_full(G_OBJECT(controller), "dt-gui-event-connect", c, g_free);
+  const gulong id = g_signal_connect_data(controller, "event",
+                                          G_CALLBACK(_dt_gui_event_trampoline),
+                                          c, NULL, 0);
+  gtk_widget_add_controller(widget, controller);
+  return id;
+#else
+  return g_signal_connect(G_OBJECT(widget), "event", G_CALLBACK(callback), user_data);
 #endif
 }
 

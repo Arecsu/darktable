@@ -231,6 +231,11 @@ typedef struct dt_gui_check_button_t
 
 GtkWidget *dt_gui_check_button_new(const dt_gui_check_button_t cfg);
 
+// Apply ellipsizing to the label of a check button.  The label owns the
+// child slot, so gtk_check_button_get_child() reports NULL for it — walk
+// the button's children (indicator first, label after) instead.
+void dt_gui_check_button_ellipsize(GtkWidget *button, const PangoEllipsizeMode mode);
+
 void dt_open_url(const char *url);
 int dt_gui_theme_init(dt_gui_gtk_t *gui);
 int dt_gui_gtk_init(dt_gui_gtk_t *gui);
@@ -625,6 +630,14 @@ void dt_gui_container_remove_children(GtkWidget *container);
 // instead; it's a bit slower but safer).
 void dt_gui_container_destroy_children(GtkWidget *container);
 
+// Move @widget under @new_parent, keeping it alive across the transition.
+// In GTK4 gtk_widget_set_parent() sinks the widget (the parent owns the
+// one reference) and gtk_widget_unparent() drops it again, finalizing a
+// widget that nobody else references.  Detaching a widget to re-attach it
+// elsewhere therefore needs a temporary reference of our own; the new
+// parent's set_parent() takes it over.
+void dt_gui_widget_reparent(GtkWidget *widget, GtkWidget *new_parent);
+
 #if !GTK_CHECK_VERSION(4, 0, 0)
 void dt_gui_menu_popup(GtkMenu *menu,
                        GtkWidget *button,
@@ -760,6 +773,21 @@ gulong dt_gui_connect_draw(GtkWidget *widget,
 #define dt_gui_connect_draw(widget, callback, data) ( \
   ASSERT_FUNC_TYPE(callback, gboolean(*)(GtkWidget *, cairo_t *, __typeof__(data))), \
   dt_gui_connect_draw(GTK_WIDGET(widget), (dt_gui_draw_callback_t)(callback), (data)))
+
+/* GTK3 widget "event" signal shim.  GTK4 removed it; a capture-phase
+ * GtkEventControllerLegacy::event on the widget is the equivalent (it sees
+ * every event reaching the widget before the target handlers).  Callback
+ * keeps the GTK3 signature (GtkWidget *, GdkEvent *, user_data); the widget
+ * is the controller's widget.  Used for the shortcut dispatcher on windows. */
+typedef gboolean (*dt_gui_event_callback_t)(GtkWidget *widget,
+                                            GdkEvent *event,
+                                            gpointer user_data);
+gulong dt_gui_connect_event(GtkWidget *widget,
+                            dt_gui_event_callback_t callback,
+                            gpointer user_data);
+#define dt_gui_connect_event(widget, callback, data) ( \
+  ASSERT_FUNC_TYPE(callback, gboolean(*)(GtkWidget *, GdkEvent *, __typeof__(data))), \
+  dt_gui_connect_event(GTK_WIDGET(widget), (dt_gui_event_callback_t)(callback), (data)))
 
 GtkGesture *(dt_gui_connect_drag)(GtkWidget *widget,
                                   GCallback drag_begin,

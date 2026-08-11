@@ -323,7 +323,7 @@ static void _shape_button_clicked(GtkButton *button, dt_lib_module_t *self)
   dt_conf_set_int("plugins/map/locationshape", shape);
 
   g_signal_handler_block (d->shape_button, d->shape_button_handler);
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->shape_button), FALSE);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->shape_button), FALSE);
   dtgtk_togglebutton_set_paint((GtkDarktableToggleButton *)d->shape_button, location_shapes[shape], 0, NULL);
   g_signal_handler_unblock (d->shape_button, d->shape_button_handler);
 }

@@ -487,7 +487,7 @@ static void _pastemode_combobox_changed(GtkWidget *widget,
   dt_conf_set_int("plugins/lighttable/copy_metadata/pastemode", mode);
 }
 
-#define ellipsize_button(button) gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(button))), PANGO_ELLIPSIZE_END);
+#define ellipsize_button(button) dt_gui_check_button_ellipsize(button, PANGO_ELLIPSIZE_END);
 
 void gui_init(dt_lib_module_t *self)
 {

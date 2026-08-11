@@ -1475,12 +1475,8 @@ void gui_init(dt_view_t *self)
   // added after the log/toast messages, so re-add the messages to keep
   // them on top (GTK3's reorder_overlay(index 1) did the same).
   GtkWidget *overlay = dt_ui_center_base(darktable.gui->ui);
-  GtkWidget *log_msg = dt_ui_log_msg(darktable.gui->ui);
-  GtkWidget *toast_msg = dt_ui_toast_msg(darktable.gui->ui);
-  gtk_widget_unparent(log_msg);
-  gtk_widget_unparent(toast_msg);
-  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), log_msg);
-  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), toast_msg);
+  dt_gui_widget_reparent(dt_ui_log_msg(darktable.gui->ui), overlay);
+  dt_gui_widget_reparent(dt_ui_toast_msg(darktable.gui->ui), overlay);
 #else
   gtk_overlay_reorder_overlay(GTK_OVERLAY(dt_ui_center_base(darktable.gui->ui)),
                               lib->culling->widget, 1);

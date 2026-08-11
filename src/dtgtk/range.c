@@ -1140,7 +1140,7 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
 
   // the select line
   pop->selection = gtk_entry_new();
-  gtk_entry_set_alignment(GTK_ENTRY(dt_gui_expand(pop->selection)), 0.5);
+  gtk_editable_set_alignment(GTK_EDITABLE(dt_gui_expand(pop->selection)), 0.5f);
   pop->now_btn = gtk_button_new_with_label(_("now"));
   gtk_widget_set_no_show_all(pop->now_btn, TRUE);
   gtk_widget_set_tooltip_text(pop->now_btn, _("set the value to always match current datetime"));
@@ -1831,7 +1831,7 @@ GtkWidget *dtgtk_range_select_new(const gchar *property, const gboolean show_ent
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(g_min), GTK_PHASE_TARGET);
 
     range->entry_max = dt_ui_entry_new(0);
-    gtk_entry_set_alignment(GTK_ENTRY(range->entry_max), 1.0);
+    gtk_editable_set_alignment(GTK_EDITABLE(range->entry_max), 1.0f);
     _entry_set_tooltip(range->entry_max, BOUND_MAX, range->type);
     g_signal_connect(G_OBJECT(range->entry_max), "activate", G_CALLBACK(_event_entry_activated), range);
     GtkEventController *focus_max = gtk_event_controller_focus_new();

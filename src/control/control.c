@@ -631,12 +631,18 @@ gboolean dt_control_draw_endmarker(GtkWidget *widget,
 
 void dt_control_mouse_leave()
 {
-  dt_view_manager_mouse_leave(darktable.view_manager);
+  // GTK4 motion controllers can emit "enter"/"leave" during startup
+  // (widget realization while the pointer is already over the center),
+  // before darktable.view_manager exists — same eager-fire problem as
+  // dt_control_configure/draw_busy_msg.
+  if(darktable.view_manager)
+    dt_view_manager_mouse_leave(darktable.view_manager);
 }
 
 void dt_control_mouse_enter()
 {
-  dt_view_manager_mouse_enter(darktable.view_manager);
+  if(darktable.view_manager)
+    dt_view_manager_mouse_enter(darktable.view_manager);
 }
 
 void dt_control_mouse_moved(double x,
@@ -644,7 +650,8 @@ void dt_control_mouse_moved(double x,
                             double pressure,
                             int which)
 {
-  dt_view_manager_mouse_moved(darktable.view_manager, x, y, pressure, which);
+  if(darktable.view_manager)
+    dt_view_manager_mouse_moved(darktable.view_manager, x, y, pressure, which);
 }
 
 void dt_control_button_released(double x,

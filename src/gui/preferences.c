@@ -1032,7 +1032,7 @@ static void init_tab_presets(GtkWidget *stack)
 
   GtkWidget *search_presets = gtk_search_entry_new();
   gtk_box_append(GTK_BOX(hbox), search_presets);
-  gtk_entry_set_placeholder_text(GTK_ENTRY(search_presets), _("search presets list"));
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search_presets), _("search presets list"));
   gtk_widget_set_tooltip_text
     (GTK_WIDGET(search_presets),
      _("incrementally search the list of presets\n"

@@ -933,8 +933,7 @@ void gui_init(dt_lib_module_t *self)
 
   /* connect callbacks */
   // FIXME: why does cursor motion over buttons trigger multiple draw callbacks?
-  g_signal_connect(G_OBJECT(s->scope_draw),
-                   "draw", G_CALLBACK(_drawable_draw_callback), s);
+  dt_gui_connect_draw(s->scope_draw, _drawable_draw_callback, s);
   dt_gui_connect_drag(s->scope_draw, _drawable_drag_begin, _drawable_drag_end,
                       _drawable_drag_update, s);
   dt_gui_connect_click(s->scope_draw, _drawable_button_press, NULL, s);

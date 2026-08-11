@@ -41,8 +41,8 @@ static void _search_synchronize(_widgets_search_t *source)
   if(dest)
   {
     source->rule->manual_widget_set++;
-    const gchar *txt = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(source->text)));
-    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(dest->text)), txt);
+    const gchar *txt = gtk_editable_get_text(GTK_EDITABLE(source->text));
+    gtk_editable_set_text(GTK_EDITABLE(dest->text), txt);
     source->rule->manual_widget_set--;
   }
 }
@@ -63,11 +63,11 @@ static gboolean _search_update(dt_lib_filtering_rule_t *rule)
 
   rule->manual_widget_set++;
   _widgets_search_t *search = (_widgets_search_t *)rule->w_specific;
-  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(search->text)), txt);
+  gtk_editable_set_text(GTK_EDITABLE(search->text), txt);
   if(rule->w_specific_top)
   {
     search = (_widgets_search_t *)rule->w_specific_top;
-    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(search->text)), txt);
+    gtk_editable_set_text(GTK_EDITABLE(search->text), txt);
   }
   _search_synchronize(search);
   rule->manual_widget_set--;
@@ -107,7 +107,7 @@ static gboolean _search_changed_wait(gpointer user_data)
       // ' or " removes the corresponding wildcard
       char start[2] = { 0 };
       char *text = NULL;
-      const char *entry = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(search->text)));
+      const char *entry = gtk_editable_get_text(GTK_EDITABLE(search->text));
       char *p = (char *)entry;
       if(strlen(entry) > 1 && !(entry[0] == '"' && entry[1] == '"'))
       {

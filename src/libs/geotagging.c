@@ -1286,7 +1286,7 @@ static void _display_offset(const GTimeSpan offset_int, const gboolean valid, dt
     for(int i = 2; i < DT_GEOTAG_PARTS_NB; i++)
       gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->of.widget[i])), "-");
   }
-  const gboolean locked = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->lock_offset));
+  const gboolean locked = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->lock_offset));
   gtk_widget_set_sensitive(d->apply_offset, d->imgid && valid && !off2 && offset_int);
   gtk_widget_set_sensitive(d->lock_offset, locked || (d->imgid && valid && !off2 && offset_int));
   gtk_widget_set_sensitive(d->apply_datetime, d->imgid && !locked);
@@ -1398,7 +1398,7 @@ static GDateTime *_get_image_datetime(dt_lib_module_t *self)
 static void _refresh_image_datetime(dt_lib_module_t *self)
 {
   dt_lib_geotagging_t *d = self->data;
-  const gboolean locked = gtk_check_button_get_active(GTK_CHECK_BUTTON(d->lock_offset));
+  const gboolean locked = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(d->lock_offset));
   GDateTime *datetime = _get_image_datetime(self);
   if(d->datetime0)
     g_date_time_unref(d->datetime0);
@@ -1555,7 +1555,7 @@ static GtkWidget *_gui_init_datetime(gchar *text,
       // 2nd widget of offset line should accommodate offsets up to 9999 days, so 4 digits
       // all other fields for 2 digit numbers
                                                       : ((type == 2) && (i == 2)) ? 4 : 2);
-      gtk_entry_set_alignment(GTK_ENTRY(dt->widget[i]), 0.5);
+      gtk_editable_set_alignment(GTK_EDITABLE(dt->widget[i]), 0.5f);
       gtk_box_append(box, dt->widget[i]);
       if(type == 0)
       {
@@ -1795,7 +1795,7 @@ static void _dt_pref_change_callback(gpointer instance, dt_lib_module_t *self)
 void gui_reset(dt_lib_module_t *self)
 {
   dt_lib_geotagging_t *d = self->data;
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->lock_offset), FALSE);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->lock_offset), FALSE);
   _refresh_image_datetime(self);
 
 #ifdef HAVE_MAP
@@ -2000,7 +2000,7 @@ void gui_init(dt_lib_module_t *self)
   d->map.preview_button = gtk_check_button_new_with_label(_("preview images"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(d->map.preview_button), TRUE);
   gtk_widget_set_sensitive(d->map.preview_button, FALSE);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(d->map.preview_button))), PANGO_ELLIPSIZE_END);
+  dt_gui_check_button_ellipsize(d->map.preview_button, PANGO_ELLIPSIZE_END);
   gtk_grid_attach(grid, d->map.preview_button, 0, line, 1, 1);
   gtk_widget_set_tooltip_text(d->map.preview_button, _("show on map matching images"));
   g_signal_connect(GTK_CHECK_BUTTON(d->map.preview_button), "toggled", G_CALLBACK(_images_preview_toggled), self);

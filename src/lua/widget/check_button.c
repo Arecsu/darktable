@@ -17,6 +17,7 @@
  */
 #include "lua/types.h"
 #include "lua/widget/common.h"
+#include "gui/gtk.h"
 
 static dt_lua_widget_type_t check_button_type = {
   .name = "check_button",
@@ -42,7 +43,7 @@ static int label_member(lua_State *L)
   if(lua_gettop(L) > 2) {
     const char * label = luaL_checkstring(L,3);
     gtk_check_button_set_label(GTK_CHECK_BUTTON(check_button->widget),label);
-    gtk_label_set_ellipsize(GTK_LABEL(gtk_check_button_get_child(GTK_CHECK_BUTTON(check_button->widget))), PANGO_ELLIPSIZE_END);
+    dt_gui_check_button_ellipsize(check_button->widget, PANGO_ELLIPSIZE_END);
     return 0;
   }
   lua_pushstring(L,gtk_check_button_get_label(GTK_CHECK_BUTTON(check_button->widget)));

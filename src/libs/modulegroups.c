@@ -901,7 +901,7 @@ static void _lib_modulegroups_update_iop_visibility(dt_lib_module_t *self)
   if(d->current == DT_MODULEGROUP_INVALID) d->current = DT_MODULEGROUP_ACTIVE_PIPE;
 
   const gchar *text_entered = (gtk_widget_is_visible(GTK_WIDGET(d->hbox_search_box)))
-                                  ? gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->text_entry)))
+                                  ? gtk_editable_get_text(GTK_EDITABLE(d->text_entry))
                                   : NULL;
 
   dt_print(DT_DEBUG_IOPORDER, "[lib_modulegroups_update_iop_visibility] modulegroups");
@@ -1085,7 +1085,7 @@ static void _lib_modulegroups_switch_to(dt_lib_module_t *self, const int group)
 
   /* clear search text */
   if(gtk_widget_is_visible(GTK_WIDGET(d->hbox_search_box)))
-    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->text_entry)), "");
+    gtk_editable_set_text(GTK_EDITABLE(d->text_entry), "");
 
   /* update visibility */
   d->force_show_module = NULL;
@@ -1097,7 +1097,7 @@ static void _lib_modulegroups_toggle(GtkWidget *button, dt_lib_module_t *self)
   DT_TRY_GUI_UPDATE();
   dt_lib_modulegroups_t *d = self->data;
   const gchar *text_entered = (gtk_widget_is_visible(GTK_WIDGET(d->hbox_search_box)))
-                                  ? gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->text_entry)))
+                                  ? gtk_editable_get_text(GTK_EDITABLE(d->text_entry))
                                   : NULL;
 
   /* store toggled modulegroup */
@@ -3296,15 +3296,24 @@ void gui_init(dt_lib_module_t *self)
   /* search box */
   d->text_entry = gtk_search_entry_new();
   dt_action_define(&darktable.view_manager->proxy.darkroom.view->actions, NULL, N_("search modules"), d->text_entry, &dt_action_def_entry);
-  gtk_entry_set_placeholder_text(GTK_ENTRY(d->text_entry),
-                                 _("search modules by name or tag"));
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(d->text_entry),
+                                       _("search modules by name or tag"));
   g_signal_connect(G_OBJECT(d->text_entry), "search-changed",
                    G_CALLBACK(_text_entry_changed_callback), self);
   g_signal_connect(G_OBJECT(d->text_entry), "stop-search",
                    G_CALLBACK(dt_gui_search_stop), dt_ui_center(darktable.gui->ui));
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: GtkSearchEntry is not a GtkEntry; focus-in-event is replaced by
+  // GtkEventControllerFocus::enter (void handler)
+  GtkEventController *search_focus = gtk_event_controller_focus_new();
+  g_signal_connect_data(search_focus, "enter", G_CALLBACK(gtk_widget_show),
+                        d->hbox_search_box, NULL, G_CONNECT_SWAPPED);
+  gtk_widget_add_controller(d->text_entry, search_focus);
+#else
   g_signal_connect_data(G_OBJECT(d->text_entry), "focus-in-event",
                         G_CALLBACK(gtk_widget_show),
                         d->hbox_search_box, NULL, G_CONNECT_AFTER | G_CONNECT_SWAPPED);
+#endif
 
   GtkWidget *visibility_wrapper = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0); // extra layer prevents disabling shortcuts when hidden
   gtk_box_append(GTK_BOX(visibility_wrapper), d->text_entry);
@@ -3958,7 +3967,7 @@ static void _preset_autoapply_changed(dt_gui_presets_edit_dialog_t *g)
 
   // we refresh the checkbox
   d->editor_reset = TRUE;
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->edit_autoapply_chkbox), autoapply);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->edit_autoapply_chkbox), autoapply);
   d->editor_reset = FALSE;
 }
 
@@ -4208,20 +4217,20 @@ static void _manage_editor_load(const char *preset,
                                                          _(DEPRECATED_PRESET_NAME)));
 
   // search checkbox
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->edit_search_cb), d->edit_show_search);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->edit_search_cb), d->edit_show_search);
   gtk_widget_set_sensitive(d->edit_search_cb, !d->edit_ro);
 
   // full_active checkbox
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->edit_full_active_cb),
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->edit_full_active_cb),
                                d->edit_full_active);
   gtk_widget_set_sensitive(d->edit_full_active_cb, !d->edit_ro);
 
   // basics checkbox
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->basics_chkbox), d->edit_basics_show);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->basics_chkbox), d->edit_basics_show);
   gtk_widget_set_sensitive(d->basics_chkbox, !d->edit_ro);
 
   // autoapply
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->edit_autoapply_chkbox), autoapply);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(d->edit_autoapply_chkbox), autoapply);
   gtk_widget_set_sensitive(d->edit_autoapply_btn, !d->edit_ro);
 
   // new group button

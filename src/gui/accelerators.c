@@ -2042,7 +2042,7 @@ static void _grab_in_tree_view(GtkTreeView *tree_view)
   g_set_weak_pointer(&_grab_window, gtk_widget_get_toplevel(_grab_widget));
   if(_sc.action && _sc.action->type == DT_ACTION_TYPE_FALLBACK)
     dt_shortcut_key_press(DT_SHORTCUT_DEVICE_KEYBOARD_MOUSE, 0, 0);
-  g_signal_connect(_grab_window, "event", G_CALLBACK(dt_shortcut_dispatcher), NULL);
+  dt_gui_connect_event(_grab_window, dt_shortcut_dispatcher, NULL);
 }
 
 static void _shortcut_row_activated(GtkTreeView *tree_view,
@@ -3105,8 +3105,8 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
   gtk_tree_view_set_search_column(shortcuts_view, 0); // fake column for _search_func
   gtk_tree_view_set_search_equal_func(shortcuts_view, _search_func, shortcuts_view, NULL);
   GtkWidget *search_shortcuts = gtk_search_entry_new();
-  gtk_entry_set_placeholder_text(GTK_ENTRY(search_shortcuts),
-                                 _("search shortcuts list"));
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search_shortcuts),
+                                        _("search shortcuts list"));
   gtk_widget_set_tooltip_text(GTK_WIDGET(search_shortcuts),
                               _("incrementally search the list of shortcuts\npress up or down keys to cycle through matches"));
   g_signal_connect(G_OBJECT(search_shortcuts), "activate",
@@ -3210,8 +3210,8 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
   gtk_tree_view_set_search_column(actions_view, 1); // fake column for _search_func
   gtk_tree_view_set_search_equal_func(actions_view, _search_func, actions_view, NULL);
   GtkWidget *search_actions = gtk_search_entry_new();
-  gtk_entry_set_placeholder_text(GTK_ENTRY(search_actions),
-                                 _("search actions list"));
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search_actions),
+                                        _("search actions list"));
   gtk_widget_set_tooltip_text(GTK_WIDGET(search_actions),
                               _("incrementally search the list of actions\npress up or down keys to cycle through matches"));
   g_signal_connect(G_OBJECT(search_actions), "activate",
