@@ -303,7 +303,7 @@ static void _update_histogram(dt_iop_module_t *self,
   if(was_invalid)
   {
     g_object_ref(g->auto_detect);
-    gdk_threads_add_idle(_auto_detect_button_enable_idle, g->auto_detect);
+    g_idle_add(_auto_detect_button_enable_idle, g->auto_detect);
   }
 }
 

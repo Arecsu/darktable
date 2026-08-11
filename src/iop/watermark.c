@@ -1248,7 +1248,7 @@ static void _text_callback(GtkWidget *entry,
 {
   DT_GUARD_GUI_UPDATE();
   dt_iop_watermark_params_t *p = self->params;
-  dt_strlcpy_to_fixed(p->text, gtk_entry_get_text(GTK_ENTRY(entry)), sizeof(p->text));
+  dt_strlcpy_to_fixed(p->text, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry))), sizeof(p->text));
   dt_conf_set_string("plugins/darkroom/watermark/text", p->text);
   dt_dev_add_history_item(darktable.develop, self, TRUE);
 }
@@ -1336,7 +1336,7 @@ void gui_update(dt_iop_module_t *self)
   }
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->align[p->alignment]), TRUE);
   _combo_box_set_active_text(g, p->filename);
-  gtk_entry_set_text(GTK_ENTRY(g->text), p->text);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->text)), p->text);
   const GdkRGBA color = (GdkRGBA){.red   = p->color[0],
                                   .green = p->color[1],
                                   .blue  = p->color[2],
@@ -1447,7 +1447,9 @@ void gui_init(dt_iop_module_t *self)
   gtk_widget_set_tooltip_text(g->fontsel,
                               _("text font, tags:\n$(WATERMARK_FONT_FAMILY)\n"
                                 "$(WATERMARK_FONT_STYLE)\n$(WATERMARK_FONT_WEIGHT)"));
-  gtk_font_button_set_show_size (GTK_FONT_BUTTON(g->fontsel), FALSE);
+  // GTK4: gtk_font_button_set_show_size is gone; set_use_size(FALSE) shows
+  // only the font name (same as show_size=FALSE in GTK3)
+  gtk_font_button_set_use_size(GTK_FONT_BUTTON(g->fontsel), FALSE);
 
   gtk_grid_attach(grid, label, 0, line++, 1, 1);
   gtk_grid_attach_next_to(grid, g->fontsel, label, GTK_POS_RIGHT, 2, 1);

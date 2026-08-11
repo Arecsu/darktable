@@ -2090,6 +2090,7 @@ static void _add_exposure_box(dt_iop_module_t *self, dt_iop_agx_gui_data_t *g, d
   dt_gui_box_add(self->widget, g->range_exposure_picker_group);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _apply_primaries_from_menu_callback(GtkMenuItem *menuitem, dt_iop_module_t *self)
 {
   const char *preset_id = gtk_widget_get_name(GTK_WIDGET(menuitem));
@@ -2125,6 +2126,15 @@ static void _primaries_popupmenu_callback(GtkWidget *button, dt_iop_module_t *se
   gtk_widget_show_all(menu);
   dt_gui_menu_popup(GTK_MENU(menu), button, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST);
 }
+#else
+// TODO P2: GtkMenu->GtkPopoverMenu migration; the primaries popup is a no-op
+// on GTK4 until then.
+static void _primaries_popupmenu_callback(GtkWidget *button, dt_iop_module_t *self)
+{
+  (void)button;
+  (void)self;
+}
+#endif
 
 static void _set_post_curve_primaries_from_pre_callback(GtkWidget *widget, dt_iop_module_t *self)
 {
@@ -2440,19 +2450,15 @@ static void _notebook_page_changed(GtkNotebook *notebook,
     if(current_parent != target_container)
     {
       g_object_ref(basics);
-      gtk_container_remove(GTK_CONTAINER(current_parent), basics);
+      gtk_widget_unparent(basics);
       dt_gui_box_add(target_container, basics);
       g_object_unref(basics);
     }
 
-    int position = -1;
-    if(page_num == 0)
-    {
-      // on settings page, place after "auto tune levels" picker group
-      gtk_container_child_get(GTK_CONTAINER(target_container), g->range_exposure_picker_group,
-                              "position", &position, NULL);
-    }
-    gtk_box_reorder_child(GTK_BOX(target_container), basics, ++position);
+    // GTK4: no gtk_container_child_get; reorder after the picker group sibling
+    // (NULL moves to the front, matching the old "++position" with -1)
+    GtkWidget *after = (page_num == 0) ? g->range_exposure_picker_group : NULL;
+    gtk_box_reorder_child_after(GTK_BOX(target_container), basics, after);
   }
 }
 

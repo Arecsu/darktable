@@ -44,8 +44,8 @@ static void _misc_synchronise(_widgets_misc_t *source)
   if(dest)
   {
     source->rule->manual_widget_set++;
-    const gchar *txt1 = gtk_entry_get_text(GTK_ENTRY(source->name));
-    gtk_entry_set_text(GTK_ENTRY(dest->name), txt1);
+    const gchar *txt1 = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(source->name)));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(dest->name)), txt1);
     source->rule->manual_widget_set--;
   }
 }
@@ -56,18 +56,16 @@ static void _misc_changed(GtkWidget *widget,
   _widgets_misc_t *misc = (_widgets_misc_t *)user_data;
   if(misc->rule->manual_widget_set) return;
 
-  _rule_set_raw_text(misc->rule, gtk_entry_get_text(GTK_ENTRY(misc->name)), TRUE);
+  _rule_set_raw_text(misc->rule, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(misc->name))), TRUE);
   _misc_synchronise(misc);
 }
 
-static gboolean _misc_focus_out(GtkWidget *entry,
-                                GdkEventFocus *event,
-                                gpointer user_data)
+static void _misc_focus_out(GtkEventControllerFocus *controller,
+                            gpointer user_data)
 {
   _widgets_misc_t *misc = (_widgets_misc_t *)user_data;
-  if(misc->rule->cleaning) return FALSE;
-  _misc_changed(entry, user_data);
-  return FALSE;
+  if(misc->rule->cleaning) return;
+  _misc_changed(GTK_WIDGET(misc->name), user_data);
 }
 
 void _misc_tree_update(_widgets_misc_t *misc)
@@ -260,8 +258,8 @@ static gboolean _misc_select_func(GtkTreeModel *model,
 static void _misc_update_selection(_widgets_misc_t *misc)
 {
   // get the current text
-  GtkWidget *entry = gtk_popover_get_default_widget(GTK_POPOVER(misc->pop));
-  const gchar *txt = gtk_entry_get_text(GTK_ENTRY(entry));
+  GtkWidget *entry = misc->name;
+  const gchar *txt = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry)));
 
   // get the current treeview
   GtkTreeSelection *sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(misc->name_tree));
@@ -290,8 +288,6 @@ static void _misc_press(GtkGestureSingle *gesture,
   if(button == GDK_BUTTON_SECONDARY)
   {
     _misc_tree_update_visibility(w, misc);
-    gtk_popover_set_default_widget(GTK_POPOVER(misc->pop), w);
-    gtk_popover_set_relative_to(GTK_POPOVER(misc->pop), w);
 
     // update the selection
     _misc_update_selection(misc);
@@ -301,7 +297,7 @@ static void _misc_press(GtkGestureSingle *gesture,
   else if(button == GDK_BUTTON_PRIMARY
           && n_press >= 2)
   {
-    gtk_entry_set_text(GTK_ENTRY(misc->name), "");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(misc->name)), "");
     _misc_changed(w, misc);
   }
 }
@@ -313,12 +309,12 @@ static gboolean _misc_update(dt_lib_filtering_rule_t *rule)
   rule->manual_widget_set++;
   _widgets_misc_t *misc = (_widgets_misc_t *)rule->w_specific;
   misc->tree_ok = FALSE;
-  gtk_entry_set_text(GTK_ENTRY(misc->name), rule->raw_text);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(misc->name)), rule->raw_text);
   if(rule->topbar && rule->w_specific_top)
   {
     misc = (_widgets_misc_t *)rule->w_specific_top;
     misc->tree_ok = FALSE;
-    gtk_entry_set_text(GTK_ENTRY(misc->name), rule->raw_text);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(misc->name)), rule->raw_text);
   }
   _misc_synchronise(misc);
   rule->manual_widget_set--;
@@ -330,7 +326,7 @@ static void _misc_popup_closed(GtkWidget *w,
                                _widgets_misc_t *misc)
 {
   // we validate the corresponding entry
-  gtk_widget_activate(gtk_popover_get_default_widget(GTK_POPOVER(w)));
+  gtk_widget_activate(misc->name);
 }
 
 static void _misc_tree_row_activated(GtkTreeView *self,
@@ -364,8 +360,8 @@ static void _misc_tree_selection_changed(GtkTreeSelection *sel,
   g_list_free_full(list, (GDestroyNotify)gtk_tree_path_free);
 
   // we set the entry with this value
-  GtkWidget *entry = gtk_popover_get_default_widget(GTK_POPOVER(misc->pop));
-  gtk_entry_set_text(GTK_ENTRY(entry), (txt == NULL) ? "" : txt);
+  GtkWidget *entry = misc->name;
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(entry)), (txt == NULL) ? "" : txt);
   g_free(txt);
 }
 
@@ -413,11 +409,17 @@ static void _misc_widget_init(dt_lib_filtering_rule_t *rule,
 
   GtkWidget *hb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), hb, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), hb);
+    gtk_widget_set_hexpand(hb, TRUE);
+  }
   else
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), hb, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box), hb);
+    gtk_widget_set_hexpand(hb, TRUE);
+  }
   misc->name = dt_ui_entry_new(top ? 10 : 0);
-  gtk_widget_set_can_default(misc->name, TRUE);
+  // gtk_widget_set_can_default is removed in GTK4; the entry is not a dialog default target
 
   gchar *name = NULL;
   gchar *tooltip = NULL;
@@ -488,9 +490,12 @@ static void _misc_widget_init(dt_lib_filtering_rule_t *rule,
   g_free(tooltip);
   g_free(name);
 
-  gtk_box_pack_start(GTK_BOX(hb), misc->name, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), misc->name);
+  gtk_widget_set_hexpand(misc->name, TRUE);
   g_signal_connect(G_OBJECT(misc->name), "activate", G_CALLBACK(_misc_changed), misc);
-  g_signal_connect(G_OBJECT(misc->name), "focus-out-event", G_CALLBACK(_misc_focus_out), misc);
+  GtkEventController *focus_controller = gtk_event_controller_focus_new();
+  gtk_widget_add_controller(GTK_WIDGET(misc->name), focus_controller);
+  g_signal_connect(focus_controller, "leave", G_CALLBACK(_misc_focus_out), misc);
   GtkGestureSingle *misc_gesture = dt_gui_connect_click(misc->name, _misc_press, NULL, misc);
   gtk_gesture_single_set_button(misc_gesture, GDK_BUTTON_SECONDARY);
   gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(misc_gesture), GTK_PHASE_TARGET);
@@ -501,11 +506,12 @@ static void _misc_widget_init(dt_lib_filtering_rule_t *rule,
   }
 
   // the popup
-  misc->pop = gtk_popover_new(misc->name);
+  misc->pop = gtk_popover_new();
+  gtk_widget_set_parent(misc->pop, misc->name);
   gtk_widget_set_size_request(misc->pop, 250, 400);
   g_signal_connect(G_OBJECT(misc->pop), "closed", G_CALLBACK(_misc_popup_closed), misc);
   hb = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  gtk_container_add(GTK_CONTAINER(misc->pop), hb);
+  gtk_popover_set_child(GTK_POPOVER(misc->pop), hb);
 
   // the name tree
   GtkTreeModel *model
@@ -529,11 +535,12 @@ static void _misc_widget_init(dt_lib_filtering_rule_t *rule,
   gtk_tree_view_set_tooltip_column(GTK_TREE_VIEW(misc->name_tree), TREE_COL_TOOLTIP);
 
   GtkWidget *sw = dt_gui_scroll_wrap(misc->name_tree);
-  gtk_box_pack_start(GTK_BOX(hb), sw, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), sw);
+  gtk_widget_set_vexpand(sw, TRUE);
 
   // the button to close the popup
   GtkWidget *btn = gtk_button_new_with_label(_("ok"));
-  gtk_box_pack_start(GTK_BOX(hb), btn, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), btn);
   g_signal_connect(G_OBJECT(btn), "clicked", G_CALLBACK(_misc_ok_clicked), misc);
 
   if(top)

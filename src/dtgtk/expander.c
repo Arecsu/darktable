@@ -34,7 +34,7 @@ GtkWidget *dtgtk_expander_get_frame(GtkDarktableExpander *expander)
 {
   g_return_val_if_fail(DTGTK_IS_EXPANDER(expander), NULL);
 
-  return gtk_bin_get_child(GTK_BIN(expander->frame));
+  return gtk_revealer_get_child(GTK_REVEALER(expander->frame));
 }
 
 GtkWidget *dtgtk_expander_get_header(GtkDarktableExpander *expander)
@@ -246,7 +246,7 @@ static void _expander_resize(GtkWidget *widget, GdkRectangle *allocation, gpoint
       // height means it is mapped and sized).  This handles the case
       // where the module is on a different tab that hasn't been
       // shown yet.
-      if(gtk_widget_get_allocated_height(widget) <= 0)
+      if(gtk_widget_get_height(widget) <= 0)
         return;
 
       // Clear _last_expanded so that, once the scroll animation
@@ -257,7 +257,7 @@ static void _expander_resize(GtkWidget *widget, GdkRectangle *allocation, gpoint
     else
     {
       const gboolean height_changed =
-        gtk_widget_get_allocated_height(widget) != _start_pos.height;
+        gtk_widget_get_height(widget) != _start_pos.height;
 
       if(!height_changed)
         return;
@@ -303,16 +303,11 @@ void dtgtk_expander_set_drag_hover(GtkDarktableExpander *expander, gboolean allo
   }
 }
 
-static void _expander_drag_leave(GtkDarktableExpander *widget,
-                           GdkDragContext *dc,
-                           guint time,
-                           gpointer user_data)
-{
-  dtgtk_expander_set_drag_hover(widget, FALSE, FALSE, time);
-}
-
-// FIXME: default highlight for the dnd is barely visible
-// it should be possible to configure it
+// GTK3 DnD (GtkWidget::drag-begin): the expander headers are drag sources
+// for module reordering, with a cairo snapshot as drag icon.  GTK4 DnD is a
+// different API (GtkDragSource/GdkContentProvider) -- TODO P3; the signal
+// connects below are GTK3-only (GTK4 has no widget-level drag signals).
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _expander_drag_begin(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
 {
   GtkAllocation allocation = {0};
@@ -346,6 +341,16 @@ static void _expander_drag_end(GtkWidget *widget, GdkDragContext *context, gpoin
   _drop_widget = NULL;
   gtk_widget_set_opacity(widget, 1.0);
 }
+#endif
+#if !GTK_CHECK_VERSION(4, 0, 0)
+static void _expander_drag_leave(GtkDarktableExpander *widget,
+                           GdkDragContext *dc,
+                           guint time,
+                           gpointer user_data)
+{
+  dtgtk_expander_set_drag_hover(widget, FALSE, FALSE, time);
+}
+#endif
 
 static void dtgtk_expander_init(GtkDarktableExpander *expander)
 {
@@ -365,23 +370,25 @@ GtkWidget *dtgtk_expander_new(GtkWidget *header, GtkWidget *body)
   expander->header = header;
   expander->body = body;
 
-  expander->header_evb = gtk_event_box_new();
-  gtk_container_add(GTK_CONTAINER(expander->header_evb), expander->header);
-  expander->body_evb = gtk_event_box_new();
+  expander->header_evb = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_box_append(GTK_BOX(expander->header_evb), expander->header);
+  expander->body_evb = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   if(expander->body)
-    gtk_container_add(GTK_CONTAINER(expander->body_evb), expander->body);
+    gtk_box_append(GTK_BOX(expander->body_evb), expander->body);
   GtkWidget *frame = gtk_frame_new(NULL);
-  gtk_container_add(GTK_CONTAINER(frame), expander->body_evb);
+  gtk_frame_set_child(GTK_FRAME(frame), expander->body_evb);
   expander->frame = gtk_revealer_new();
   gtk_revealer_set_transition_duration(GTK_REVEALER(expander->frame), 0);
   gtk_revealer_set_reveal_child(GTK_REVEALER(expander->frame), TRUE);
-  gtk_container_add(GTK_CONTAINER(expander->frame), frame);
+  gtk_revealer_set_child(GTK_REVEALER(expander->frame), frame);
 
   dt_gui_box_add(expander, expander->header_evb, expander->frame);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(expander->header_evb, "drag-begin", G_CALLBACK(_expander_drag_begin), NULL);
   g_signal_connect(expander->header_evb, "drag-end", G_CALLBACK(_expander_drag_end), NULL);
   g_signal_connect(expander, "drag-leave", G_CALLBACK(_expander_drag_leave), NULL);
+#endif
   g_signal_connect(expander, "size-allocate", G_CALLBACK(_expander_resize), frame);
 
   return GTK_WIDGET(expander);

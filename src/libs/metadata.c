@@ -105,9 +105,15 @@ static gboolean _set_leave_unchanged(GtkTextView *textview, GtkWidget *label)
 
   gtk_widget_set_name(label, this_changed ? "dt-metadata-changed" : NULL);
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: toggle the overlay hint directly (stored in qdata by _add_grid_row)
+  GtkWidget *hint = g_object_get_data(G_OBJECT(textview), "leave_unchanged_hint");
+  if(hint) gtk_widget_set_visible(hint, leave_unchanged && !this_changed);
+#else
   gtk_container_foreach(GTK_CONTAINER(textview),
                         (GtkCallback)gtk_widget_set_visible,
                         GINT_TO_POINTER(leave_unchanged && !this_changed));
+#endif
   return this_changed;
 }
 
@@ -424,7 +430,6 @@ static gboolean _key_pressed_cb(GtkEventControllerKey *controller,
                                    GdkModifierType state,
                                    dt_lib_module_t *self)
 {
-  GtkWidget *textview = dt_gui_get_widget(controller);
   dt_lib_metadata_t *d = self->data;
 
   switch(keyval)
@@ -433,14 +438,14 @@ static gboolean _key_pressed_cb(GtkEventControllerKey *controller,
     case GDK_KEY_KP_Enter:
       if(!dt_modifier_is(state, GDK_CONTROL_MASK))
       {
-        gtk_button_clicked(GTK_BUTTON(d->apply_button));
+        gtk_widget_activate(GTK_WIDGET(d->apply_button));
         return TRUE;
       }
       break;
     case GDK_KEY_Escape:
       if(dt_modifier_is(state, 0))
       {
-        gtk_button_clicked(GTK_BUTTON(d->cancel_button));
+        gtk_widget_activate(GTK_WIDGET(d->cancel_button));
         return TRUE;
       }
       break;
@@ -551,6 +556,7 @@ void gui_reset(dt_lib_module_t *self)
   _write_metadata(self);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _menu_line_activated(GtkMenuItem *menuitem, GtkTextView *textview)
 {
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(textview);
@@ -558,14 +564,16 @@ static void _menu_line_activated(GtkMenuItem *menuitem, GtkTextView *textview)
     (buffer,
      gtk_label_get_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(menuitem)))), -1);
 }
+#endif
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _populate_popup_multi(GtkTextView *textview,
                                   GtkWidget *popup,
                                   dt_lib_module_t *self)
 {
-  const dt_lib_metadata_t *d = self->data;
-
   if(!_is_leave_unchanged(textview)) return;
+
+  const dt_lib_metadata_t *d = self->data;
 
   // get keyid from textview
   const uint32_t key = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(textview), "key"));
@@ -581,6 +589,7 @@ static void _populate_popup_multi(GtkTextView *textview,
   }
   gtk_widget_show_all(popup);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _metadata_reset_cb(GtkGestureSingle *gesture, int n_press,
                                   double x, double y,
@@ -606,10 +615,10 @@ static void _add_grid_row(dt_metadata_t *metadata, int row, dt_lib_module_t *sel
   GtkWidget *label = dt_ui_label_new(metadata->name);
   gtk_widget_set_halign(label, GTK_ALIGN_FILL);
   gtk_widget_set_valign(label, GTK_ALIGN_START);
-  GtkWidget *labelev = gtk_event_box_new();
+  GtkWidget *labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_tooltip_text(labelev, _("double-click to reset"));
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
+  gtk_box_append(GTK_BOX(labelev), label);
   g_object_set_data(G_OBJECT(labelev), "label", label);
   gtk_grid_attach(grid, labelev, 0, row, 1, 1);
 
@@ -630,7 +639,13 @@ static void _add_grid_row(dt_metadata_t *metadata, int row, dt_lib_module_t *sel
   GtkWidget *unchanged = gtk_label_new(_("<leave unchanged>"));
   gtk_widget_set_name(unchanged, "dt-metadata-multi");
   gtk_widget_set_visible(unchanged, FALSE);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: child windows are gone; the hint is an overlay positioned at (0,0)
+  gtk_text_view_add_overlay(GTK_TEXT_VIEW(textview), unchanged, 0, 0);
+  g_object_set_data(G_OBJECT(textview), "leave_unchanged_hint", unchanged);
+#else
   gtk_text_view_add_child_in_window(GTK_TEXT_VIEW(textview), unchanged, GTK_TEXT_WINDOW_WIDGET, 0, 0);
+#endif
 
   gchar *setting_name = g_strdup_printf("plugins/lighttable/metadata/%s_text_height", dt_metadata_get_tag_subkey(metadata->tagname));
   GtkWidget *swindow = dt_ui_resize_wrap(GTK_WIDGET(textview), 100, setting_name);
@@ -654,7 +669,9 @@ static void _add_grid_row(dt_metadata_t *metadata, int row, dt_lib_module_t *sel
   gtk_widget_add_events(textview, GDK_FOCUS_CHANGE_MASK | GDK_ENTER_NOTIFY_MASK);
   dt_gui_connect_key(textview, _key_pressed_cb, self);
   g_signal_connect(textview, "focus", G_CALLBACK(_textview_focus), self);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(textview, "populate-popup", G_CALLBACK(_populate_popup_multi), self);
+#endif
   dt_gui_connect_click_all(labelev, _metadata_reset_cb, NULL, textview);
   g_signal_connect(buffer, "changed", G_CALLBACK(_textbuffer_changed), self);
   gtk_widget_set_hexpand(textview, TRUE);
@@ -662,6 +679,7 @@ static void _add_grid_row(dt_metadata_t *metadata, int row, dt_lib_module_t *sel
   d->num_grid_rows++;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _toggled_callback(gchar *path_str,
                               gpointer user_data,
                               const int column)
@@ -677,21 +695,27 @@ static void _toggled_callback(gchar *path_str,
 
   gtk_tree_path_free(path);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _visible_toggled_callback(GtkCellRendererToggle *cell_renderer,
                                       gchar *path_str,
                                       gpointer user_data)
 {
   _toggled_callback(path_str, user_data, DT_METADATA_PREF_COL_VISIBLE);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _private_toggled_callback(GtkCellRendererToggle *cell_renderer,
                                       gchar *path_str,
                                       gpointer user_data)
 {
   _toggled_callback(path_str, user_data, DT_METADATA_PREF_COL_PRIVATE);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _display_name_edited_callback(GtkCellRenderer *renderer,
                                           gchar *path_str,
                                           gchar *new_text,
@@ -705,7 +729,9 @@ static void _display_name_edited_callback(GtkCellRenderer *renderer,
   gtk_list_store_set(store, &iter, DT_METADATA_PREF_COL_NAME, new_text, -1);
   gtk_tree_path_free(path);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _find_metadata_iter_per_text(GtkTreeModel *model, GtkTreeIter *iter, gint col, const char *text)
 {
   if(!text) return FALSE;
@@ -726,7 +752,9 @@ static gboolean _find_metadata_iter_per_text(GtkTreeModel *model, GtkTreeIter *i
   }
   return FALSE;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _add_selected_metadata(gchar *tagname, dt_lib_metadata_t *d)
 {
   GtkTreeIter iter;
@@ -754,8 +782,10 @@ static void _metadata_activated(GtkTreeView *tree_view,
   gchar *tagname = dt_metadata_tags_get_selected();
   _add_selected_metadata(tagname, d);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 // dialog to add metadata tag into the formula list
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _add_tag_button_clicked(GtkButton *button, dt_lib_metadata_t *d)
 {
   GtkWidget *dialog = dt_metadata_tags_dialog(d->dialog, _metadata_activated, d);
@@ -790,11 +820,14 @@ static void _delete_tag_button_clicked(GtkButton *button, dt_lib_metadata_t *d)
     gtk_list_store_remove(d->liststore, &iter);
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _drag_data_inserted(GtkTreeModel *tree_model, GtkTreePath *path, GtkTreeIter *iter, dt_lib_metadata_t *d)
 {
   d->needs_rebuild = TRUE;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 
 static void _fill_grid(dt_lib_module_t *self)
@@ -842,6 +875,7 @@ static void _fill_grid(dt_lib_module_t *self)
   dt_lib_gui_queue_update(self);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _menuitem_preferences(GtkMenuItem *menuitem,
                                   dt_lib_module_t *self)
 {
@@ -1136,12 +1170,15 @@ static void _menuitem_preferences(GtkMenuItem *menuitem,
 finish:
   gtk_widget_destroy(dialog);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void set_preferences(void *menu, dt_lib_module_t *self)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
   g_signal_connect(G_OBJECT(mi), "activate", G_CALLBACK(_menuitem_preferences), self);
   gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 }
 
 void gui_init(dt_lib_module_t *self)

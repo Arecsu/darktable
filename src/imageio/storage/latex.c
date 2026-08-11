@@ -144,14 +144,18 @@ static void button_clicked(GtkWidget *widget, dt_imageio_module_storage_t *self)
         _("select directory"), GTK_WINDOW(win), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
         _("_select as output destination"), _("_cancel"));
 
-  gchar *old = g_strdup(gtk_entry_get_text(d->entry));
+  gchar *old = g_strdup(gtk_editable_get_text(GTK_EDITABLE(d->entry)));
   char *c = g_strstr_len(old, -1, "$");
   if(c) *c = '\0';
-  gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), old);
+  GFile *folder = g_file_new_for_path(old);
+  gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), folder, NULL);
+  g_object_unref(folder);
   g_free(old);
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *dir = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    GFile *dir_file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    gchar *dir = dir_file ? g_file_get_path(dir_file) : NULL;
+    if(dir_file) g_object_unref(dir_file);
     char *composed = g_build_filename(dir, "$(FILE_NAME)", NULL);
 
     // composed can now contain '\': on Windows it's the path separator,
@@ -159,7 +163,7 @@ static void button_clicked(GtkWidget *widget, dt_imageio_module_storage_t *self)
     // This would later clash with variable substitution, so we have to escape them
     gchar *escaped = dt_util_str_replace(composed, "\\", "\\\\");
 
-    gtk_entry_set_text(GTK_ENTRY(d->entry), escaped); // the signal handler will write this to conf
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->entry)), escaped); // the signal handler will write this to conf
     g_free(dir);
     g_free(composed);
     g_free(escaped);
@@ -169,12 +173,12 @@ static void button_clicked(GtkWidget *widget, dt_imageio_module_storage_t *self)
 
 static void entry_changed_callback(GtkEntry *entry, gpointer user_data)
 {
-  dt_conf_set_string("plugins/imageio/storage/latex/file_directory", gtk_entry_get_text(entry));
+  dt_conf_set_string("plugins/imageio/storage/latex/file_directory", gtk_editable_get_text(GTK_EDITABLE(entry)));
 }
 
 static void title_changed_callback(GtkEntry *entry, gpointer user_data)
 {
-  dt_conf_set_string("plugins/imageio/storage/latex/title", gtk_entry_get_text(entry));
+  dt_conf_set_string("plugins/imageio/storage/latex/title", gtk_editable_get_text(GTK_EDITABLE(entry)));
 }
 
 void gui_init(dt_imageio_module_storage_t *self)
@@ -214,10 +218,10 @@ void gui_cleanup(dt_imageio_module_storage_t *self)
 void gui_reset(dt_imageio_module_storage_t *self)
 {
   latex_t *d = (latex_t *)self->gui_data;
-  gtk_entry_set_text(d->entry, dt_confgen_get("plugins/imageio/storage/latex/file_directory", DT_DEFAULT));
-  gtk_entry_set_text(d->title_entry, dt_confgen_get("plugins/imageio/storage/latex/title", DT_DEFAULT));
-  dt_conf_set_string("plugins/imageio/storage/latex/file_directory", gtk_entry_get_text(d->entry));
-  dt_conf_set_string("plugins/imageio/storage/latex/title", gtk_entry_get_text(d->title_entry));
+  gtk_editable_set_text(GTK_EDITABLE(d->entry), dt_confgen_get("plugins/imageio/storage/latex/file_directory", DT_DEFAULT));
+  gtk_editable_set_text(GTK_EDITABLE(d->title_entry), dt_confgen_get("plugins/imageio/storage/latex/title", DT_DEFAULT));
+  dt_conf_set_string("plugins/imageio/storage/latex/file_directory", gtk_editable_get_text(GTK_EDITABLE(d->entry)));
+  dt_conf_set_string("plugins/imageio/storage/latex/title", gtk_editable_get_text(GTK_EDITABLE(d->title_entry)));
 }
 
 static gint sort_pos(pair_t *a, pair_t *b)
@@ -461,9 +465,9 @@ int set_params(dt_imageio_module_storage_t *self, const void *params, const int 
   if(size != self->params_size(self)) return 1;
   dt_imageio_latex_t *d = (dt_imageio_latex_t *)params;
   latex_t *g = (latex_t *)self->gui_data;
-  gtk_entry_set_text(GTK_ENTRY(g->entry), d->filename);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->entry)), d->filename);
   dt_conf_set_string("plugins/imageio/storage/latex/file_directory", d->filename);
-  gtk_entry_set_text(GTK_ENTRY(g->title_entry), d->title);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->title_entry)), d->title);
   dt_conf_set_string("plugins/imageio/storage/latex/title", d->title);
   return 0;
 }

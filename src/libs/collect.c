@@ -144,7 +144,9 @@ typedef struct filmroll_row_t
 
 static void _lib_collect_gui_update(dt_lib_module_t *self);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _lib_folders_update_collection(const gchar *filmroll);
+#endif
 
 static void entry_changed(GtkEntry *entry, dt_lib_collect_rule_t *dr);
 
@@ -158,7 +160,7 @@ static void collection_updated(gpointer instance,
 static void row_activated_with_event(GtkTreeView *view,
                                      GtkTreePath *path,
                                      GtkTreeViewColumn *col,
-                                     GdkEventButton *event,
+                                     const GdkEvent *event,
                                      dt_lib_collect_t *d);
 
 static int _is_time_property(const int property);
@@ -436,6 +438,7 @@ uint32_t container(dt_lib_module_t *self)
   return DT_UI_CONTAINER_PANEL_LEFT_CENTER;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void view_popup_menu_onSearchFilmroll(GtkWidget *menuitem,
                                              gpointer userdata)
 {
@@ -464,19 +467,36 @@ static void view_popup_menu_onSearchFilmroll(GtkWidget *menuitem,
      _("_open"), _("_cancel"));
 
   if(tree_path != NULL)
+  {
+#if GTK_CHECK_VERSION(4, 0, 0)
+    GFile *folder = g_file_new_for_path(tree_path);
+    gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), folder, NULL);
+    g_object_unref(folder);
+#else
     gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), tree_path);
+#endif
+  }
   else
     goto error;
 
   // run the dialog
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
     gint id = -1;
     sqlite3_stmt *stmt;
     gchar *query = NULL;
 
     gchar *uri = NULL;
+#if GTK_CHECK_VERSION(4, 0, 0)
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    if(file)
+    {
+      uri = g_file_get_uri(file);
+      g_object_unref(file);
+    }
+#else
     uri = gtk_file_chooser_get_uri(GTK_FILE_CHOOSER(filechooser));
+#endif
     new_path = g_filename_from_uri(uri, NULL, NULL);
     g_free(uri);
     if(new_path)
@@ -631,6 +651,7 @@ static void view_popup_menu(GtkWidget *treeview,
 
   gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 /* Claim the press only when the collections handler fully owns it, so a
  * plain click still reaches the treeview's internal bubble-phase gesture:
@@ -692,10 +713,14 @@ static gboolean _coords_are_over_arrow(GtkTreeView *view, gint bin_x, gint bin_y
 
   gboolean indent_expanders = TRUE;
   gint expander_size = 12, horizontal_separator = 0;
+#if !GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4 removed gtk_widget_style_get() (style properties are gone);
+  // these are the GtkTreeView defaults.
   gtk_widget_style_get(GTK_WIDGET(view),
                        "indent-expanders", &indent_expanders,
                        "horizontal-separator", &horizontal_separator,
                        "expander-size", &expander_size, NULL);
+#endif
 
   /* GTK draws the arrow one expander width in per tree level below the
    * top level when indent-expanders is set: gtk_tree_view_get_arrow_xrange
@@ -794,7 +819,7 @@ static void view_onButtonPressed_cb(GtkGestureSingle *gesture, int n_press,
       gtk_tree_selection_select_range(selection, path2, path);
     g_list_free_full(sels, (GDestroyNotify)gtk_tree_path_free);
 
-    row_activated_with_event(GTK_TREE_VIEW(treeview), path, NULL, (GdkEventButton *)event, d);
+    row_activated_with_event(GTK_TREE_VIEW(treeview), path, NULL, event, d);
 
     gtk_tree_path_free(path);
     return;
@@ -813,8 +838,13 @@ static void view_onButtonPressed_cb(GtkGestureSingle *gesture, int n_press,
      && !(dt_modifier_is(mod_state, GDK_SHIFT_MASK)
           || dt_modifier_is(mod_state, GDK_CONTROL_MASK)))
   {
-    row_activated_with_event(GTK_TREE_VIEW(treeview), path, NULL, (GdkEventButton *)event, d);
+#if !GTK_CHECK_VERSION(4, 0, 0)
+    row_activated_with_event(GTK_TREE_VIEW(treeview), path, NULL, event, d);
     view_popup_menu(treeview, (GdkEventButton *)event, d);
+#else
+    // TODO P2: GtkMenu->GtkPopoverMenu migration (context menu on right click)
+    row_activated_with_event(GTK_TREE_VIEW(treeview), path, NULL, event, d);
+#endif
 
     if(path) gtk_tree_path_free(path);
     return;
@@ -827,7 +857,7 @@ static void view_onButtonPressed_cb(GtkGestureSingle *gesture, int n_press,
      || (d->view_rule == DT_COLLECTION_PROP_MONTH
          && n_press == 1 && button == GDK_BUTTON_PRIMARY))
   {
-    row_activated_with_event(GTK_TREE_VIEW(treeview), path, NULL, (GdkEventButton *)event, d);
+    row_activated_with_event(GTK_TREE_VIEW(treeview), path, NULL, event, d);
 
     if(path) gtk_tree_path_free(path);
     return;
@@ -836,6 +866,7 @@ static void view_onButtonPressed_cb(GtkGestureSingle *gesture, int n_press,
   if(path) gtk_tree_path_free(path);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean view_onPopupMenu(GtkWidget *treeview, dt_lib_collect_t *d)
 {
   if(d->view_rule != DT_COLLECTION_PROP_FOLDERS)
@@ -847,6 +878,7 @@ static gboolean view_onPopupMenu(GtkWidget *treeview, dt_lib_collect_t *d)
 
   return TRUE; /* we handled this */
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static dt_lib_collect_t *get_collect(dt_lib_collect_rule_t *r)
 {
@@ -883,7 +915,7 @@ static gboolean list_select(GtkTreeModel *model,
   gtk_tree_model_get(model, iter, DT_LIB_COLLECT_COL_PATH, &str, -1);
 
   gchar *haystack = g_utf8_strdown(str, -1);
-  gchar *needle = g_utf8_strdown(gtk_entry_get_text(GTK_ENTRY(dr->text)), -1);
+  gchar *needle = g_utf8_strdown(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(dr->text))), -1);
 
   if(strcmp(haystack, needle) == 0)
   {
@@ -1230,6 +1262,7 @@ static void tree_set_visibility(GtkTreeModel *model, gpointer data)
   gtk_tree_model_foreach(model, (GtkTreeModelForeachFunc)tree_reveal_func, NULL);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _lib_folders_update_collection(const gchar *filmroll)
 {
 
@@ -1261,11 +1294,12 @@ static void _lib_folders_update_collection(const gchar *filmroll)
                             DT_COLLECTION_PROP_UNDEF, (GList *)NULL, -1);
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void set_properties(dt_lib_collect_rule_t *dr)
 {
   const int property = _combo_get_active_collection(dr->combo);
-  const gchar *text = gtk_entry_get_text(GTK_ENTRY(dr->text));
+  const gchar *text = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(dr->text)));
 
   char confname[200] = { 0 };
   snprintf(confname, sizeof(confname),
@@ -1978,7 +2012,7 @@ static void _tree_view(dt_lib_collect_rule_t *dr)
   if(_is_time_property(property) || property == DT_COLLECTION_PROP_DAY)
   {
     gchar *number1, *number2;
-    dt_collection_split_operator_datetime(gtk_entry_get_text(GTK_ENTRY(dr->text)),
+    dt_collection_split_operator_datetime(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(dr->text))),
                                           &number1, &number2, &dr->datetime_range.operator);
     if(number1 && number1[strlen(number1) - 1] == '%')
       number1[strlen(number1) - 1] = '\0';
@@ -1991,8 +2025,8 @@ static void _tree_view(dt_lib_collect_rule_t *dr)
   dr->sensitive = (property == DT_COLLECTION_PROP_TAG &&
      dt_conf_is_equal("plugins/lighttable/tagging/case_sensitivity", "sensitive"));
   gchar *needle = dr->sensitive
-    ? g_strdup(gtk_entry_get_text(GTK_ENTRY(dr->text)))
-    : g_utf8_strdown(gtk_entry_get_text(GTK_ENTRY(dr->text)), -1);
+    ? g_strdup(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(dr->text))))
+    : g_utf8_strdown(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(dr->text))), -1);
 
   if(g_str_has_suffix(needle, "%"))
     needle[strlen(needle) - 1] = '\0';
@@ -2673,7 +2707,7 @@ static void _list_view(dt_lib_collect_rule_t *dr)
          || property == DT_COLLECTION_PROP_RATING
          || property >= DT_COLLECTION_PROP_METADATA_OFFSET))
   {
-    gchar *needle = g_utf8_strdown(gtk_entry_get_text(GTK_ENTRY(dr->text)), -1);
+    gchar *needle = g_utf8_strdown(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(dr->text))), -1);
     if(g_str_has_suffix(needle, "%"))
       needle[strlen(needle) - 1] = '\0';
 
@@ -2697,7 +2731,7 @@ static void _list_view(dt_lib_collect_rule_t *dr)
     GMatchInfo *match_info;
 
     regex = g_regex_new("^\\s*\\[\\s*(.*)\\s*;\\s*(.*)\\s*\\]\\s*$", 0, 0, NULL);
-    g_regex_match_full(regex, gtk_entry_get_text(GTK_ENTRY(dr->text)), -1, 0, 0,
+    g_regex_match_full(regex, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(dr->text))), -1, 0, 0,
                        &match_info, NULL);
     const int match_count = g_match_info_get_match_count(match_info);
 
@@ -2811,7 +2845,12 @@ static void _set_tooltip(dt_lib_collect_rule_t *d)
   }
 
   //set the combobox tooltip as well
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4 returns a const/transfer-none string; GTK3 returned an owned copy
+  gchar *tip = g_strdup(gtk_widget_get_tooltip_text(d->text));
+#else
   gchar *tip = gtk_widget_get_tooltip_text(d->text);
+#endif
   gtk_widget_set_tooltip_text(GTK_WIDGET(d->combo), tip);
   g_free(tip);
 }
@@ -2865,7 +2904,7 @@ static void _lib_collect_gui_update(dt_lib_module_t *self)
       g_signal_handlers_block_matched(d->rule[i].text,
                                       G_SIGNAL_MATCH_FUNC, 0, 0, NULL,
                                       entry_changed, NULL);
-      gtk_entry_set_text(GTK_ENTRY(d->rule[i].text), text);
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->rule[i].text)), text);
       gtk_editable_set_position(GTK_EDITABLE(d->rule[i].text), -1);
       g_signal_handlers_unblock_matched(d->rule[i].text,
                                         G_SIGNAL_MATCH_FUNC, 0, 0, NULL,
@@ -3080,7 +3119,7 @@ static void combo_changed(GtkWidget *combo,
   snprintf(confname, sizeof(confname),
            "plugins/lighttable/collect/item%1d", d->num);
   const int prev_property = dt_conf_get_int(confname);
-  const gchar *cur_text = gtk_entry_get_text(GTK_ENTRY(d->text));
+  const gchar *cur_text = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->text)));
   const gboolean has_text = cur_text && cur_text[0];
 
   const gboolean keep_path = prev_property == DT_COLLECTION_PROP_FILMROLL
@@ -3100,9 +3139,9 @@ static void combo_changed(GtkWidget *combo,
   g_signal_handlers_block_matched(d->text, G_SIGNAL_MATCH_FUNC, 0, 0, NULL,
                                   entry_changed, NULL);
   if(resolved_filmroll)
-    gtk_entry_set_text(GTK_ENTRY(d->text), resolved_filmroll);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->text)), resolved_filmroll);
   else if(!keep_path)
-    gtk_entry_set_text(GTK_ENTRY(d->text), "");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->text)), "");
   g_signal_handlers_unblock_matched(d->text, G_SIGNAL_MATCH_FUNC, 0, 0, NULL,
                                     entry_changed, NULL);
   g_free(resolved_filmroll);
@@ -3148,7 +3187,7 @@ static void combo_changed(GtkWidget *combo,
 static void row_activated_with_event(GtkTreeView *view,
                                      GtkTreePath *path,
                                      GtkTreeViewColumn *col,
-                                     GdkEventButton *event,
+                                     const GdkEvent *event,
                                      dt_lib_collect_t *d)
 {
   GtkTreeIter iter;
@@ -3263,7 +3302,7 @@ static void row_activated_with_event(GtkTreeView *view,
 
   g_signal_handlers_block_matched(d->rule[active].text,
                                   G_SIGNAL_MATCH_FUNC, 0, 0, NULL, entry_changed, NULL);
-  gtk_entry_set_text(GTK_ENTRY(d->rule[active].text), text);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->rule[active].text)), text);
   gtk_editable_set_position(GTK_EDITABLE(d->rule[active].text), -1);
   g_signal_handlers_unblock_matched(d->rule[active].text,
                                     G_SIGNAL_MATCH_FUNC, 0, 0, NULL, entry_changed, NULL);
@@ -3332,7 +3371,7 @@ static void entry_activated(GtkWidget *entry,
         g_signal_handlers_block_matched(d->text,
                                         G_SIGNAL_MATCH_FUNC,
                                         0, 0, NULL, entry_changed, NULL);
-        gtk_entry_set_text(GTK_ENTRY(d->text), text);
+        gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->text)), text);
         gtk_editable_set_position(GTK_EDITABLE(d->text), -1);
         g_signal_handlers_unblock_matched(d->text,
                                           G_SIGNAL_MATCH_FUNC,
@@ -3368,9 +3407,8 @@ int position(const dt_lib_module_t *self)
   return 400;
 }
 
-static gboolean entry_focus_in_callback(GtkWidget *w,
-                                        GdkEventFocus *event,
-                                        dt_lib_collect_rule_t *d)
+static void entry_focus_in_callback(GtkEventControllerFocus *controller,
+                                    dt_lib_collect_rule_t *d)
 {
   dt_lib_collect_t *c = get_collect(d);
   if(c->active_rule != d->num)
@@ -3378,10 +3416,9 @@ static gboolean entry_focus_in_callback(GtkWidget *w,
     c->active_rule = d->num;
     update_view(c->rule + c->active_rule);
   }
-
-  return FALSE;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void menuitem_mode(GtkMenuItem *menuitem,
                           dt_lib_collect_rule_t *d)
 {
@@ -3428,6 +3465,7 @@ static void menuitem_mode_change(GtkMenuItem *menuitem,
                              DT_COLLECTION_CHANGE_NEW_QUERY,
                              DT_COLLECTION_PROP_UNDEF, NULL);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void collection_updated(gpointer instance,
                                const dt_collection_change_t query_change,
@@ -3635,7 +3673,7 @@ static void _metadata_changed(gpointer instance,
         g_signal_handlers_block_matched(d->rule[i].text,
                                         G_SIGNAL_MATCH_FUNC, 0, 0, NULL,
                                         entry_changed, NULL);
-        gtk_entry_set_text(GTK_ENTRY(d->rule[i].text), "");
+        gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->rule[i].text)), "");
         g_signal_handlers_unblock_matched(d->rule[i].text,
                                           G_SIGNAL_MATCH_FUNC, 0, 0, NULL,
                                           entry_changed, NULL);
@@ -3660,6 +3698,7 @@ static void _metadata_changed(gpointer instance,
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void menuitem_clear(GtkMenuItem *menuitem,
                            dt_lib_collect_rule_t *d)
 {
@@ -3706,6 +3745,7 @@ static void menuitem_clear(GtkMenuItem *menuitem,
                              DT_COLLECTION_CHANGE_NEW_QUERY,
                              DT_COLLECTION_PROP_UNDEF, NULL);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void popup_button_callback_cb(GtkGestureSingle *gesture, int n_press,
                                          double x, double y,
@@ -3714,6 +3754,7 @@ static void popup_button_callback_cb(GtkGestureSingle *gesture, int n_press,
   if(gtk_gesture_single_get_current_button(gesture) != 1)
     return;
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *menu = gtk_menu_new();
   GtkWidget *mi;
   const int _a = dt_conf_get_int("plugins/lighttable/collect/num_rules");
@@ -3774,6 +3815,7 @@ static void popup_button_callback_cb(GtkGestureSingle *gesture, int n_press,
 
   const GdkEvent *event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), NULL);
   gtk_menu_popup_at_pointer(GTK_MENU(menu), event);
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
   return;
 }
 
@@ -3848,6 +3890,7 @@ static void _populate_collect_combo(GtkWidget *w)
 #undef ADD_COLLECT_ENTRY
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 void _menuitem_preferences(GtkMenuItem *menuitem,
                            dt_lib_module_t *self)
 {
@@ -3871,13 +3914,16 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
                              DT_COLLECTION_CHANGE_NEW_QUERY,
                              DT_COLLECTION_PROP_UNDEF, NULL);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void set_preferences(void *menu,
                      dt_lib_module_t *self)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
   g_signal_connect(G_OBJECT(mi), "activate", G_CALLBACK(_menuitem_preferences), self);
   gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 }
 
 static gint _sort_model_func(GtkTreeModel *model,
@@ -3922,6 +3968,7 @@ void _mount_changed(GUnixMountMonitor *monitor,
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _history_apply(GtkWidget *widget,
                            dt_lib_module_t *self)
 {
@@ -3968,7 +4015,9 @@ static void _history_apply(GtkWidget *widget,
       DT_CONTROL_SIGNAL_RAISE(DT_SIGNAL_IMAGES_ORDER_CHANGE, order);
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _history_pretty_print(const char *buf,
                                   char *out,
                                   size_t outsize)
@@ -4041,10 +4090,12 @@ static void _history_pretty_print(const char *buf,
     if(buf[0] == '$') buf++;
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _history_show(GtkWidget *widget,
                           dt_lib_module_t *self)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   // we show a popup with all the history entries
   GtkMenuShell *pop = GTK_MENU_SHELL(gtk_menu_new());
   gtk_widget_set_size_request(GTK_WIDGET(pop), 200, -1);
@@ -4073,6 +4124,7 @@ static void _history_show(GtkWidget *widget,
   }
 
   dt_gui_menu_popup(GTK_MENU(pop), widget, GDK_GRAVITY_SOUTH, GDK_GRAVITY_NORTH);
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 }
 
 static void _history_previous(dt_action_t *action)
@@ -4154,11 +4206,12 @@ void gui_init(dt_lib_module_t *self)
 
     d->rule[i].text = w = dt_ui_entry_new(10);
     gtk_widget_add_events(w, GDK_FOCUS_CHANGE_MASK | GDK_KEY_PRESS_MASK);
-    g_signal_connect(G_OBJECT(w), "focus-in-event",
-                     G_CALLBACK(entry_focus_in_callback), d->rule + i);
+    GtkEventController *focus = gtk_event_controller_focus_new();
+    g_signal_connect(focus, "enter", G_CALLBACK(entry_focus_in_callback), d->rule + i);
+    gtk_widget_add_controller(w, focus);
     g_signal_connect(G_OBJECT(w), "changed", G_CALLBACK(entry_changed), d->rule + i);
     g_signal_connect(G_OBJECT(w), "activate", G_CALLBACK(entry_activated), d->rule + i);
-    gtk_entry_set_width_chars(GTK_ENTRY(w), 5);
+    gtk_editable_set_width_chars(GTK_EDITABLE(w), 5);
 
     d->rule[i].button = w = dtgtk_button_new(dtgtk_cairo_paint_presets, 0, NULL);
     dt_gui_add_class(GTK_WIDGET(w), "dt_big_btn_canvas");
@@ -4177,14 +4230,17 @@ void gui_init(dt_lib_module_t *self)
    * would fight our own selection handling: use a CAPTURE-phase gesture
    * that claims the sequence, replicating the event consumption of the
    * pre-migration button-press-event handler */
-  GtkGesture *gesture = gtk_gesture_multi_press_new(GTK_WIDGET(view));
+  GtkGesture *gesture = gtk_gesture_click_new();
   gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
                                              GTK_PHASE_CAPTURE);
   dt_gui_add_controller(GTK_WIDGET(view), gesture);
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
   g_signal_connect(gesture, "pressed", G_CALLBACK(view_onButtonPressed_cb), d);
   g_signal_connect(gesture, "begin", G_CALLBACK(_gesture_begin_claim), d);
+#if !GTK_CHECK_VERSION(4, 0, 0)
+  // TODO P2: GtkMenu->GtkPopoverMenu migration
   g_signal_connect(G_OBJECT(view), "popup-menu", G_CALLBACK(view_onPopupMenu), d);
+#endif
 
   GtkTreeViewColumn *col = gtk_tree_view_column_new();
   gtk_tree_view_append_column(view, col);

@@ -129,13 +129,19 @@ static gboolean _added_gui_thread(gpointer user_data)
   _added_gui_thread_t *params = (_added_gui_thread_t *)user_data;
 
   /* lets show jobbox if its hidden */
-  gtk_box_pack_start(GTK_BOX(params->self_widget), params->instance_widget, TRUE, FALSE, 0);
-  gtk_box_reorder_child(GTK_BOX(params->self_widget), params->instance_widget, 1);
+  gtk_box_append(GTK_BOX(params->self_widget), params->instance_widget);
+  gtk_widget_set_vexpand(params->instance_widget, TRUE);
+  GtkWidget *first = gtk_widget_get_first_child(params->self_widget);
+  if(first && first != params->instance_widget)
+    gtk_box_reorder_child_after(GTK_BOX(params->self_widget), params->instance_widget, first);
   gtk_widget_show_all(params->instance_widget);
   gtk_widget_show(params->self_widget);
 
   // instance cursor to tell user that, if this is a blocking job with
   // a global busy cursor, the cancel box in this widget can stop it
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_widget_set_cursor(params->instance_widget, gdk_cursor_new_from_name("default", NULL));
+#else
   GdkWindow *window = gtk_widget_get_window(params->instance_widget);
   if(window)
   {
@@ -143,6 +149,7 @@ static gboolean _added_gui_thread(gpointer user_data)
     gdk_window_set_cursor(window, cursor);
     g_object_unref(cursor);
   }
+#endif
 
   free(params);
   return G_SOURCE_REMOVE;
@@ -160,27 +167,30 @@ static void *_lib_backgroundjobs_added(dt_lib_module_t *self, gboolean has_progr
     return NULL;
   }
 
-  instance->widget = gtk_event_box_new();
+  instance->widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
   /* initialize the ui elements for job */
   gtk_widget_set_name(GTK_WIDGET(instance->widget), "background-job-eventbox");
   dt_gui_add_class(GTK_WIDGET(instance->widget), "dt_big_btn_canvas");
   GtkBox *vbox = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0));
   instance->hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-  gtk_container_add(GTK_CONTAINER(instance->widget), GTK_WIDGET(vbox));
+  gtk_box_append(GTK_BOX(instance->widget), GTK_WIDGET(vbox));
 
   /* add job label */
   instance->label = gtk_label_new(message);
   gtk_widget_set_halign(instance->label, GTK_ALIGN_START);
   gtk_label_set_ellipsize(GTK_LABEL(instance->label), PANGO_ELLIPSIZE_END);
-  gtk_box_pack_start(GTK_BOX(instance->hbox), GTK_WIDGET(instance->label), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(instance->hbox), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(instance->hbox), GTK_WIDGET(instance->label));
+  gtk_widget_set_hexpand(GTK_WIDGET(instance->label), TRUE);
+  gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(instance->hbox));
+  gtk_widget_set_vexpand(GTK_WIDGET(instance->hbox), TRUE);
 
   /* use progressbar ? */
   if(has_progress_bar)
   {
     instance->progressbar = gtk_progress_bar_new();
-    gtk_box_pack_start(GTK_BOX(vbox), instance->progressbar, TRUE, FALSE, 0);
+    gtk_box_append(GTK_BOX(vbox), instance->progressbar);
+    gtk_widget_set_vexpand(instance->progressbar, TRUE);
   }
 
   /* lets show jobbox if its hidden */
@@ -204,7 +214,7 @@ static gboolean _destroyed_gui_thread(gpointer user_data)
 
   /* remove job widget from jobbox */
   if(params->instance->widget && GTK_IS_WIDGET(params->instance->widget))
-    gtk_container_remove(GTK_CONTAINER(params->self->widget), params->instance->widget);
+    gtk_box_remove(GTK_BOX(params->self->widget), params->instance->widget);
   params->instance->widget = NULL;
 
   /* if jobbox is empty let's hide */
@@ -249,7 +259,7 @@ static gboolean _cancellable_gui_thread(gpointer user_data)
         .clicked_cb = G_CALLBACK(_lib_backgroundjobs_cancel_callback_new),
         .clicked_data = params->progress,
       });
-  gtk_box_pack_start(hbox, GTK_WIDGET(button), FALSE, FALSE, 0);
+  gtk_box_append(hbox, GTK_WIDGET(button));
   gtk_widget_show_all(button);
 
   free(params);

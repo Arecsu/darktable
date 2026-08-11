@@ -498,14 +498,7 @@ static inline GtkWidget *dt_ui_label_new(const gchar *str)
 static inline GtkWidget *dt_ui_entry_new(gint width_chars)
 {
   GtkWidget *entry = gtk_entry_new();
-#if !GTK_CHECK_VERSION(4, 0, 0)
-  gtk_drag_dest_unset(entry);
-#endif
-#if GTK_CHECK_VERSION(4, 0, 0)
   gtk_editable_set_width_chars(GTK_EDITABLE(entry), width_chars);
-#else
-  gtk_entry_set_width_chars(GTK_ENTRY(entry), width_chars);
-#endif
   return entry;
 };
 
@@ -958,6 +951,7 @@ static inline GCallback G_CALLBACK(void *f) { return (GCallback)f; } // as a mac
     BOOLSIGNAL(signal, drag-drop) \
     BOOLSIGNAL(signal, focus) \
     BOOLSIGNAL(signal, draw) \
+    BOOLSIGNAL(signal, close-request) \
     BOOLSIGNAL(signal, popup-menu) \
     BOOLSIGNAL(signal, query-tooltip) \
     BOOLSIGNAL(signal, match-selected) \

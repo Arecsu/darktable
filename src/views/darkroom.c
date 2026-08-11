@@ -300,14 +300,15 @@ void _display_module_trouble_message_callback(gpointer instance,
       {
         label_widget = gtk_label_new(NULL);
         gtk_label_set_markup(GTK_LABEL(label_widget), trouble_msg);
-        gtk_label_set_line_wrap(GTK_LABEL(label_widget), TRUE);
+        gtk_label_set_wrap(GTK_LABEL(label_widget), TRUE);
         gtk_label_set_xalign(GTK_LABEL(label_widget), 0.0);
         gtk_widget_set_name(label_widget, "iop-plugin-warning");
         dt_gui_add_class(label_widget, "dt_warning");
 
         GtkWidget *iopw = gtk_widget_get_parent(module->widget);
-        gtk_box_pack_start(GTK_BOX(iopw), label_widget, TRUE, TRUE, 0);
-        gtk_box_reorder_child(GTK_BOX(iopw), label_widget, 0);
+        gtk_box_append(GTK_BOX(iopw), label_widget);
+        gtk_widget_set_vexpand(label_widget, TRUE);
+        gtk_box_reorder_child_after(GTK_BOX(iopw), label_widget, NULL);
         gtk_widget_show(label_widget);
       }
 
@@ -560,12 +561,15 @@ static void _darkroom_dnd_set_active(const gboolean active)
   _darkroom_dnd_queue_redraw();
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _darkroom_dnd_clear_timeout_cb(gpointer user_data)
 {
   _darkroom_dnd_clear_timeout = 0;
   _darkroom_dnd_set_active(FALSE);
   return G_SOURCE_REMOVE;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
+
 
 static void _darkroom_dnd_stop(void)
 {
@@ -577,6 +581,7 @@ static void _darkroom_dnd_stop(void)
   _darkroom_dnd_set_active(FALSE);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 // whether the drag comes from outside the application (a file manager) rather
 // than being an internal thumbnail or module reorder - only external file drags
 // should trigger the hint. We key off the (absent) in-app source widget rather
@@ -618,6 +623,7 @@ static void _darkroom_dnd_leave(GtkWidget *widget,
   if(_darkroom_dnd_active && !_darkroom_dnd_clear_timeout)
     _darkroom_dnd_clear_timeout = g_timeout_add(200, _darkroom_dnd_clear_timeout_cb, NULL);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 // paint a dimmed overlay with a centered hint label
 static void
@@ -646,6 +652,7 @@ _darkroom_draw_dnd_hint(cairo_t *cr, const int width, const int height, const ch
   cairo_restore(cr);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 // connected (after) to the filmstrip thumbtable "draw" so the hint paints on
 // top of the thumbnails
 static gboolean _darkroom_filmstrip_draw_hint(GtkWidget *widget, cairo_t *cr, gpointer user_data)
@@ -657,6 +664,7 @@ static gboolean _darkroom_filmstrip_draw_hint(GtkWidget *widget, cairo_t *cr, gp
                             _("drop image files here to add them to the collection"));
   return FALSE;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void expose(dt_view_t *self,
             cairo_t *cri,
@@ -1834,6 +1842,7 @@ static void _darkroom_ui_favorite_presets_popupmenu(GtkWidget *w,
   dt_gui_favorite_presets_menu_show(w);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _darkroom_ui_apply_style_activate_callback(GtkMenuItem *menuitem,
                                                        const dt_stylemenu_data_t *menu_data)
 {
@@ -1852,10 +1861,12 @@ static void _darkroom_ui_apply_style_button_callback(GtkGestureSingle *gesture,
   else
     dt_shortcut_copy_lua(NULL, menu_data->name);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _darkroom_ui_apply_style_popupmenu(GtkWidget *w,
                                                gpointer user_data)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   /* if we got any styles, lets popup menu for selection */
   GtkMenuShell *menu =
     dtgtk_build_style_menu_hierarchy(FALSE,
@@ -1868,6 +1879,9 @@ static void _darkroom_ui_apply_style_popupmenu(GtkWidget *w,
   }
   else
     dt_control_log(_("no styles have been created yet"));
+#else
+  // TODO P2: GtkMenu->GtkPopoverMenu migration
+#endif
 }
 
 static void _second_window_quickbutton_clicked(GtkWidget *w,
@@ -1906,6 +1920,16 @@ static gboolean _toolbar_show_popup(gpointer user_data)
 {
   GtkPopover *popover = GTK_POPOVER(user_data);
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: popovers anchor to their parent automatically (no
+  // gtk_popover_get_relative_to / GdkWindow pointer-position dance).
+  GtkWidget *button = gtk_widget_get_parent(GTK_WIDGET(popover));
+  if(button)
+  {
+    GdkRectangle rect = { gtk_widget_get_width(button) / 2, 0, 1, 1 };
+    gtk_popover_set_pointing_to(popover, &rect);
+  }
+#else
   GtkWidget *button = gtk_popover_get_relative_to(popover);
   GdkDevice *pointer =
     gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default()));
@@ -1922,6 +1946,7 @@ static gboolean _toolbar_show_popup(gpointer user_data)
     gtk_widget_translate_coordinates(pointer_widget, button, x, y, &rect.x, &rect.y);
 
   gtk_popover_set_pointing_to(popover, &rect);
+#endif
 
   // for the guides popover, it need to be updated before we show it
   if(darktable.view_manager
@@ -1951,7 +1976,7 @@ static void _color_assessment_border_width_callback(GtkWidget *slider, gpointer 
   }
   else
   {
-    gtk_button_clicked(GTK_BUTTON(dev->color_assessment.button));
+    gtk_widget_activate(GTK_WIDGET(dev->color_assessment.button));
   }
 }
 
@@ -1965,7 +1990,7 @@ static void _color_assessment_border_white_ratio_callback(GtkWidget *slider, gpo
   }
   else
   {
-    gtk_button_clicked(GTK_BUTTON(dev->color_assessment.button));
+    gtk_widget_activate(GTK_WIDGET(dev->color_assessment.button));
   }
 }
 
@@ -2029,7 +2054,7 @@ static void _colorscheme_callback(GtkWidget *combo,
   dt_develop_t *d = (dt_develop_t *)user_data;
   d->overexposed.colorscheme = dt_bauhaus_combobox_get(combo);
   if(d->overexposed.enabled == FALSE)
-    gtk_button_clicked(GTK_BUTTON(d->overexposed.button));
+    gtk_widget_activate(GTK_WIDGET(d->overexposed.button));
   else
     dt_dev_reprocess_center(d, 0);
 }
@@ -2040,7 +2065,7 @@ static void _lower_callback(GtkWidget *slider,
   dt_develop_t *d = (dt_develop_t *)user_data;
   d->overexposed.lower = dt_bauhaus_slider_get(slider);
   if(d->overexposed.enabled == FALSE)
-    gtk_button_clicked(GTK_BUTTON(d->overexposed.button));
+    gtk_widget_activate(GTK_WIDGET(d->overexposed.button));
   else
     dt_dev_reprocess_center(d, 0);
 }
@@ -2051,7 +2076,7 @@ static void _upper_callback(GtkWidget *slider,
   dt_develop_t *d = (dt_develop_t *)user_data;
   d->overexposed.upper = dt_bauhaus_slider_get(slider);
   if(d->overexposed.enabled == FALSE)
-    gtk_button_clicked(GTK_BUTTON(d->overexposed.button));
+    gtk_widget_activate(GTK_WIDGET(d->overexposed.button));
   else
     dt_dev_reprocess_center(d, 0);
 }
@@ -2062,7 +2087,7 @@ static void _mode_callback(GtkWidget *slider,
   dt_develop_t *d = (dt_develop_t *)user_data;
   d->overexposed.mode = dt_bauhaus_combobox_get(slider);
   if(d->overexposed.enabled == FALSE)
-    gtk_button_clicked(GTK_BUTTON(d->overexposed.button));
+    gtk_widget_activate(GTK_WIDGET(d->overexposed.button));
   else
     dt_dev_reprocess_center(d, 0);
 }
@@ -2083,7 +2108,7 @@ static void _rawoverexposed_mode_callback(GtkWidget *combo,
   dt_develop_t *d = (dt_develop_t *)user_data;
   d->rawoverexposed.mode = dt_bauhaus_combobox_get(combo);
   if(d->rawoverexposed.enabled == FALSE)
-    gtk_button_clicked(GTK_BUTTON(d->rawoverexposed.button));
+    gtk_widget_activate(GTK_WIDGET(d->rawoverexposed.button));
   else
     dt_dev_reprocess_center(d, 0);
 }
@@ -2094,7 +2119,7 @@ static void _rawoverexposed_colorscheme_callback(GtkWidget *combo,
   dt_develop_t *d = (dt_develop_t *)user_data;
   d->rawoverexposed.colorscheme = dt_bauhaus_combobox_get(combo);
   if(d->rawoverexposed.enabled == FALSE)
-    gtk_button_clicked(GTK_BUTTON(d->rawoverexposed.button));
+    gtk_widget_activate(GTK_WIDGET(d->rawoverexposed.button));
   else
     dt_dev_reprocess_center(d, 0);
 }
@@ -2105,7 +2130,7 @@ static void _rawoverexposed_threshold_callback(GtkWidget *slider,
   dt_develop_t *d = (dt_develop_t *)user_data;
   d->rawoverexposed.threshold = dt_bauhaus_slider_get(slider);
   if(d->rawoverexposed.enabled == FALSE)
-    gtk_button_clicked(GTK_BUTTON(d->rawoverexposed.button));
+    gtk_widget_activate(GTK_WIDGET(d->rawoverexposed.button));
   else
     dt_dev_reprocess_center(d, 0);
 }
@@ -2802,7 +2827,13 @@ static void _quickbutton_pressed_cb(GtkGestureSingle *gesture,
   /* secondary click: show popup immediately */
   if(gtk_gesture_single_get_current_button(gesture) == GDK_BUTTON_SECONDARY)
   {
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // GTK4: popovers anchor to their parent; reparent to the opener
+    gtk_widget_unparent(popover);
+    gtk_widget_set_parent(popover, button);
+#else
     gtk_popover_set_relative_to(GTK_POPOVER(popover), button);
+#endif
     g_object_set(G_OBJECT(popover), "transitions-enabled", FALSE, NULL);
     _toolbar_show_popup(popover);
   }
@@ -3176,11 +3207,12 @@ void gui_init(dt_view_t *self)
 
     dt_view_manager_module_toolbox_add(darktable.view_manager, dev->color_assessment.button, DT_VIEW_DARKROOM);
     /* add pop-up window */
-    dev->color_assessment.floating_window = gtk_popover_new(dev->color_assessment.button);
+    dev->color_assessment.floating_window = gtk_popover_new();
+    gtk_widget_set_parent(dev->color_assessment.floating_window, dev->color_assessment.button);
     connect_button_press_release(dev->color_assessment.button, dev->color_assessment.floating_window);
 
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_container_add(GTK_CONTAINER(dev->color_assessment.floating_window), vbox);
+    gtk_popover_set_child(GTK_POPOVER(dev->color_assessment.floating_window), vbox);
 
     /* total border width */
     GtkWidget *border_width_slider = dt_bauhaus_slider_new_action(DT_ACTION(self), 0.05, 0.4, 0.05, 0.2, 2);
@@ -3192,7 +3224,8 @@ void gui_init(dt_view_t *self)
                                   "this includes the outer gray part plus the inner white frame."));
     g_signal_connect(G_OBJECT(border_width_slider), "value-changed",
                      G_CALLBACK(_color_assessment_border_width_callback), dev);
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(border_width_slider), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(border_width_slider));
+    gtk_widget_set_vexpand(GTK_WIDGET(border_width_slider), TRUE);
 
     /* white border ratio */
     GtkWidget *border_ratio_slider = dt_bauhaus_slider_new_action(DT_ACTION(self), 0.1, 0.95, 0.05, 0.4, 2);
@@ -3204,7 +3237,8 @@ void gui_init(dt_view_t *self)
                                 _("the border ratio specifies the fraction of the white part of the border."));
     g_signal_connect(G_OBJECT(border_ratio_slider), "value-changed",
                      G_CALLBACK(_color_assessment_border_white_ratio_callback), dev);
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(border_ratio_slider), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(border_ratio_slider));
+    gtk_widget_set_vexpand(GTK_WIDGET(border_ratio_slider), TRUE);
 
     gtk_widget_show_all(vbox);
   }
@@ -3251,12 +3285,13 @@ void gui_init(dt_view_t *self)
                                  dt_conf_get_bool("darkroom/ui/rawoverexposed/enabled"));
 
     // and the popup window
-    dev->rawoverexposed.floating_window = gtk_popover_new(dev->rawoverexposed.button);
+    dev->rawoverexposed.floating_window = gtk_popover_new();
+    gtk_widget_set_parent(dev->rawoverexposed.floating_window, dev->rawoverexposed.button);
     connect_button_press_release(dev->rawoverexposed.button,
                                  dev->rawoverexposed.floating_window);
 
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_container_add(GTK_CONTAINER(dev->rawoverexposed.floating_window), vbox);
+    gtk_popover_set_child(GTK_POPOVER(dev->rawoverexposed.floating_window), vbox);
 
     /** let's fill the encapsulating widgets */
     /* mode of operation */
@@ -3267,7 +3302,8 @@ void gui_init(dt_view_t *self)
                                  _rawoverexposed_mode_callback, dev,
                                  N_("mark with CFA color"), N_("mark with solid color"),
                                  N_("false color"));
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(mode), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(mode));
+    gtk_widget_set_vexpand(GTK_WIDGET(mode), TRUE);
 
     DT_BAUHAUS_COMBOBOX_NEW_FULL(colorscheme, self,
                                  N_("raw overexposed"),
@@ -3279,7 +3315,8 @@ void gui_init(dt_view_t *self)
                                 NC_("solidcolor", "green"),
                                 NC_("solidcolor", "blue"),
                                 NC_("solidcolor", "black"));
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(colorscheme), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(colorscheme));
+    gtk_widget_set_vexpand(GTK_WIDGET(colorscheme), TRUE);
 
     /* threshold */
     GtkWidget *threshold = dt_bauhaus_slider_new_action(DT_ACTION(self),
@@ -3292,7 +3329,8 @@ void gui_init(dt_view_t *self)
         threshold, _("threshold of what shall be considered overexposed\n1.0 - white level\n0.0 - black level"));
     g_signal_connect(G_OBJECT(threshold), "value-changed",
                      G_CALLBACK(_rawoverexposed_threshold_callback), dev);
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(threshold), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(threshold));
+    gtk_widget_set_vexpand(GTK_WIDGET(threshold), TRUE);
 
     gtk_widget_show_all(vbox);
   }
@@ -3319,12 +3357,13 @@ void gui_init(dt_view_t *self)
                                  dt_conf_get_bool("darkroom/ui/overexposed/enabled"));
 
     // and the popup window
-    dev->overexposed.floating_window = gtk_popover_new(dev->overexposed.button);
+    dev->overexposed.floating_window = gtk_popover_new();
+    gtk_widget_set_parent(dev->overexposed.floating_window, dev->overexposed.button);
     connect_button_press_release(dev->overexposed.button,
                                  dev->overexposed.floating_window);
 
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_container_add(GTK_CONTAINER(dev->overexposed.floating_window), vbox);
+    gtk_popover_set_child(GTK_POPOVER(dev->overexposed.floating_window), vbox);
 
     /** let's fill the encapsulating widgets */
     /* preview mode */
@@ -3338,7 +3377,8 @@ void gui_init(dt_view_t *self)
                                  N_("full gamut"),
                                  N_("any RGB channel"),
                                  N_("luminance only"), N_("saturation only"));
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(mode), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(mode));
+    gtk_widget_set_vexpand(GTK_WIDGET(mode), TRUE);
 
     /* color scheme */
     DT_BAUHAUS_COMBOBOX_NEW_FULL(colorscheme, self, N_("overexposed"),
@@ -3349,7 +3389,8 @@ void gui_init(dt_view_t *self)
                                  N_("black & white"),
                                  N_("red & blue"),
                                  N_("purple & green"));
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(colorscheme), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(colorscheme));
+    gtk_widget_set_vexpand(GTK_WIDGET(colorscheme), TRUE);
 
     /* lower */
     GtkWidget *lower = dt_bauhaus_slider_new_action(DT_ACTION(self),
@@ -3368,7 +3409,8 @@ void gui_init(dt_view_t *self)
                                          ));
     g_signal_connect(G_OBJECT(lower), "value-changed",
                      G_CALLBACK(_lower_callback), dev);
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(lower), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(lower));
+    gtk_widget_set_vexpand(GTK_WIDGET(lower), TRUE);
 
     /* upper */
     GtkWidget *upper = dt_bauhaus_slider_new_action(DT_ACTION(self), 0.0, 100.0, 0.1, 99.99, 2);
@@ -3379,7 +3421,8 @@ void gui_init(dt_view_t *self)
     gtk_widget_set_tooltip_text(upper, _("clipping threshold for the white point.\n"
                                          "100% is peak medium luminance."));
     g_signal_connect(G_OBJECT(upper), "value-changed", G_CALLBACK(_upper_callback), dev);
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(upper), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(upper));
+    gtk_widget_set_vexpand(GTK_WIDGET(upper), TRUE);
 
     gtk_widget_show_all(vbox);
   }
@@ -3418,15 +3461,15 @@ void gui_init(dt_view_t *self)
                                        dev->profile.gamut_button, DT_VIEW_DARKROOM);
     dt_gui_add_help_link(dev->profile.gamut_button, "gamut");
 
-    // and the popup window, which is shared between the two profile buttons
-    dev->profile.floating_window = gtk_popover_new(NULL);
+    // and the popup window, which is shared between the three profile buttons
+    dev->profile.floating_window = gtk_popover_new();
     connect_button_press_release(dev->second_wnd_button, dev->profile.floating_window);
     connect_button_press_release(dev->profile.softproof_button,
                                  dev->profile.floating_window);
     connect_button_press_release(dev->profile.gamut_button, dev->profile.floating_window);
     // randomly connect to one of the buttons, so widgets can be realized
-    gtk_popover_set_relative_to(GTK_POPOVER(dev->profile.floating_window),
-                                dev->second_wnd_button);
+    // (GTK4: each press reparents the popover to its opener)
+    gtk_widget_set_parent(dev->profile.floating_window, dev->second_wnd_button);
 
     /** let's fill the encapsulating widgets */
     const int force_lcms2 = dt_conf_get_bool("plugins/lighttable/export/force_lcms2");
@@ -3573,7 +3616,7 @@ void gui_init(dt_view_t *self)
        softproof_profile, histogram_profile);
 
     gtk_widget_show_all(vbox);
-    gtk_container_add(GTK_CONTAINER(dev->profile.floating_window), vbox);
+    gtk_popover_set_child(GTK_POPOVER(dev->profile.floating_window), vbox);
   }
 
   /* create grid changer popup tool */
@@ -3693,14 +3736,18 @@ enum
   _DND_XMP_DUPLICATE = 2,
 };
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _path_is_xmp(const gchar *path)
 {
   const gchar *dot = strrchr(path, '.');
   return dot && !g_ascii_strcasecmp(dot, ".xmp");
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
+
 
 // switch the darkroom to a freshly created duplicate so the dropped
 // history becomes visible
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _darkroom_show_image(dt_develop_t *dev, const dt_imgid_t imgid)
 {
   _dev_change_image(dev, imgid);
@@ -3708,24 +3755,29 @@ static void _darkroom_show_image(dt_develop_t *dev, const dt_imgid_t imgid)
     dt_thumbtable_set_offset_image(dt_ui_thumbtable(darktable.gui->ui), imgid, TRUE);
   dt_control_queue_redraw();
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
+
 
 // build a question dialog parented to and centered on the main window, with
 // the given primary text. The caller adds the buttons and runs it.
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static GtkWidget *_darkroom_dnd_dialog_new(const char *title, const char *text)
 {
   GtkWindow *win = GTK_WINDOW(dt_ui_main_window(darktable.gui->ui));
   GtkWidget *dialog = gtk_message_dialog_new(
     win, GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_QUESTION, GTK_BUTTONS_NONE, "%s", text);
   gtk_window_set_title(GTK_WINDOW(dialog), title);
-  gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
 #ifdef GDK_WINDOWING_QUARTZ
   dt_osx_disallow_fullscreen(dialog);
 #endif
   return dialog;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
+
 
 // create a duplicate of imgid and apply the sidecar to it, returning the new
 // imgid (or NO_IMGID on failure)
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static dt_imgid_t _darkroom_duplicate_with_xmp(const dt_imgid_t imgid, gchar *path)
 {
   const dt_imgid_t newid = dt_image_duplicate(imgid);
@@ -3746,7 +3798,10 @@ static dt_imgid_t _darkroom_duplicate_with_xmp(const dt_imgid_t imgid, gchar *pa
 
   return newid;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+
+#if !GTK_CHECK_VERSION(4, 0, 0)
 // apply the dropped XMP sidecar(s) to the current darkroom image. With a
 // single file the user is asked whether to replace the current history or
 // create a duplicate; with several files one duplicate is created per file.
@@ -3831,7 +3886,9 @@ static void _darkroom_apply_dropped_xmps(dt_develop_t *dev, GList *xmps)
     }
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _darkroom_dnd_xmp_received(GtkWidget *widget,
                                        GdkDragContext *context,
                                        const gint x,
@@ -3876,6 +3933,7 @@ static void _darkroom_dnd_xmp_received(GtkWidget *widget,
 
   gtk_drag_finish(context, success, FALSE, time);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void enter(dt_view_t *self)
 {
@@ -4021,6 +4079,7 @@ void enter(dt_view_t *self)
 
   /* accept XMP sidecar files dropped onto the center view; we draw our own
      drag hint so don't request GTK's default highlight */
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *center = dt_ui_center(darktable.gui->ui);
   gtk_drag_dest_set(center,
                     GTK_DEST_DEFAULT_MOTION | GTK_DEST_DEFAULT_DROP,
@@ -4044,6 +4103,7 @@ void enter(dt_view_t *self)
     g_signal_connect_after(
       G_OBJECT(tt->widget), "draw", G_CALLBACK(_darkroom_filmstrip_draw_hint), NULL);
   }
+#endif
 
 #ifdef USE_LUA
 
@@ -4087,6 +4147,7 @@ void leave(dt_view_t *self)
   // stop accepting XMP sidecar drops and tear down the drop-hint machinery on
   // the (shared) center view and filmstrip
   _darkroom_dnd_stop();
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *center = dt_ui_center(darktable.gui->ui);
   g_signal_handlers_disconnect_by_func(
     G_OBJECT(center), G_CALLBACK(_darkroom_dnd_xmp_received), self->data);
@@ -4104,6 +4165,7 @@ void leave(dt_view_t *self)
     g_signal_handlers_disconnect_by_func(
       G_OBJECT(tt->widget), G_CALLBACK(_darkroom_filmstrip_draw_hint), NULL);
   }
+#endif
 
   // store groups for next time:
   dt_conf_set_int("plugins/darkroom/groups", dt_dev_modulegroups_get(darktable.develop));
@@ -4877,16 +4939,36 @@ gboolean gesture_pinch(dt_view_t *self,
   // Convert root (screen-absolute) pinch coords to center-widget-local.
   // This is the coord space dt_dev_zoom_move expects for its built-in cursor
   // anchoring (it computes mouse_off via x - border - 0.5 * port->width).
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: pinch coords are surface-relative (no root-coords API); the screen
+  // offset cancels out when subtracting the widget origin computed the same way
+  GtkWidget *center = dt_ui_center(darktable.gui->ui);
+  graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+  if(!gtk_widget_compute_point(center, NULL, &origin, &origin))
+    origin = GRAPHENE_POINT_INIT(0, 0);
+  const float x_local = (float)x - origin.x;
+  const float y_local = (float)y - origin.y;
+#else
   int ox, oy;
   gdk_window_get_origin(gtk_widget_get_window(dt_ui_center(darktable.gui->ui)), &ox, &oy);
   const float x_local = (float)x - ox;
   const float y_local = (float)y - oy;
+#endif
+#if GTK_CHECK_VERSION(4, 0, 0)
+  dt_print(DT_DEBUG_INPUT,
+           "[darkroom pinch] update x=%.1f y=%.1f (local=%.1f,%.1f origin=%.1f,%.1f"
+           " border=%d port=%dx%d) raw_dx=%.3f raw_dy=%.3f"
+           " eff_dx=%.3f eff_dy=%.3f score=%.2f zoom_dom=%d scale=%.6f state=0x%x"
+           " -> tscale=%.6f (floor=%.6f top=%.1f) zoom_scale=%.6f",
+           x, y, x_local, y_local, origin.x, origin.y,
+#else
   dt_print(DT_DEBUG_INPUT,
            "[darkroom pinch] update x=%.1f y=%.1f (local=%.1f,%.1f origin=%d,%d"
            " border=%d port=%dx%d) raw_dx=%.3f raw_dy=%.3f"
            " eff_dx=%.3f eff_dy=%.3f score=%.2f zoom_dom=%d scale=%.6f state=0x%x"
            " -> tscale=%.6f (floor=%.6f top=%.1f) zoom_scale=%.6f",
            x, y, x_local, y_local, ox, oy,
+#endif
            dev->full.border_size, dev->full.width, dev->full.height,
            dx, dy, eff_dx, eff_dy, zoom_pan_score, zoom_dominant,
            scale, state, tscale, tscalefloor, tscaletop, zoom_scale);
@@ -4968,9 +5050,7 @@ static void _dt_second_window_change_cursor(dt_develop_t *dev,
                                             const gchar *curs)
 {
   GtkWidget *widget = dev->second_wnd;
-  GdkCursor *cursor = gdk_cursor_new_from_name(curs, NULL);
-  gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
-  g_object_unref(cursor);
+  gtk_widget_set_cursor_from_name(widget, curs);
 }
 
 static void _second_window_leave(dt_develop_t *dev)
@@ -5179,7 +5259,7 @@ static gboolean _second_window_pinch_phase(dt_develop_t *dev,
     if(dt_gdk_event_get_type(event) != GDK_TOUCHPAD_PINCH) return FALSE;
 #if GTK_CHECK_VERSION(4, 0, 0)
     // GTK4 has no root-coords API: surface-relative position (see gtk.c)
-    gdk_event_get_position(event, &x_root, &y_root);
+    gdk_event_get_position((GdkEvent *)event, &x_root, &y_root);
 #else
     x_root = dt_gdk_event_get_root_x(event);
     y_root = dt_gdk_event_get_root_y(event);
@@ -5348,21 +5428,22 @@ static void _second_window_leave_callback(GtkEventControllerMotion *controller,
   _second_window_leave(dev);
 }
 
-static gboolean _second_window_configure_callback(GtkWidget *da,
-                                                  GdkEventConfigure *event,
-                                                  dt_develop_t *dev)
+static void _second_window_configure_callback(GtkWidget *da,
+                                              int width,
+                                              int height,
+                                              dt_develop_t *dev)
 {
-  if(dev->gui_leaving) return TRUE;
+  if(dev->gui_leaving) return;
 
-  gboolean size_changed = (dev->preview2.orig_width != event->width ||
-                          dev->preview2.orig_height != event->height);
+  gboolean size_changed = (dev->preview2.orig_width != width ||
+                          dev->preview2.orig_height != height);
 
   if(size_changed)
   {
-    dev->preview2.width = event->width;
-    dev->preview2.height = event->height;
-    dev->preview2.orig_width = event->width;
-    dev->preview2.orig_height = event->height;
+    dev->preview2.width = width;
+    dev->preview2.height = height;
+    dev->preview2.orig_width = width;
+    dev->preview2.orig_height = height;
 
     // pipe needs to be reconstructed
     dev->preview2.pipe->status = DT_DEV_PIXELPIPE_DIRTY;
@@ -5374,10 +5455,10 @@ static gboolean _second_window_configure_callback(GtkWidget *da,
     if(pinned_dev && !pinned_dev->gui_leaving)
     {
       dt_dev_viewport_t *pinned_port = &pinned_dev->preview2;
-      pinned_port->width = event->width;
-      pinned_port->height = event->height;
-      pinned_port->orig_width = event->width;
-      pinned_port->orig_height = event->height;
+      pinned_port->width = width;
+      pinned_port->height = height;
+      pinned_port->orig_width = width;
+      pinned_port->orig_height = height;
       pinned_port->pipe->status = DT_DEV_PIXELPIPE_DIRTY;
       pinned_port->pipe->changed |= DT_DEV_PIPE_REMOVE;
       pinned_port->pipe->cache_obsolete_order = 0;
@@ -5402,8 +5483,6 @@ static gboolean _second_window_configure_callback(GtkWidget *da,
     pinned_port->dpi_factor = dev->preview2.dpi_factor;
     dt_dev_configure(pinned_port);
   }
-
-  return TRUE;
 }
 
 static void _second_window_buttons_enter_notify_callback(GtkEventControllerMotion *controller,
@@ -5415,8 +5494,7 @@ static void _second_window_buttons_enter_notify_callback(GtkEventControllerMotio
   // keeps the GdkWindow (and its NSView tracking areas on macOS) always alive,
   // which is required for GTK's tooltip mechanism to work correctly.
   gtk_widget_set_opacity(button_box, 1.0);
-  gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(gtk_widget_get_parent(button_box)),
-                                       button_box, FALSE);
+  gtk_widget_set_can_target(button_box, TRUE);
 }
 
 static void _second_window_buttons_leave_notify_callback(GtkEventControllerMotion *controller,
@@ -5440,8 +5518,7 @@ static void _second_window_buttons_leave_notify_callback(GtkEventControllerMotio
   }
 
   gtk_widget_set_opacity(button_box, 0.0);
-  gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(gtk_widget_get_parent(button_box)),
-                                       button_box, TRUE);
+  gtk_widget_set_can_target(button_box, FALSE);
 }
 
 // Callback for the pin button in the overlay
@@ -5460,8 +5537,10 @@ static void _darkroom_ui_second_window_init(GtkWidget *overlay,
 
   const int width = MAX(10, dt_conf_get_int("second_window/window_w"));
   const int height = MAX(10, dt_conf_get_int("second_window/window_h"));
+#if !GTK_CHECK_VERSION(4, 0, 0)
   const gint x = MAX(0, dt_conf_get_int("second_window/window_x"));
   const gint y = MAX(0, dt_conf_get_int("second_window/window_y"));
+#endif
 
   // Group buttons in a vertical box for easy future expansion.
   GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
@@ -5475,7 +5554,7 @@ static void _darkroom_ui_second_window_init(GtkWidget *overlay,
       });
   gtk_widget_set_name(pin_button, "dt_window2_pin_button");
   gtk_widget_set_size_request(pin_button, 24, 24);
-  gtk_box_pack_start(GTK_BOX(button_box), pin_button, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(button_box), pin_button);
 
   // Associate the pin button with the toggle COMMAND action registered in
   // gui_init().  Passing action_def=NULL leaves the action type and callback
@@ -5486,12 +5565,12 @@ static void _darkroom_ui_second_window_init(GtkWidget *overlay,
 
   // Wrap the box in a GtkEventBox so that the overlay can toggle pass-through on
   // a windowed widget, which enables tooltip rendering.
-  GtkWidget *event_box = gtk_event_box_new();
+  GtkWidget *event_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_halign(event_box, GTK_ALIGN_END);
   gtk_widget_set_valign(event_box, GTK_ALIGN_START);
   gtk_widget_set_margin_top(event_box, 10);
   gtk_widget_set_margin_end(event_box, 10);
-  gtk_container_add(GTK_CONTAINER(event_box), button_box);
+  gtk_box_append(GTK_BOX(event_box), button_box);
 
   // Add the event box as a single overlay widget.  Start transparent and
   // non-interactive; the enter/leave callbacks will toggle opacity and
@@ -5501,7 +5580,7 @@ static void _darkroom_ui_second_window_init(GtkWidget *overlay,
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay), event_box);
   gtk_widget_show_all(event_box);
   gtk_widget_set_opacity(event_box, 0.0);
-  gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(overlay), event_box, TRUE);
+  gtk_widget_set_can_target(event_box, FALSE);
 
   // Needed to display/hide the widgets.
   // Must be done before the window is realized.
@@ -5512,8 +5591,10 @@ static void _darkroom_ui_second_window_init(GtkWidget *overlay,
 
   dev->preview2.border_size = 0;
   gtk_window_set_default_size(GTK_WINDOW(window), width, height);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_window_move(GTK_WINDOW(window), x, y);
   gtk_window_resize(GTK_WINDOW(window), width, height);
+#endif
 
   // Handle window state (fullscreen/maximized)
   const int fullscreen = dt_conf_get_bool("second_window/fullscreen");
@@ -5532,18 +5613,27 @@ static void _darkroom_ui_second_window_init(GtkWidget *overlay,
 
 static void _darkroom_ui_second_window_write_config(GtkWidget *widget)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: window position is managed by the window manager and not queryable;
+  // the size is queried via gtk_widget_get_width/height
+  const int w = gtk_widget_get_width(widget);
+  const int h = gtk_widget_get_height(widget);
+#else
   GtkAllocation allocation;
   gtk_widget_get_allocation(widget, &allocation);
   gint x, y;
   gtk_window_get_position(GTK_WINDOW(widget), &x, &y);
   dt_conf_set_int("second_window/window_x", x);
   dt_conf_set_int("second_window/window_y", y);
-  dt_conf_set_int("second_window/window_w", allocation.width);
-  dt_conf_set_int("second_window/window_h", allocation.height);
+  const int w = allocation.width;
+  const int h = allocation.height;
+#endif
+  dt_conf_set_int("second_window/window_w", w);
+  dt_conf_set_int("second_window/window_h", h);
   dt_conf_set_bool("second_window/maximized",
-                   (gdk_window_get_state(gtk_widget_get_window(widget)) & GDK_WINDOW_STATE_MAXIMIZED));
+                   gtk_window_is_maximized(GTK_WINDOW(widget)));
   dt_conf_set_bool("second_window/fullscreen",
-                   (gdk_window_get_state(gtk_widget_get_window(widget)) & GDK_WINDOW_STATE_FULLSCREEN));
+                   gtk_window_is_fullscreen(GTK_WINDOW(widget)));
 }
 
 // Helper to clean up second window state - called before destroying window
@@ -5615,6 +5705,7 @@ static gboolean _second_window_delete_callback(GtkWidget *widget,
   return FALSE;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _second_window_dnd_received(GtkWidget *widget,
                                         GdkDragContext *context,
                                         const gint x,
@@ -5643,6 +5734,7 @@ static void _second_window_dnd_received(GtkWidget *widget,
 
   gtk_drag_finish(context, success, FALSE, time);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _darkroom_display_second_window(dt_develop_t *dev)
 {
@@ -5660,7 +5752,7 @@ static void _darkroom_display_second_window(dt_develop_t *dev)
     dev->preview2.width = -1;
     dev->preview2.height = -1;
 
-    dev->second_wnd = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    dev->second_wnd = gtk_window_new();
     gtk_widget_set_name(dev->second_wnd, "second_window");
 
     _second_window_configure_ppd_dpi(dev);
@@ -5679,12 +5771,11 @@ static void _darkroom_display_second_window(dt_develop_t *dev)
 
     // Create the overlay for the window
     GtkWidget *overlay = gtk_overlay_new();
-    gtk_widget_add_events(overlay, GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK);
-    gtk_container_add(GTK_CONTAINER(dev->second_wnd), overlay);
+    gtk_window_set_child(GTK_WINDOW(dev->second_wnd), overlay);
 
     // Create the drawing area and add it to the overlay
     dev->preview2.widget = gtk_drawing_area_new();
-    gtk_container_add(GTK_CONTAINER(overlay), dev->preview2.widget);
+    gtk_overlay_set_child(GTK_OVERLAY(overlay), dev->preview2.widget);
     gtk_widget_set_size_request(dev->preview2.widget, DT_PIXEL_APPLY_DPI_2ND_WND(dev, 50), DT_PIXEL_APPLY_DPI_2ND_WND(dev, 200));
     gtk_widget_set_hexpand(dev->preview2.widget, TRUE);
     gtk_widget_set_vexpand(dev->preview2.widget, TRUE);
@@ -5706,7 +5797,7 @@ static void _darkroom_display_second_window(dt_develop_t *dev)
                           _second_window_scrolled_callback, dev);
     // touchpad pinch via GtkGestureZoom (the old "event" signal handler is GTK3-only)
     {
-      GtkGesture *zoom = gtk_gesture_zoom_new(dev->preview2.widget);
+      GtkGesture *zoom = gtk_gesture_zoom_new();
       dt_gui_add_controller(dev->preview2.widget, zoom);
       g_signal_connect(zoom, "begin", G_CALLBACK(_second_window_pinch_begin), dev);
       g_signal_connect(zoom, "scale-changed", G_CALLBACK(_second_window_pinch_scale_changed), dev);
@@ -5714,15 +5805,18 @@ static void _darkroom_display_second_window(dt_develop_t *dev)
     }
     dt_gui_connect_click_all(dev->preview2.widget, _second_window_button_pressed_callback, _second_window_button_released_callback, dev);
     dt_gui_connect_motion(dev->preview2.widget, _second_window_mouse_moved_callback, NULL, _second_window_leave_callback, dev);
-    g_signal_connect(G_OBJECT(dev->preview2.widget), "configure-event",
+    // GTK4: "configure-event" was replaced by the GtkDrawingArea::resize signal
+    g_signal_connect(G_OBJECT(dev->preview2.widget), "resize",
                      G_CALLBACK(_second_window_configure_callback), dev);
 
     /* dropping a filmstrip thumbnail pins it in the 2nd window */
+#if !GTK_CHECK_VERSION(4, 0, 0)
     gtk_drag_dest_set(dev->preview2.widget, GTK_DEST_DEFAULT_ALL,
                       target_list_internal, n_targets_internal,
                       GDK_ACTION_COPY | GDK_ACTION_MOVE);
     g_signal_connect(G_OBJECT(dev->preview2.widget), "drag-data-received",
                      G_CALLBACK(_second_window_dnd_received), dev);
+#endif
 
     g_signal_connect(G_OBJECT(dev->second_wnd), "delete-event",
                      G_CALLBACK(_second_window_delete_callback), dev);

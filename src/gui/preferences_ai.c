@@ -1160,7 +1160,7 @@ static void _show_model_card(dt_prefs_ai_data_t *data,
   GtkWidget *msg_area
     = gtk_message_dialog_get_message_area(GTK_MESSAGE_DIALOG(dlg));
   gtk_widget_set_margin_top(msg_area, 8);
-  gtk_container_add(GTK_CONTAINER(msg_area), grid);
+  gtk_box_append(GTK_BOX(msg_area), grid);
 
   const char *labels[] = {
     N_("scope"), N_("author"),
@@ -1203,7 +1203,7 @@ static void _show_model_card(dt_prefs_ai_data_t *data,
       val = gtk_label_new(v);
     }
     gtk_label_set_xalign(GTK_LABEL(val), 0.0f);
-    gtk_label_set_line_wrap(GTK_LABEL(val), TRUE);
+    gtk_label_set_wrap(GTK_LABEL(val), TRUE);
     gtk_label_set_max_width_chars(GTK_LABEL(val), 50);
     gtk_label_set_selectable(GTK_LABEL(val), TRUE);
     gtk_grid_attach(GTK_GRID(grid), val, 1, i, 1, 1);
@@ -1368,7 +1368,7 @@ static void _on_detect_system_ort(GtkButton *button, gpointer user_data)
   else if(count == 1)
   {
     const dt_ai_ort_found_t *f = found->data;
-    gtk_entry_set_text(GTK_ENTRY(data->ort_path_entry), f->path);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(data->ort_path_entry)), f->path);
     _set_ort_path(data, f->path);
     GtkWidget *dlg = gtk_message_dialog_new(
       GTK_WINDOW(data->parent_dialog),
@@ -1395,7 +1395,7 @@ static void _on_detect_system_ort(GtkButton *button, gpointer user_data)
     GtkWidget *label = gtk_label_new(_("multiple ONNX Runtime libraries found:"));
     gtk_widget_set_halign(label, GTK_ALIGN_START);
     gtk_widget_set_margin_bottom(label, DT_PIXEL_APPLY_DPI(5));
-    gtk_container_add(GTK_CONTAINER(content), label);
+    gtk_box_append(GTK_BOX(content), label);
 
     GtkWidget *combo = gtk_combo_box_text_new();
     for(GList *l = found; l; l = g_list_next(l))
@@ -1407,7 +1407,7 @@ static void _on_detect_system_ort(GtkButton *button, gpointer user_data)
       g_free(entry);
     }
     gtk_combo_box_set_active(GTK_COMBO_BOX(combo), 0);
-    gtk_container_add(GTK_CONTAINER(content), combo);
+    gtk_box_append(GTK_BOX(content), combo);
     gtk_widget_show_all(content);
 
     if(dt_gui_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT)
@@ -1416,7 +1416,7 @@ static void _on_detect_system_ort(GtkButton *button, gpointer user_data)
       if(sel >= 0)
       {
         const dt_ai_ort_found_t *f = g_list_nth_data(found, sel);
-        gtk_entry_set_text(GTK_ENTRY(data->ort_path_entry), f->path);
+        gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(data->ort_path_entry)), f->path);
         _set_ort_path(data, f->path);
       }
     }
@@ -1432,13 +1432,13 @@ static void _reset_ort_path_click_cb(GtkGestureSingle *gesture, int n_press,
 {
   if(n_press < 2) return;
   dt_prefs_ai_data_t *data = (dt_prefs_ai_data_t *)user_data;
-  gtk_entry_set_text(GTK_ENTRY(data->ort_path_entry), "");
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(data->ort_path_entry)), "");
   _set_ort_path(data, "");
 }
 static void _on_ort_path_changed(GtkEntry *entry, gpointer user_data)
 {
   dt_prefs_ai_data_t *data = (dt_prefs_ai_data_t *)user_data;
-  const char *text = gtk_entry_get_text(GTK_ENTRY(data->ort_path_entry));
+  const char *text = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(data->ort_path_entry)));
 
   // empty = reset to bundled
   if(!text || !text[0])
@@ -1453,7 +1453,7 @@ static void _on_ort_path_changed(GtkEntry *entry, gpointer user_data)
   {
     // revert entry to saved config
     gchar *prev = dt_conf_get_string("plugins/ai/ort_library_path");
-    gtk_entry_set_text(GTK_ENTRY(data->ort_path_entry), prev ? prev : "");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(data->ort_path_entry)), prev ? prev : "");
     g_free(prev);
     return;
   }
@@ -1511,7 +1511,7 @@ static void _on_ort_browse_clicked(GtkButton *button, gpointer user_data)
     _show_ort_probe_result(GTK_WINDOW(data->parent_dialog), filename, version);
     if(version)
     {
-      gtk_entry_set_text(GTK_ENTRY(data->ort_path_entry), filename);
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(data->ort_path_entry)), filename);
       _set_ort_path(data, filename);
       g_free(version);
     }
@@ -1533,9 +1533,9 @@ void init_tab_ai(GtkWidget *dialog, GtkWidget *stack)
   // enable AI toggle
   GtkWidget *enable_label = gtk_label_new(_("enable AI features"));
   gtk_widget_set_halign(enable_label, GTK_ALIGN_START);
-  GtkWidget *enable_labelev = gtk_event_box_new();
+  GtkWidget *enable_labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
-  gtk_container_add(GTK_CONTAINER(enable_labelev), enable_label);
+  gtk_box_append(GTK_BOX(enable_labelev), enable_label);
   gtk_event_box_set_visible_window(GTK_EVENT_BOX(enable_labelev), FALSE);
 
   data->enable_indicator = _create_indicator("plugins/ai/enabled");
@@ -1574,9 +1574,9 @@ void init_tab_ai(GtkWidget *dialog, GtkWidget *stack)
   // provider dropdown
   GtkWidget *provider_label = gtk_label_new(_("AI acceleration"));
   gtk_widget_set_halign(provider_label, GTK_ALIGN_START);
-  GtkWidget *provider_labelev = gtk_event_box_new();
+  GtkWidget *provider_labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
-  gtk_container_add(GTK_CONTAINER(provider_labelev), provider_label);
+  gtk_box_append(GTK_BOX(provider_labelev), provider_label);
   gtk_event_box_set_visible_window(GTK_EVENT_BOX(provider_labelev), FALSE);
 
   data->provider_indicator = _create_indicator(DT_AI_CONF_PROVIDER);
@@ -1628,16 +1628,16 @@ void init_tab_ai(GtkWidget *dialog, GtkWidget *stack)
   {
     GtkWidget *path_label = gtk_label_new(_("ONNX Runtime library"));
     gtk_widget_set_halign(path_label, GTK_ALIGN_START);
-    GtkWidget *path_labelev = gtk_event_box_new();
+    GtkWidget *path_labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_add_events(path_labelev, GDK_BUTTON_PRESS_MASK);
-    gtk_container_add(GTK_CONTAINER(path_labelev), path_label);
+    gtk_box_append(GTK_BOX(path_labelev), path_label);
     gtk_event_box_set_visible_window(GTK_EVENT_BOX(path_labelev), FALSE);
 
     data->ort_path_indicator = _create_indicator("plugins/ai/ort_library_path");
 
     gchar *cur_path = dt_conf_get_string("plugins/ai/ort_library_path");
     data->ort_path_entry = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(data->ort_path_entry), cur_path ? cur_path : "");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(data->ort_path_entry)), cur_path ? cur_path : "");
 #if defined(_WIN32)
     gtk_entry_set_placeholder_text(GTK_ENTRY(data->ort_path_entry),
                                    _("bundled (DirectML)"));
@@ -1856,7 +1856,7 @@ void init_tab_ai(GtkWidget *dialog, GtkWidget *stack)
     DT_PIXEL_APPLY_DPI(200));
   gtk_widget_set_hexpand(scroll, TRUE);
   gtk_widget_set_vexpand(scroll, TRUE);
-  gtk_container_add(GTK_CONTAINER(scroll), data->model_list);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), data->model_list);
   gtk_grid_attach(GTK_GRID(models_grid), scroll, 0, row++, 1, 1);
 
   // button box

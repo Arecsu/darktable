@@ -4242,7 +4242,7 @@ static void _output_dir_changed(GtkEditable *editable,
                                 dt_lib_module_t *self)
 {
   dt_conf_set_string(CONF_OUTPUT_DIR,
-                     gtk_entry_get_text(GTK_ENTRY(editable)));
+                     gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(editable))));
 }
 
 static void _output_dir_browse(GtkWidget *button,
@@ -4259,7 +4259,7 @@ static void _output_dir_browse(GtkWidget *button,
                                   NULL);
 
   const char *current
-    = gtk_entry_get_text(GTK_ENTRY(d->output_dir_entry));
+    = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->output_dir_entry)));
   if(current && current[0])
     gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), current);
 
@@ -4268,7 +4268,7 @@ static void _output_dir_browse(GtkWidget *button,
     char *folder = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
     if(folder)
     {
-      gtk_entry_set_text(GTK_ENTRY(d->output_dir_entry), folder);
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->output_dir_entry)), folder);
       dt_conf_set_string(CONF_OUTPUT_DIR, folder);
       g_free(folder);
     }
@@ -4506,8 +4506,7 @@ void gui_init(dt_lib_module_t *self)
   GtkWidget *dir_box = dt_gui_hbox();
   d->output_dir_entry = gtk_entry_new();
   char *saved_dir = dt_conf_get_string(CONF_OUTPUT_DIR);
-  gtk_entry_set_text(GTK_ENTRY(d->output_dir_entry),
-                     (saved_dir && saved_dir[0])
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->output_dir_entry)), (saved_dir && saved_dir[0])
                        ? saved_dir : "$(FILE_FOLDER)");
   g_free(saved_dir);
   gtk_widget_set_tooltip_text(d->output_dir_entry,

@@ -101,8 +101,8 @@ static void _exposure_widget_init(dt_lib_filtering_rule_t *rule, const dt_collec
 
   if(!top)
   {
-    gtk_entry_set_width_chars(GTK_ENTRY(range->entry_min), 10);
-    gtk_entry_set_width_chars(GTK_ENTRY(range->entry_max), 10);
+    gtk_editable_set_width_chars(GTK_EDITABLE(range->entry_min), 10);
+    gtk_editable_set_width_chars(GTK_EDITABLE(range->entry_max), 10);
   }
   dtgtk_range_select_set_selection_from_raw_text(range, text, FALSE);
   dtgtk_range_select_set_band_func(range, _exposure_value_from_band_func, _exposure_value_to_band_func);

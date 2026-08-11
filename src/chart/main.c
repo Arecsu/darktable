@@ -536,8 +536,8 @@ static char *get_export_filename(dt_lut_t *self, const char *extension, char **n
   name_entry = gtk_entry_new();
   description_entry = gtk_entry_new();
 
-  gtk_entry_set_text(GTK_ENTRY(name_entry), *name);
-  gtk_entry_set_text(GTK_ENTRY(description_entry), *description);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(name_entry)), *name);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(description_entry)), *description);
   g_free(*name);
   g_free(*description);
   *name = NULL;
@@ -586,8 +586,8 @@ static char *get_export_filename(dt_lut_t *self, const char *extension, char **n
   if(res == GTK_RESPONSE_ACCEPT)
   {
     filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-    *name = g_strdup(gtk_entry_get_text(GTK_ENTRY(name_entry)));
-    *description = g_strdup(gtk_entry_get_text(GTK_ENTRY(description_entry)));
+    *name = g_strdup(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(name_entry))));
+    *description = g_strdup(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(description_entry))));
     if(basecurve)
     {
       // either request all of them or none ...

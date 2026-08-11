@@ -144,9 +144,15 @@ static void _local_copy_widget_init(dt_lib_filtering_rule_t *rule, const dt_coll
   dt_bauhaus_widget_hide_label(local_copy->combo);
 
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), local_copy->combo, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), local_copy->combo);
+    gtk_widget_set_hexpand(local_copy->combo, TRUE);
+  }
   else
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), local_copy->combo, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box), local_copy->combo);
+    gtk_widget_set_hexpand(local_copy->combo, TRUE);
+  }
 
   if(top)
   {

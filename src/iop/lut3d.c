@@ -1220,7 +1220,7 @@ static gboolean _list_match_string(GtkTreeModel *model,
 
   gtk_tree_model_get(model, iter, DT_LUT3D_COL_NAME, &str, -1);
   gchar *haystack = g_utf8_strdown(str, -1);
-  gchar *needle = g_utf8_strdown(gtk_entry_get_text(GTK_ENTRY(g->lutentry)), -1);
+  gchar *needle = g_utf8_strdown(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->lutentry))), -1);
 
   visible = (g_strrstr(haystack, needle) != NULL);
 
@@ -1437,7 +1437,7 @@ static void _filepath_callback(GtkWidget *widget, dt_iop_module_t *self)
     dt_strlcpy_to_fixed(p->filepath, filepath, sizeof(p->filepath));
     _get_compressed_clut(self, FALSE);
     _show_hide_controls(self);
-    gtk_entry_set_text(GTK_ENTRY(g->lutentry), "");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->lutentry)), "");
 #else
     dt_strlcpy_to_fixed(p->filepath, filepath, sizeof(p->filepath));
 #endif // HAVE_GMIC
@@ -1588,9 +1588,17 @@ static void _button_clicked(GtkWidget *widget, dt_iop_module_t *self)
 
   char *composed = g_build_filename(lutfolder, p->filepath, NULL);
   if(strlen(p->filepath) == 0 || g_access(composed, F_OK) == -1)
-    gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), lutfolder);
+  {
+    GFile *folder = g_file_new_for_path(lutfolder);
+    gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), folder, NULL);
+    g_object_unref(folder);
+  }
   else
-    gtk_file_chooser_select_filename(GTK_FILE_CHOOSER(filechooser), composed);
+  {
+    GFile *file = g_file_new_for_path(composed);
+    gtk_file_chooser_set_file(GTK_FILE_CHOOSER(filechooser), file, NULL);
+    g_object_unref(file);
+  }
   g_free(composed);
 
   GtkFileFilter* filter = GTK_FILE_FILTER(gtk_file_filter_new());
@@ -1617,9 +1625,11 @@ static void _button_clicked(GtkWidget *widget, dt_iop_module_t *self)
   gtk_file_filter_set_name(filter, _("all files"));
   gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(filechooser), filter);
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *filepath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    gchar *filepath = file ? g_file_get_path(file) : NULL;
+    if(file) g_object_unref(file);
     if(strcmp(lutfolder, filepath) < 0)
     {
       _remove_root_from_path(lutfolder, filepath);

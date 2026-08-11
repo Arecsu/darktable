@@ -21,8 +21,6 @@
 
 G_DEFINE_TYPE(GtkDarktableIcon, dtgtk_icon, GTK_TYPE_WIDGET);
 
-static gboolean _icon_draw(GtkWidget *widget, cairo_t *cr);
-
 static void _icon_snapshot(GtkWidget *widget, GtkSnapshot *snapshot);
 
 static void dtgtk_icon_class_init(GtkDarktableIconClass *klass)

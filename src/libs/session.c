@@ -71,9 +71,9 @@ static void create_callback(GtkButton *button, dt_lib_module_t *self)
 {
   dt_lib_session_t *lib = self->data;
 
-  dt_conf_set_string("plugins/session/jobcode", gtk_entry_get_text(lib->gui.entry1));
+  dt_conf_set_string("plugins/session/jobcode", gtk_editable_get_text(GTK_EDITABLE(lib->gui.entry1)));
 #ifdef HAVE_GPHOTO2
-  dt_view_tethering_set_job_code(darktable.view_manager, gtk_entry_get_text(lib->gui.entry1));
+  dt_view_tethering_set_job_code(darktable.view_manager, gtk_editable_get_text(GTK_EDITABLE(lib->gui.entry1)));
 #endif
 }
 
@@ -96,21 +96,26 @@ void gui_init(dt_lib_module_t *self)
 
   lib->gui.label1 = GTK_LABEL(gtk_label_new(_("jobcode")));
   gtk_widget_set_halign(GTK_WIDGET(lib->gui.label1), GTK_ALIGN_START);
-  gtk_box_pack_start(vbox1, GTK_WIDGET(lib->gui.label1), TRUE, TRUE, 0);
+  gtk_box_append(vbox1, GTK_WIDGET(lib->gui.label1));
+  gtk_widget_set_vexpand(GTK_WIDGET(lib->gui.label1), TRUE);
 
   lib->gui.entry1 = GTK_ENTRY(dt_ui_entry_new(0));
-  gtk_box_pack_start(vbox2, GTK_WIDGET(lib->gui.entry1), TRUE, TRUE, 0);
+  gtk_box_append(vbox2, GTK_WIDGET(lib->gui.entry1));
+  gtk_widget_set_vexpand(GTK_WIDGET(lib->gui.entry1), TRUE);
 
   lib->gui.button1 = GTK_BUTTON(gtk_button_new_with_label(_("create")));
-  gtk_box_pack_start(GTK_BOX(hbox), GTK_WIDGET(vbox1), FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), GTK_WIDGET(vbox2), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(hbox), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(lib->gui.button1), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), GTK_WIDGET(vbox1));
+  gtk_box_append(GTK_BOX(hbox), GTK_WIDGET(vbox2));
+  gtk_widget_set_hexpand(GTK_WIDGET(vbox2), TRUE);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(hbox));
+  gtk_widget_set_vexpand(GTK_WIDGET(hbox), TRUE);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(lib->gui.button1));
+  gtk_widget_set_vexpand(GTK_WIDGET(lib->gui.button1), TRUE);
 
   g_signal_connect(G_OBJECT(lib->gui.button1), "clicked", G_CALLBACK(create_callback), self);
 
   const char *str = dt_conf_get_string_const("plugins/session/jobcode");
-  gtk_entry_set_text(lib->gui.entry1, str);
+  gtk_editable_set_text(GTK_EDITABLE(lib->gui.entry1), str);
 }
 
 void gui_cleanup(dt_lib_module_t *self)

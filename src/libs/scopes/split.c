@@ -208,19 +208,29 @@ static void _responsive_buttons(dt_scopes_t *const s)
   // for a layout without buttons moving after first shown
   if(!btns_mode_hori)
   {
-    GtkStyleContext *ctx = gtk_widget_get_style_context(s->cur_mode->button_activate);
+    GtkWidget *button = s->cur_mode->button_activate;
+    int min_w_int = 0;
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // GTK4 dropped gtk_style_context_get_property(); measure the button's
+    // CSS-driven minimum width directly.
+    int min_nat = 0;
+    gtk_widget_measure(button, GTK_ORIENTATION_HORIZONTAL, -1,
+                       &min_w_int, &min_nat, NULL, NULL);
+#else
+    GtkStyleContext *ctx = gtk_widget_get_style_context(button);
     GValue val = G_VALUE_INIT;
     gtk_style_context_get_property(ctx, "min-width",
                                    gtk_style_context_get_state(ctx),
                                    &val);
-    double min_w = 0.0;
     if(G_VALUE_HOLDS_INT(&val))
-      min_w = g_value_get_int(&val);
+      min_w_int = g_value_get_int(&val);
     else if(G_VALUE_HOLDS_DOUBLE(&val))
-      min_w = g_value_get_double(&val);
+      min_w_int = g_value_get_double(&val);
     else
       dt_print(DT_DEBUG_ALWAYS, "[_responsive_buttons] unexpected type for min-width");
     g_value_unset(&val);
+#endif
+    const double min_w = min_w_int;
     if(min_w == 0.0) return;
 
     const int mode_btns_hori = DT_SCOPES_MODE_N;
@@ -257,7 +267,7 @@ static void _reparent(GtkWidget *src, GtkWidget *dest, GtkWidget *child)
   if(gtk_widget_get_parent(child) == src)
   {
     g_object_ref(child);
-    gtk_container_remove(GTK_CONTAINER(src), child);
+    gtk_widget_unparent(child);
     dt_gui_box_add(dest, child);
     g_object_unref(child);
   }

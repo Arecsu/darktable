@@ -183,13 +183,10 @@ static void _rating_paint_icon(cairo_t *cr, gint x, gint y, gint w, gint h, gint
 
   if((flags & CPF_PRELIGHT) || (flags & CPF_ACTIVE))
   {
-    // we want a filled icon
-    cairo_get_source(cr);
-    cairo_pattern_get_rgba(cairo_get_source(cr),
-                           &shade_color.red,
-                           &shade_color.green,
-                           &shade_color.blue,
-                           &shade_color.alpha);
+    // GTK4 GdkRGBA stores floats; cairo wants doubles
+    double rgba[4];
+    cairo_pattern_get_rgba(cairo_get_source(cr), &rgba[0], &rgba[1], &rgba[2], &rgba[3]);
+    shade_color = (GdkRGBA){ rgba[0], rgba[1], rgba[2], rgba[3] };
     shade_color.alpha *= 0.6;
     my_data = &shade_color;
   }

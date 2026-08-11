@@ -109,10 +109,9 @@ void dt_splash_screen_create(const gboolean force)
     return;
   }
 
-  darktable.splash.start_screen = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+  darktable.splash.start_screen = gtk_window_new();
   gtk_window_set_decorated(GTK_WINDOW(darktable.splash.start_screen), FALSE);
   gtk_window_set_resizable(GTK_WINDOW(darktable.splash.start_screen), FALSE);
-  gtk_window_set_position(GTK_WINDOW(darktable.splash.start_screen), GTK_WIN_POS_CENTER);
 
   gtk_widget_set_name(darktable.splash.start_screen, "splashscreen");
   darktable.splash.progress_text = gtk_label_new(_("initializing"));
@@ -178,8 +177,10 @@ void dt_splash_screen_create(const gboolean force)
   gtk_widget_set_valign(logo, GTK_ALIGN_CENTER);
 
   GtkWidget *logo_col = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-  gtk_box_pack_start(GTK_BOX(logo_col), logo, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(logo_col), copyright, FALSE, FALSE, 0);
+  gtk_widget_set_halign(logo, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(logo_col), logo);
+  gtk_widget_set_halign(copyright, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(logo_col), copyright);
   gtk_widget_set_halign(logo_col, GTK_ALIGN_START);
   gtk_widget_set_valign(logo_col, GTK_ALIGN_CENTER);
 
@@ -196,11 +197,11 @@ void dt_splash_screen_create(const gboolean force)
   gtk_widget_set_halign(GTK_WIDGET(darktable.splash.remaining_box), GTK_ALIGN_START);
 
   dt_gui_box_add(content, darktable.splash.remaining_box);
-  gtk_container_add(GTK_CONTAINER(darktable.splash.start_screen), GTK_WIDGET(content));
+  gtk_window_set_child(GTK_WINDOW(darktable.splash.start_screen), GTK_WIDGET(content));
 
   gtk_window_set_default_size(GTK_WINDOW(darktable.splash.start_screen), 700, -1);
-  gtk_widget_show_all(darktable.splash.start_screen);
-  gtk_widget_hide(darktable.splash.remaining_box);
+  gtk_widget_set_visible(darktable.splash.start_screen, TRUE);
+  gtk_widget_set_visible(darktable.splash.remaining_box, FALSE);
   dt_gui_process_events();
 }
 
@@ -248,7 +249,7 @@ void dt_splash_screen_set_progress_percent(const char *msg,
     {
       gtk_label_set_text(GTK_LABEL(darktable.splash.remaining_text), "   --:--");
     }
-    gtk_widget_show_all(darktable.splash.start_screen);
+    gtk_widget_set_visible(darktable.splash.start_screen, TRUE);
     dt_gui_process_events();
   }
 }

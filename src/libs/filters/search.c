@@ -41,8 +41,8 @@ static void _search_synchronize(_widgets_search_t *source)
   if(dest)
   {
     source->rule->manual_widget_set++;
-    const gchar *txt = gtk_entry_get_text(GTK_ENTRY(source->text));
-    gtk_entry_set_text(GTK_ENTRY(dest->text), txt);
+    const gchar *txt = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(source->text)));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(dest->text)), txt);
     source->rule->manual_widget_set--;
   }
 }
@@ -63,11 +63,11 @@ static gboolean _search_update(dt_lib_filtering_rule_t *rule)
 
   rule->manual_widget_set++;
   _widgets_search_t *search = (_widgets_search_t *)rule->w_specific;
-  gtk_entry_set_text(GTK_ENTRY(search->text), txt);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(search->text)), txt);
   if(rule->w_specific_top)
   {
     search = (_widgets_search_t *)rule->w_specific_top;
-    gtk_entry_set_text(GTK_ENTRY(search->text), txt);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(search->text)), txt);
   }
   _search_synchronize(search);
   rule->manual_widget_set--;
@@ -107,7 +107,7 @@ static gboolean _search_changed_wait(gpointer user_data)
       // ' or " removes the corresponding wildcard
       char start[2] = { 0 };
       char *text = NULL;
-      const char *entry = gtk_entry_get_text(GTK_ENTRY(search->text));
+      const char *entry = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(search->text)));
       char *p = (char *)entry;
       if(strlen(entry) > 1 && !(entry[0] == '"' && entry[1] == '"'))
       {
@@ -165,16 +165,25 @@ static void _search_widget_init(dt_lib_filtering_rule_t *rule, const dt_collecti
 
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), hbox, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), hbox);
+    gtk_widget_set_hexpand(hbox, TRUE);
+  }
   else
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), hbox, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box), hbox);
+    gtk_widget_set_hexpand(hbox, TRUE);
+  }
   search->text = gtk_search_entry_new();
+#if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_drag_dest_unset(search->text);
+#endif
   g_signal_connect(G_OBJECT(search->text), "search-changed", G_CALLBACK(_search_changed), search);
   g_signal_connect(G_OBJECT(search->text), "stop-search", G_CALLBACK(_search_reset_text_entry), rule);
   if(top)
-    gtk_entry_set_max_width_chars(GTK_ENTRY(search->text), 20);
-  gtk_entry_set_width_chars(GTK_ENTRY(search->text), 0);
+    // GTK4: gtk_entry_set_max_width_chars moved to GtkEditable
+    gtk_editable_set_max_width_chars(GTK_EDITABLE(search->text), 20);
+  gtk_editable_set_width_chars(GTK_EDITABLE(search->text), 0);
   gtk_widget_set_tooltip_text(search->text,
                               /* xgettext:no-c-format */
                               _("filter by text from images metadata, camera brand/model, tags, file path and name"
@@ -183,7 +192,8 @@ static void _search_widget_init(dt_lib_filtering_rule_t *rule, const dt_collecti
                                 "\nstarting or ending with a double quote disables the corresponding wildcard"
                                 "\nis dimmed during the search execution"));
   dt_gui_add_class(search->text, "dt_transparent_background");
-  gtk_box_pack_start(GTK_BOX(hbox), search->text, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), search->text);
+  gtk_widget_set_hexpand(search->text, TRUE);
   if(top)
   {
     dt_gui_add_class(hbox, "dt_quick_filter");

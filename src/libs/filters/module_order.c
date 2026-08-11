@@ -163,9 +163,15 @@ static void _module_order_widget_init(dt_lib_filtering_rule_t *rule, const dt_co
   dt_bauhaus_widget_hide_label(module_order->combo);
 
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), module_order->combo, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), module_order->combo);
+    gtk_widget_set_hexpand(module_order->combo, TRUE);
+  }
   else
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), module_order->combo, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box), module_order->combo);
+    gtk_widget_set_hexpand(module_order->combo, TRUE);
+  }
 
   if(top)
   {

@@ -60,7 +60,7 @@ typedef struct dt_iop_equalizer_gui_data_t
   GtkBox *hbox;
   GtkDrawingArea *area;
   GtkComboBox *presets;
-  GtkRadioButton *channel_button[3];
+  GtkWidget *channel_button[3];
   double mouse_x, mouse_y, mouse_pick;
   float mouse_radius;
   dt_iop_equalizer_params_t drag_params;

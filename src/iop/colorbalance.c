@@ -1714,12 +1714,12 @@ static void _configure_slider_blocks(gpointer instance, dt_iop_module_t *self)
   dt_iop_colorbalance_gui_data_t *g = self->gui_data;
 
   GtkWidget *new_container = NULL;
-  GtkWidget *old_container = gtk_bin_get_child(GTK_BIN(g->main_box));
+  GtkWidget *old_container = gtk_widget_get_first_child(g->main_box);
 
   for(int i=0; i<3; i++)
   {
     g_object_ref(G_OBJECT(g->blocks[i]));
-    if(old_container) gtk_container_remove(GTK_CONTAINER(old_container), g->blocks[i]);
+    if(old_container) gtk_widget_unparent(g->blocks[i]);
   }
 
   if(old_container) gtk_widget_destroy(old_container);
@@ -1745,11 +1745,11 @@ static void _configure_slider_blocks(gpointer instance, dt_iop_module_t *self)
       else
       {
         GtkWidget *label = dt_ui_section_label_new(Q_(long_label[i]));
-        gtk_container_add(GTK_CONTAINER(new_container), label);
+        gtk_box_append(GTK_BOX(new_container), label);
         if(old_container) gtk_widget_show(label);
       }
 
-      gtk_container_add(GTK_CONTAINER(new_container), g->blocks[i]);
+      gtk_box_append(GTK_BOX(new_container), g->blocks[i]);
     }
   }
   else
@@ -1776,7 +1776,7 @@ static void _configure_slider_blocks(gpointer instance, dt_iop_module_t *self)
       {
         dt_gui_add_class(label[i], "dt_section_label");
 
-        gtk_container_add(GTK_CONTAINER(new_container), label[i]);
+        gtk_grid_attach(GTK_GRID(new_container), label[i], i, 0, 1, 1);
         if(old_container) gtk_widget_show(label[i]);
         gtk_grid_attach_next_to(GTK_GRID(new_container), g->blocks[i], label[i], GTK_POS_BOTTOM, 1, 1);
       }
@@ -1793,7 +1793,7 @@ static void _configure_slider_blocks(gpointer instance, dt_iop_module_t *self)
 
   for(int i=0; i<3; i++) g_object_unref(G_OBJECT(g->blocks[i]));
 
-  gtk_container_add(GTK_CONTAINER(g->main_box), new_container);
+  gtk_box_append(GTK_BOX(g->main_box), new_container);
   if(old_container) gtk_widget_show(new_container);
 }
 
@@ -1899,11 +1899,11 @@ void gui_init(dt_iop_module_t *self)
 
   g->main_label = dt_ui_section_label_new(""); // is set in _configure_slider_blocks
   gtk_widget_set_tooltip_text(g->main_label, _("click to cycle layout"));
-  GtkWidget *main_label_box = gtk_event_box_new();
-  gtk_container_add(GTK_CONTAINER(main_label_box), g->main_label);
+  GtkWidget *main_label_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_box_append(GTK_BOX(main_label_box), g->main_label);
   dt_gui_connect_click(main_label_box, NULL, _cycle_layout_callback, self);
 
-  g->main_box = gtk_event_box_new(); // is filled in _configure_slider_blocks
+  g->main_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0); // is filled in _configure_slider_blocks
 
   char field_name[10];
 

@@ -219,7 +219,7 @@ static void _gui_styles_new_style_response(GtkDialog *dialog,
     _gui_styles_get_active_items(g, &result, NULL);
 
     /* create the style from imageid */
-    char *newname = g_strdup(gtk_entry_get_text(GTK_ENTRY(g->name)));
+    char *newname = g_strdup(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->name))));
 
     if(g->newname)
       *g->newname = newname;
@@ -244,7 +244,7 @@ static void _gui_styles_new_style_response(GtkDialog *dialog,
       }
 
       if(dt_styles_create_from_image(newname,
-                                     gtk_entry_get_text(GTK_ENTRY(g->description)),
+                                     gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->description))),
                                      g->imgid,
                                      result,
                                      _gui_styles_is_copy_module_order_set(g)))
@@ -295,7 +295,7 @@ static void _gui_styles_edit_style_response(GtkDialog *dialog,
   }
   else if(response_id == GTK_RESPONSE_ACCEPT)
   {
-    char *newname = g_strdup(gtk_entry_get_text(GTK_ENTRY(g->name)));
+    char *newname = g_strdup(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->name))));
 
     if(g->newname)
       *g->newname = newname;
@@ -311,7 +311,7 @@ static void _gui_styles_edit_style_response(GtkDialog *dialog,
       {
         dt_styles_create_from_style(g->nameorig,
                                     newname,
-                                    gtk_entry_get_text(GTK_ENTRY(g->description)),
+                                    gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->description))),
                                     result,
                                     g->imgid,
                                     update,
@@ -322,7 +322,7 @@ static void _gui_styles_edit_style_response(GtkDialog *dialog,
       {
         dt_styles_update(g->nameorig,
                          newname,
-                         gtk_entry_get_text(GTK_ENTRY(g->description)),
+                         gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->description))),
                          result,
                          g->imgid,
                          update,
@@ -511,7 +511,7 @@ static gint _g_list_find_module_by_name(gconstpointer a, gconstpointer b)
 static void _name_changed(GtkEntry *entry,
                           GtkDialog *dialog)
 {
-  const gchar *name = gtk_entry_get_text(entry);
+  const gchar *name = gtk_editable_get_text(GTK_EDITABLE(entry));
   gtk_dialog_set_response_sensitive(dialog, GTK_RESPONSE_ACCEPT, name && *name);
 }
 
@@ -585,12 +585,12 @@ static gboolean _gui_styles_dialog_run(const gboolean edit,
   if(edit && name)
   {
     /* name */
-    gtk_entry_set_text(GTK_ENTRY(sd->name), name);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(sd->name)), name);
     /* description */
     gchar *desc = dt_styles_get_description(name);
     if(desc)
     {
-      gtk_entry_set_text(GTK_ENTRY(sd->description), desc);
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(sd->description)), desc);
       g_free(desc);
     }
   }
@@ -859,7 +859,7 @@ static gboolean _gui_styles_dialog_run(const gboolean edit,
   else
     g_signal_connect(dialog, "response", G_CALLBACK(_gui_styles_new_style_response), sd);
 
-  gtk_widget_show_all(GTK_WIDGET(dialog));
+  gtk_widget_set_visible(GTK_WIDGET(dialog), TRUE);
 
   gint dr = GTK_RESPONSE_YES;
   while(dr == GTK_RESPONSE_YES || dr == GTK_RESPONSE_NONE)
@@ -890,9 +890,7 @@ typedef struct _preview_data_t
   int psize;
 } _preview_data_t;
 
-static gboolean _preview_draw(GtkWidget *widget,
-                              cairo_t *cr,
-                              gpointer user_data)
+static void _preview_draw(GtkDrawingArea *da, cairo_t *cr, int width, int height, gpointer user_data)
 {
   _preview_data_t *data = (_preview_data_t *)user_data;
 
@@ -910,10 +908,8 @@ static gboolean _preview_draw(GtkWidget *widget,
   else
   {
     data->first_draw = FALSE;
-    gtk_widget_queue_draw(widget);
+    gtk_widget_queue_draw(GTK_WIDGET(da));
   }
-
-  return FALSE;
 }
 
 GtkWidget *dt_gui_style_content_dialog(char *name, const dt_imgid_t imgid)
@@ -961,8 +957,8 @@ GtkWidget *dt_gui_style_content_dialog(char *name, const dt_imgid_t imgid)
   label = gtk_label_new(NULL);
   gtk_label_set_markup(GTK_LABEL(label), esc_name);
   gtk_label_set_max_width_chars(GTK_LABEL(label), STYLE_TOOLTIP_MAX_WIDTH);
-  gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-  gtk_box_pack_start(GTK_BOX(ht), label, FALSE, FALSE, 0);
+  gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+  gtk_box_append(GTK_BOX(ht), label);
   g_free(esc_name);
 
   // Style description, it can be empty
@@ -973,19 +969,23 @@ GtkWidget *dt_gui_style_content_dialog(char *name, const dt_imgid_t imgid)
     char *localized_des = dt_util_localize_segmented_name(des, TRUE);
     // If the name and/or description are long and become multi-line, it will look
     // hard to understand what is what, so we add a horizontal separator between them.
-    gtk_box_pack_start(GTK_BOX(ht), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), TRUE, TRUE, 0);
+    GtkWidget *sep = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_widget_set_hexpand(sep, TRUE);
+    gtk_box_append(GTK_BOX(ht), sep);
 
     gchar *esc_des = g_markup_printf_escaped("<b>%s</b>", localized_des);
     g_free(localized_des);
     label = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label), esc_des);
     gtk_label_set_max_width_chars(GTK_LABEL(label), STYLE_TOOLTIP_MAX_WIDTH);
-    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-    gtk_box_pack_start(GTK_BOX(ht), label, FALSE, FALSE, 0);
+    gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+    gtk_box_append(GTK_BOX(ht), label);
     g_free(esc_des);
   }
 
-  gtk_box_pack_start(GTK_BOX(ht), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), TRUE, TRUE, 0);
+  GtkWidget *sep = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+  gtk_widget_set_hexpand(sep, TRUE);
+  gtk_box_append(GTK_BOX(ht), sep);
 
   GList *items = dt_styles_get_item_list(name, TRUE, -1, FALSE);
   GList *l = items;
@@ -1016,7 +1016,7 @@ GtkWidget *dt_gui_style_content_dialog(char *name, const dt_imgid_t imgid)
 
     label = gtk_label_new(buf);
     gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_box_pack_start(GTK_BOX(ht), label, FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(ht), label);
     l = g_list_next(l);
   }
 
@@ -1024,7 +1024,9 @@ GtkWidget *dt_gui_style_content_dialog(char *name, const dt_imgid_t imgid)
 
   if(dt_is_valid_imgid(imgid))
   {
-    gtk_box_pack_start(GTK_BOX(ht), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), TRUE, TRUE, 0);
+    GtkWidget *sep2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_widget_set_hexpand(sep2, TRUE);
+    gtk_box_append(GTK_BOX(ht), sep2);
     // style preview
     const int preview_size = dt_conf_get_int("plugins/lighttable/style/preview_size");
     if(!dt_conf_get_bool("ui_last/styles_hide_preview"))
@@ -1041,9 +1043,11 @@ GtkWidget *dt_gui_style_content_dialog(char *name, const dt_imgid_t imgid)
       gtk_widget_set_size_request(da, data.psize, data.psize);
       gtk_widget_set_halign(da, GTK_ALIGN_CENTER);
       dt_gui_add_class(da, "dt_transparent_background");
-      gtk_box_pack_start(GTK_BOX(ht), da, TRUE, TRUE, 0);
+      gtk_widget_set_hexpand(da, TRUE);
+      gtk_widget_set_vexpand(da, TRUE);
+      gtk_box_append(GTK_BOX(ht), da);
       data.first_draw = TRUE;
-      g_signal_connect(G_OBJECT(da), "draw", G_CALLBACK(_preview_draw), &data);
+      gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(da), _preview_draw, &data, NULL);
     }
   }
 

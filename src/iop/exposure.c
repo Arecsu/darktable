@@ -1193,7 +1193,7 @@ void gui_init(dt_iop_module_t *self)
   g->deflicker_histogram = NULL;
 
   g->mode_stack = GTK_STACK(gtk_stack_new());
-  gtk_stack_set_homogeneous(GTK_STACK(g->mode_stack),FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(g->mode_stack), FALSE);
 
   GtkWidget *vbox_manual = self->widget = dt_gui_vbox();
   gtk_stack_add_named(GTK_STACK(g->mode_stack), vbox_manual, "manual");

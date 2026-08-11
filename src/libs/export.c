@@ -108,25 +108,25 @@ static inline gboolean _is_style_set(const char *name)
 
 static inline float pixels2cm(dt_lib_export_t *self, const uint32_t pix)
 {
-  const int dpi = atoi(gtk_entry_get_text(GTK_ENTRY(self->print_dpi)));
+  const int dpi = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(self->print_dpi))));
   return ((float)pix * INCH_TO_CM) / (float)dpi;
 }
 
 static inline float pixels2inch(dt_lib_export_t *self, const uint32_t pix)
 {
-  const int dpi = atoi(gtk_entry_get_text(GTK_ENTRY(self->print_dpi)));
+  const int dpi = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(self->print_dpi))));
   return (float)pix / (float)dpi;
 }
 
 static inline uint32_t cm2pixels(dt_lib_export_t *self, const float cm)
 {
-  const int dpi = atoi(gtk_entry_get_text(GTK_ENTRY(self->print_dpi)));
+  const int dpi = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(self->print_dpi))));
   return ceilf((cm * (float)dpi) / INCH_TO_CM);
 }
 
 static inline uint32_t inch2pixels(dt_lib_export_t *self, const float inch)
 {
-  const int dpi = atoi(gtk_entry_get_text(GTK_ENTRY(self->print_dpi)));
+  const int dpi = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(self->print_dpi))));
   return ceilf(inch * (float)dpi);
 }
 
@@ -429,8 +429,7 @@ static void _export_with_current_settings(dt_lib_module_t *self)
   g_free(icc_filename);
 
   _scale_optim();
-  gtk_entry_set_text(GTK_ENTRY(d->scale),
-                     dt_conf_get_string_const(CONFIG_PREFIX "resizing_factor"));
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->scale)), dt_conf_get_string_const(CONFIG_PREFIX "resizing_factor"));
 }
 
 static void _export_with_preset(const gchar *preset_name, dt_lib_module_t *self)
@@ -506,7 +505,7 @@ static void _scale_changed(GtkEntry *spin,
                            dt_lib_export_t *d)
 {
   const char *validSign = ",.0123456789";
-  const gchar *value = gtk_entry_get_text(spin);
+  const gchar *value = gtk_editable_get_text(GTK_EDITABLE(spin));
 
   const int len = sizeof(value);
   int i, j = 0, idec = 0, idiv = 0, pdiv = 0;
@@ -561,7 +560,7 @@ static void _scale_changed(GtkEntry *spin,
     }
   }
   dt_conf_set_string(CONFIG_PREFIX "resizing_factor", new_value);
-  gtk_entry_set_text(spin, new_value);
+  gtk_editable_set_text(GTK_EDITABLE(spin), new_value);
 }
 
 static void _width_changed(GtkEditable *entry, gpointer user_data);
@@ -576,7 +575,7 @@ static void _scale_mdlclick_cb(GtkGestureSingle *gesture, int n_press,
   {
     dt_conf_set_string(CONFIG_PREFIX "resizing_factor", "1");
     g_signal_handlers_block_by_func(spin, _scale_changed, d);
-    gtk_entry_set_text(GTK_ENTRY(spin), "1");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(spin)), "1");
     g_signal_handlers_unblock_by_func(spin, _scale_changed, d);
   }
   else
@@ -594,7 +593,7 @@ static void _widht_mdlclick_cb(GtkGestureSingle *gesture, int n_press,
   {
     dt_conf_set_int(CONFIG_PREFIX "width", 0);
     g_signal_handlers_block_by_func(spin, _width_changed, d);
-    gtk_entry_set_text(GTK_ENTRY(spin), "0");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(spin)), "0");
     g_signal_handlers_unblock_by_func(spin, _width_changed, d);
   }
   else
@@ -612,7 +611,7 @@ static void _height_mdlclick_cb(GtkGestureSingle *gesture, int n_press,
   {
     dt_conf_set_int(CONFIG_PREFIX "height", 0);
     g_signal_handlers_block_by_func(spin, _height_changed, d);
-    gtk_entry_set_text(GTK_ENTRY(spin), "0");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(spin)), "0");
     g_signal_handlers_unblock_by_func(spin, _height_changed, d);
   }
   else
@@ -636,8 +635,8 @@ static void _size_in_px_update(dt_lib_export_t *d)
     gchar size_in_px_txt[120];
     snprintf(size_in_px_txt, sizeof(size_in_px_txt) / sizeof(size_in_px_txt[0]),
              _("which is equal to %s × %s px"),
-             gtk_entry_get_text(GTK_ENTRY(d->width)),
-             gtk_entry_get_text(GTK_ENTRY(d->height)));
+             gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->width))),
+             gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->height))));
     gtk_label_set_text(GTK_LABEL(d->size_in_px), size_in_px_txt);
   }
 }
@@ -653,10 +652,10 @@ void _set_dimensions(dt_lib_export_t *d,
   gchar *max_dpi_char = g_strdup_printf("%u", print_dpi);
 
   DT_ENTER_GUI_UPDATE();
-  gtk_entry_set_text(GTK_ENTRY(d->width), max_width_char);
-  gtk_entry_set_text(GTK_ENTRY(d->height), max_height_char);
-  gtk_entry_set_text(GTK_ENTRY(d->print_dpi), max_dpi_char);
-  gtk_entry_set_text(GTK_ENTRY(d->scale), scale);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->width)), max_width_char);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->height)), max_height_char);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->print_dpi)), max_dpi_char);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->scale)), scale);
   _size_in_px_update(d);
   DT_LEAVE_GUI_UPDATE();
 
@@ -691,10 +690,8 @@ void gui_reset(dt_lib_module_t *self)
   // make sure we don't do anything useless:
   if(!dt_control_running()) return;
   dt_lib_export_t *d = self->data;
-  gtk_entry_set_text(GTK_ENTRY(d->width),
-                     dt_confgen_get(CONFIG_PREFIX "width", DT_DEFAULT));
-  gtk_entry_set_text(GTK_ENTRY(d->height),
-                     dt_confgen_get(CONFIG_PREFIX "height", DT_DEFAULT));
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->width)), dt_confgen_get(CONFIG_PREFIX "width", DT_DEFAULT));
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->height)), dt_confgen_get(CONFIG_PREFIX "height", DT_DEFAULT));
   dt_bauhaus_combobox_set(d->dimensions_type,
                           dt_confgen_get_int(CONFIG_PREFIX "dimensions_type", DT_DEFAULT));
   _size_update_display(d);
@@ -878,10 +875,10 @@ static void _get_max_output_dimension(dt_lib_export_t *d,
 static void _validate_dimensions(dt_lib_export_t *d)
 {
   //reset dimensions to previously stored value if they exceed the maximum
-  uint32_t width = atoi(gtk_entry_get_text(GTK_ENTRY(d->width)));
-  uint32_t height = atoi(gtk_entry_get_text(GTK_ENTRY(d->height)));
-  uint32_t print_dpi = atoi(gtk_entry_get_text(GTK_ENTRY(d->print_dpi)));
-  const gchar *scale = gtk_entry_get_text(GTK_ENTRY(d->scale));
+  uint32_t width = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->width))));
+  uint32_t height = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->height))));
+  uint32_t print_dpi = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->print_dpi))));
+  const gchar *scale = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->scale)));
   if(width > d->max_allowed_width || height > d->max_allowed_height)
   {
     width  = width  > d->max_allowed_width
@@ -1039,7 +1036,7 @@ static void _resync_print_dimensions(dt_lib_export_t *self)
 
   const uint32_t width = dt_conf_get_int(CONFIG_PREFIX "width");
   const uint32_t height = dt_conf_get_int(CONFIG_PREFIX "height");
-  const int dpi = atoi(gtk_entry_get_text(GTK_ENTRY(self->print_dpi)));
+  const int dpi = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(self->print_dpi))));
 
   const float p_width = pixels2print(self, width);
   const float p_height = pixels2print(self, height);
@@ -1047,9 +1044,9 @@ static void _resync_print_dimensions(dt_lib_export_t *self)
   gchar *pwidth = g_strdup_printf("%.2f", p_width);
   gchar *pheight = g_strdup_printf("%.2f", p_height);
   gchar *pdpi = g_strdup_printf("%d", dpi);
-  gtk_entry_set_text(GTK_ENTRY(self->print_width), pwidth);
-  gtk_entry_set_text(GTK_ENTRY(self->print_height), pheight);
-  gtk_entry_set_text(GTK_ENTRY(self->print_dpi), pdpi);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(self->print_width)), pwidth);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(self->print_height)), pheight);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(self->print_dpi)), pdpi);
   g_free(pwidth);
   g_free(pheight);
   g_free(pdpi);
@@ -1060,8 +1057,8 @@ static void _resync_pixel_dimensions(dt_lib_export_t *self)
 {
   DT_TRY_GUI_UPDATE();
 
-  const float p_width = atof(gtk_entry_get_text(GTK_ENTRY(self->print_width)));
-  const float p_height = atof(gtk_entry_get_text(GTK_ENTRY(self->print_height)));
+  const float p_width = atof(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(self->print_width))));
+  const float p_height = atof(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(self->print_height))));
 
   const uint32_t width = print2pixels(self, p_width);
   const uint32_t height = print2pixels(self, p_height);
@@ -1071,8 +1068,8 @@ static void _resync_pixel_dimensions(dt_lib_export_t *self)
 
   gchar *pwidth = g_strdup_printf("%u", width);
   gchar *pheight = g_strdup_printf("%u", height);
-  gtk_entry_set_text(GTK_ENTRY(self->width), pwidth);
-  gtk_entry_set_text(GTK_ENTRY(self->height), pheight);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(self->width)), pwidth);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(self->height)), pheight);
   g_free(pwidth);
   g_free(pheight);
   DT_LEAVE_GUI_UPDATE();
@@ -1083,7 +1080,7 @@ static void _width_changed(GtkEditable *entry, gpointer user_data)
   DT_GUARD_GUI_UPDATE();
 
   const dt_lib_export_t *d = (dt_lib_export_t *)user_data;
-  const uint32_t width = atoi(gtk_entry_get_text(GTK_ENTRY(d->width)));
+  const uint32_t width = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->width))));
   dt_conf_set_int(CONFIG_PREFIX "width", width);
 }
 
@@ -1093,12 +1090,12 @@ static void _print_width_changed(GtkEditable *entry, gpointer user_data)
 
   dt_lib_export_t *d = (dt_lib_export_t *)user_data;
 
-  const float p_width = atof(gtk_entry_get_text(GTK_ENTRY(d->print_width)));
+  const float p_width = atof(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->print_width))));
   const uint32_t width = print2pixels(d, p_width);
   dt_conf_set_int(CONFIG_PREFIX "width", width);
 
   gchar *pwidth = g_strdup_printf("%u", width);
-  gtk_entry_set_text(GTK_ENTRY(d->width), pwidth);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->width)), pwidth);
   g_free(pwidth);
   _size_in_px_update(d);
   DT_LEAVE_GUI_UPDATE();
@@ -1109,7 +1106,7 @@ static void _height_changed(GtkEditable *entry, gpointer user_data)
   DT_GUARD_GUI_UPDATE();
 
   const dt_lib_export_t *d = (dt_lib_export_t *)user_data;
-  const uint32_t height = atoi(gtk_entry_get_text(GTK_ENTRY(d->height)));
+  const uint32_t height = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->height))));
   dt_conf_set_int(CONFIG_PREFIX "height", height);
 }
 
@@ -1119,12 +1116,12 @@ static void _print_height_changed(GtkEditable *entry, gpointer user_data)
 
   dt_lib_export_t *d = (dt_lib_export_t *)user_data;
 
-  const float p_height = atof(gtk_entry_get_text(GTK_ENTRY(d->print_height)));
+  const float p_height = atof(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->print_height))));
   const uint32_t height = print2pixels(d, p_height);
   dt_conf_set_int(CONFIG_PREFIX "height", height);
 
   gchar *pheight = g_strdup_printf("%u", height);
-  gtk_entry_set_text(GTK_ENTRY(d->height), pheight);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->height)), pheight);
   g_free(pheight);
   _size_in_px_update(d);
   DT_LEAVE_GUI_UPDATE();
@@ -1135,7 +1132,7 @@ static void _print_dpi_changed(GtkWidget *widget, gpointer user_data)
   DT_GUARD_GUI_UPDATE();
 
   dt_lib_export_t *d = (dt_lib_export_t *)user_data;
-  const int dpi = atoi(gtk_entry_get_text(GTK_ENTRY(d->print_dpi)));
+  const int dpi = atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->print_dpi))));
 
   dt_conf_set_int(CONFIG_PREFIX "print_dpi", dpi);
   dt_conf_set_int("metadata/resolution", dpi);
@@ -1179,6 +1176,7 @@ static void _update_style_label(dt_lib_export_t *d, const char *name)
   dt_conf_set_string(CONFIG_PREFIX "style", d->style_name);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _update_style(const dt_stylemenu_data_t *menu_data)
 {
   _update_style_label(menu_data->user_data,menu_data->name);
@@ -1204,9 +1202,11 @@ static void _apply_style_button_callback(GtkGestureSingle *gesture,
     //??? dt_shortcut_copy_lua(NULL, name);
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _style_popupmenu_callback(GtkWidget *w, gpointer user_data)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   /* if we got any styles, lets popup menu for selection */
   GtkMenuShell *menu = dtgtk_build_style_menu_hierarchy(TRUE,
                                                         _apply_style_activate_callback,
@@ -1218,6 +1218,10 @@ static void _style_popupmenu_callback(GtkWidget *w, gpointer user_data)
   }
   else
     dt_control_log(_("no styles have been created yet"));
+#else
+  // TODO P2: GtkMenu->GtkPopoverMenu migration
+  dt_control_log(_("no styles have been created yet"));
+#endif
 }
 
 int position(const dt_lib_module_t *self)
@@ -1264,12 +1268,13 @@ static void _on_storage_list_changed(gpointer instance,
     dt_bauhaus_combobox_add(d->storage, module->name(module));
     if(module->widget)
     {
-      gtk_container_add(GTK_CONTAINER(d->storage_extra_container), module->widget);
+      gtk_stack_add_named(GTK_STACK(d->storage_extra_container), module->widget, NULL);
     }
   }
   dt_bauhaus_combobox_set(d->storage, dt_imageio_get_index_of_storage(storage));
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _menuitem_preferences(GtkMenuItem *menuitem, dt_lib_module_t *self)
 {
   dt_lib_export_t *d = self->data;
@@ -1279,6 +1284,7 @@ static void _menuitem_preferences(GtkMenuItem *menuitem, dt_lib_module_t *self)
   d->metadata_export =
     dt_lib_export_metadata_configuration_dialog(d->metadata_export, ondisk);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static gboolean _batch_preset_active(dt_lib_module_t *self)
 {
@@ -1420,10 +1426,12 @@ static void _export_presets_changed_callback(gpointer instance, gpointer module,
 
 void set_preferences(void *menu, dt_lib_module_t *self)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
   g_signal_connect(G_OBJECT(mi), "activate",
                    G_CALLBACK(_menuitem_preferences), self);
   gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+#endif
 }
 
 void gui_init(dt_lib_module_t *self)
@@ -1439,7 +1447,8 @@ void gui_init(dt_lib_module_t *self)
 
   // add all storage widgets to the stack widget
   d->storage_extra_container = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(d->storage_extra_container),FALSE);
+  gtk_stack_set_hhomogeneous(GTK_STACK(d->storage_extra_container), FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(d->storage_extra_container), FALSE);
 
   for(const GList *it = darktable.imageio->plugins_storage;
       it;
@@ -1449,7 +1458,7 @@ void gui_init(dt_lib_module_t *self)
     dt_bauhaus_combobox_add(d->storage, module->name(module));
     if(module->widget)
     {
-      gtk_container_add(GTK_CONTAINER(d->storage_extra_container), module->widget);
+      gtk_stack_add_named(GTK_STACK(d->storage_extra_container), module->widget, NULL);
     }
   }
 
@@ -1472,13 +1481,14 @@ void gui_init(dt_lib_module_t *self)
 
   // add all format widgets to the stack widget
   d->format_extra_container = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(d->format_extra_container),FALSE);
+  gtk_stack_set_hhomogeneous(GTK_STACK(d->format_extra_container), FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(d->format_extra_container), FALSE);
   for(const GList *it = darktable.imageio->plugins_format; it; it = g_list_next(it))
   {
     const dt_imageio_module_format_t *module = it->data;
     if(module->widget)
     {
-      gtk_container_add(GTK_CONTAINER(d->format_extra_container), module->widget);
+      gtk_stack_add_named(GTK_STACK(d->format_extra_container), module->widget, NULL);
     }
   }
 
@@ -1524,30 +1534,34 @@ void gui_init(dt_lib_module_t *self)
   d->print_size = gtk_flow_box_new();
   gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(d->print_size), 5);
   gtk_flow_box_set_column_spacing (GTK_FLOW_BOX(d->print_size), 3);
-  gtk_container_add(GTK_CONTAINER(d->print_size), d->print_width);
-  gtk_container_add(GTK_CONTAINER(d->print_size), gtk_label_new(_("x")));
-  gtk_container_add(GTK_CONTAINER(d->print_size), d->print_height);
+  gtk_flow_box_append(GTK_FLOW_BOX(d->print_size), d->print_width);
+  gtk_flow_box_append(GTK_FLOW_BOX(d->print_size), gtk_label_new(_("x")));
+  gtk_flow_box_append(GTK_FLOW_BOX(d->print_size), d->print_height);
   d->unit_label = gtk_label_new(_("cm"));
-  gtk_container_add(GTK_CONTAINER(d->print_size), d->unit_label);
+  gtk_flow_box_append(GTK_FLOW_BOX(d->print_size), d->unit_label);
   GtkBox *dpi_box = GTK_BOX(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3));
-  gtk_box_pack_start(dpi_box, gtk_label_new(_("@")), FALSE, FALSE, 0);
-  gtk_box_pack_start(dpi_box, d->print_dpi, TRUE, TRUE, 0);
-  gtk_box_pack_start(dpi_box, gtk_label_new(_("dpi")), FALSE, FALSE, 0);
-  gtk_container_add(GTK_CONTAINER(d->print_size), GTK_WIDGET(dpi_box));
-  gtk_container_foreach(GTK_CONTAINER(d->print_size),
-                        (GtkCallback)gtk_widget_set_can_focus, GINT_TO_POINTER(FALSE));
+  gtk_box_append(dpi_box, gtk_label_new(_("@")));
+  gtk_box_append(dpi_box, d->print_dpi);
+  gtk_widget_set_hexpand(d->print_dpi, TRUE);
+  gtk_box_append(dpi_box, gtk_label_new(_("dpi")));
+  gtk_flow_box_append(GTK_FLOW_BOX(d->print_size), GTK_WIDGET(dpi_box));
+  for(GtkWidget *child = gtk_widget_get_first_child(d->print_size);
+      child; child = gtk_widget_get_next_sibling(child))
+    gtk_widget_set_can_focus(child, FALSE);
 
   d->px_size = gtk_flow_box_new();
   gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(d->px_size), 3);
   gtk_flow_box_set_column_spacing (GTK_FLOW_BOX(d->px_size), 3);
-  gtk_container_add(GTK_CONTAINER(d->px_size), d->width);
-  gtk_container_add(GTK_CONTAINER(d->px_size), gtk_label_new(_("x")));
+  gtk_flow_box_append(GTK_FLOW_BOX(d->px_size), d->width);
+  gtk_flow_box_append(GTK_FLOW_BOX(d->px_size), gtk_label_new(_("x")));
   GtkBox *px_box = GTK_BOX(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3));
-  gtk_box_pack_start(px_box, d->height, TRUE, TRUE, 0);
-  gtk_box_pack_start(px_box, gtk_label_new(_("px")), FALSE, FALSE, 0);
-  gtk_container_add(GTK_CONTAINER(d->px_size), GTK_WIDGET(px_box));
-  gtk_container_foreach(GTK_CONTAINER(d->px_size),
-                        (GtkCallback)gtk_widget_set_can_focus, GINT_TO_POINTER(FALSE));
+  gtk_box_append(px_box, d->height);
+  gtk_widget_set_hexpand(d->height, TRUE);
+  gtk_box_append(px_box, gtk_label_new(_("px")));
+  gtk_flow_box_append(GTK_FLOW_BOX(d->px_size), GTK_WIDGET(px_box));
+  for(GtkWidget *child = gtk_widget_get_first_child(d->px_size);
+      child; child = gtk_widget_get_next_sibling(child))
+    gtk_widget_set_can_focus(child, FALSE);
 
   d->scale = dt_action_entry_new
     (DT_ACTION(self), N_("scale"),
@@ -1657,13 +1671,14 @@ void gui_init(dt_lib_module_t *self)
   GtkBox *style_box = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
   gtk_widget_set_tooltip_text(GTK_WIDGET(style_box), _("temporary style to use while exporting"));
   GtkWidget *styles_label = gtk_label_new(_("style"));
-  gtk_box_pack_start(style_box, styles_label, FALSE, FALSE, 0);
+  gtk_box_append(style_box, styles_label);
   GtkWidget *current_style = gtk_label_new("");
   gtk_widget_set_halign(current_style,GTK_ALIGN_END);
   gtk_label_set_justify(GTK_LABEL(current_style), GTK_JUSTIFY_RIGHT);
   gtk_label_set_ellipsize(GTK_LABEL(current_style), PANGO_ELLIPSIZE_MIDDLE);
-  gtk_box_pack_start(style_box, current_style, TRUE, TRUE, 0);
-  gtk_box_pack_start(style_box, styles_button, FALSE, FALSE, 0);
+  gtk_widget_set_hexpand(current_style, TRUE);
+  gtk_box_append(style_box, current_style);
+  gtk_box_append(style_box, styles_button);
 
   d->style = GTK_WIDGET(current_style);
   d->style_name = NULL;
@@ -1745,9 +1760,9 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_no_show_all(self->widget, TRUE);
 
   const char* setting = dt_conf_get_string_const(CONFIG_PREFIX "width");
-  gtk_entry_set_text(GTK_ENTRY(d->width), setting);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->width)), setting);
   setting = dt_conf_get_string_const(CONFIG_PREFIX "height");
-  gtk_entry_set_text(GTK_ENTRY(d->height), setting);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->height)), setting);
 
   _size_update_display(d);
 
@@ -1812,14 +1827,14 @@ void gui_cleanup(dt_lib_module_t *self)
   {
     dt_imageio_module_storage_t *module = it->data;
     if(module->widget)
-      gtk_container_remove(GTK_CONTAINER(d->storage_extra_container), module->widget);
+      gtk_stack_remove(GTK_STACK(d->storage_extra_container), module->widget);
   }
 
   for(const GList *it = darktable.imageio->plugins_format; it; it = g_list_next(it))
   {
     dt_imageio_module_format_t *module = it->data;
     if(module->widget)
-      gtk_container_remove(GTK_CONTAINER(d->format_extra_container), module->widget);
+      gtk_stack_remove(GTK_STACK(d->format_extra_container), module->widget);
   }
 
   g_free(d->style_name);

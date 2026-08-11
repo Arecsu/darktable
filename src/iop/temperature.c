@@ -1968,10 +1968,10 @@ static void _gui_sliders_update(dt_iop_module_t *self)
     dt_bauhaus_widget_set_label(g->scale_y, NULL, N_("yellow"));
     gtk_widget_set_tooltip_text(g->scale_y, _("yellow channel coefficient"));
 
-    gtk_box_reorder_child(GTK_BOX(g->cs.container), g->scale_b, 0);
-    gtk_box_reorder_child(GTK_BOX(g->cs.container), g->scale_y, 1);
-    gtk_box_reorder_child(GTK_BOX(g->cs.container), g->scale_g, 2);
-    gtk_box_reorder_child(GTK_BOX(g->cs.container), g->scale_r, 3);
+    gtk_box_reorder_child_after(GTK_BOX(g->cs.container), g->scale_b, NULL);
+    gtk_box_reorder_child_after(GTK_BOX(g->cs.container), g->scale_y, g->scale_b);
+    gtk_box_reorder_child_after(GTK_BOX(g->cs.container), g->scale_g, g->scale_y);
+    gtk_box_reorder_child_after(GTK_BOX(g->cs.container), g->scale_r, g->scale_g);
   }
   else
   {
@@ -1984,10 +1984,10 @@ static void _gui_sliders_update(dt_iop_module_t *self)
     dt_bauhaus_widget_set_label(g->scale_y, NULL, N_("emerald"));
     gtk_widget_set_tooltip_text(g->scale_y, _("emerald channel coefficient"));
 
-    gtk_box_reorder_child(GTK_BOX(g->cs.container), g->scale_r, 0);
-    gtk_box_reorder_child(GTK_BOX(g->cs.container), g->scale_g, 1);
-    gtk_box_reorder_child(GTK_BOX(g->cs.container), g->scale_b, 2);
-    gtk_box_reorder_child(GTK_BOX(g->cs.container), g->scale_y, 3);
+    gtk_box_reorder_child_after(GTK_BOX(g->cs.container), g->scale_r, NULL);
+    gtk_box_reorder_child_after(GTK_BOX(g->cs.container), g->scale_g, g->scale_r);
+    gtk_box_reorder_child_after(GTK_BOX(g->cs.container), g->scale_b, g->scale_g);
+    gtk_box_reorder_child_after(GTK_BOX(g->cs.container), g->scale_y, g->scale_b);
   }
 
   gtk_widget_set_visible(GTK_WIDGET(g->scale_y), (img->flags & DT_IMAGE_4BAYER));
@@ -2124,10 +2124,10 @@ void gui_init(dt_iop_module_t *self)
   for_four_channels(k)
     g->mod_coeff[k] = 1.0;
 
-  GtkWidget *temp_label_box = gtk_event_box_new();
+  GtkWidget *temp_label_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   g->temp_label = dt_ui_section_label_new(C_("section", "scene illuminant temp"));
   gtk_widget_set_tooltip_text(g->temp_label, _("click to cycle color mode on sliders"));
-  gtk_container_add(GTK_CONTAINER(temp_label_box), g->temp_label);
+  gtk_box_append(GTK_BOX(temp_label_box), g->temp_label);
 
   dt_gui_connect_click(temp_label_box, NULL, temp_label_click, self);
 
@@ -2188,7 +2188,7 @@ void gui_init(dt_iop_module_t *self)
 
   // start building top level widget
   self->widget = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(self->widget), FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(self->widget), FALSE);
 
   GtkWidget *label_disabled = gtk_label_new(_("white balance disabled for camera"));
   gtk_widget_set_halign(label_disabled, GTK_ALIGN_START);

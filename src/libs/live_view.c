@@ -311,13 +311,15 @@ void gui_init(dt_lib_module_t *self)
   // Setup gui
   self->widget = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-  gtk_box_pack_start(GTK_BOX(self->widget), box, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), box);
+  gtk_widget_set_vexpand(box, TRUE);
 
   GtkWidget *button;
 #define NEW_BUTTON(type, paint, direction, callback, data, action)           \
   button = dtgtk_##type##button_new(paint, direction, NULL);                 \
   gtk_widget_set_tooltip_text(button, action);                               \
-  gtk_box_pack_start(GTK_BOX(box), button, TRUE, TRUE, 0);                   \
+  gtk_box_append(GTK_BOX(box), button);                                      \
+  gtk_widget_set_hexpand(button, TRUE);                                      \
   g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(callback), data); \
   dt_action_define(DT_ACTION(self), NULL, action, button, *(#type)?&dt_action_def_toggle:&dt_action_def_button);
 
@@ -339,7 +341,8 @@ void gui_init(dt_lib_module_t *self)
 
   // focus buttons
   box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-  gtk_box_pack_start(GTK_BOX(self->widget), box, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), box);
+  gtk_widget_set_vexpand(box, TRUE);
 
   lib->focus_in_big = NEW_BUTTON(,dtgtk_cairo_paint_solid_triangle,
                                  CPF_DIRECTION_LEFT,
@@ -372,7 +375,8 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_tooltip_text(lib->overlay, _("overlay another image over the live view"));
   g_signal_connect(G_OBJECT(lib->overlay), "value-changed",
                    G_CALLBACK(overlay_changed), lib);
-  gtk_box_pack_start(GTK_BOX(self->widget), lib->overlay, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), lib->overlay);
+  gtk_widget_set_vexpand(lib->overlay, TRUE);
 
   lib->overlay_id_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   GtkWidget *label = gtk_label_new(_("image id"));
@@ -385,9 +389,12 @@ void gui_init(dt_lib_module_t *self)
                    G_CALLBACK(_overlay_id_changed), lib);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(lib->overlay_id),
                             dt_conf_get_int("plugins/lighttable/live_view/overlay_imgid"));
-  gtk_box_pack_start(GTK_BOX(lib->overlay_id_box), label, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(lib->overlay_id_box), lib->overlay_id, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(self->widget), lib->overlay_id_box, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(lib->overlay_id_box), label);
+  gtk_widget_set_hexpand(label, TRUE);
+  gtk_box_append(GTK_BOX(lib->overlay_id_box), lib->overlay_id);
+  gtk_widget_set_hexpand(lib->overlay_id, TRUE);
+  gtk_box_append(GTK_BOX(self->widget), lib->overlay_id_box);
+  gtk_widget_set_vexpand(lib->overlay_id_box, TRUE);
   gtk_widget_show(lib->overlay_id);
   gtk_widget_show(label);
 
@@ -417,7 +424,8 @@ void gui_init(dt_lib_module_t *self)
                           dt_conf_get_int("plugins/lighttable/live_view/overlay_mode"));
   g_signal_connect(G_OBJECT(lib->overlay_mode), "value-changed",
                    G_CALLBACK(_overlay_mode_changed), lib);
-  gtk_box_pack_start(GTK_BOX(self->widget), lib->overlay_mode, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), lib->overlay_mode);
+  gtk_widget_set_vexpand(lib->overlay_mode, TRUE);
 
   lib->overlay_splitline = dt_bauhaus_combobox_new_action(DT_ACTION(self));
   dt_bauhaus_widget_set_label(lib->overlay_splitline, NULL, N_("split line"));
@@ -429,7 +437,8 @@ void gui_init(dt_lib_module_t *self)
   g_signal_connect(G_OBJECT(lib->overlay_splitline), "value-changed",
                    G_CALLBACK(_overlay_splitline_changed),
                    lib);
-  gtk_box_pack_start(GTK_BOX(self->widget), lib->overlay_splitline, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), lib->overlay_splitline);
+  gtk_widget_set_vexpand(lib->overlay_splitline, TRUE);
 
   gtk_widget_set_visible(GTK_WIDGET(lib->overlay_mode), FALSE);
   gtk_widget_set_visible(GTK_WIDGET(lib->overlay_id_box), FALSE);

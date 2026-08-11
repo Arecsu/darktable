@@ -42,7 +42,7 @@
 static void _list_remove_thumb(gpointer user_data)
 {
   dt_thumbnail_t *thumb = (dt_thumbnail_t *)user_data;
-  gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(thumb->w_main)), thumb->w_main);
+  gtk_widget_unparent(thumb->w_main);
   dt_thumbnail_destroy(thumb);
 }
 
@@ -222,9 +222,15 @@ static dt_thumbnail_t *_thumb_get_under_mouse(dt_thumbtable_t *table)
 
   int x = -1;
   int y = -1;
-  gdk_window_get_origin(gtk_widget_get_window(table->widget), &x, &y);
-  x = table->last_x - x;
-  y = table->last_y - y;
+  // GTK4: last_x/last_y are surface-relative (dt_gui_get_event_coords);
+  // subtract the widget's origin in surface coords to get widget coords,
+  // mirroring the GTK3 window-origin math.
+  graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+  if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+  {
+    x = round(table->last_x - origin.x);
+    y = round(table->last_y - origin.y);
+  }
 
   return _thumb_get_at_pos(table, x, y);
 }
@@ -469,7 +475,7 @@ static gboolean _thumbtable_update_scrollbars(dt_thumbtable_t *table)
   // if the scrollbar is currently visible and we want to hide it we
   // first ensure that with the width without the scrollbar, we won't
   // need a scrollbar
-  const int bar = gtk_widget_get_allocated_width(darktable.gui->scrollbars.vscrollbar);
+  const int bar = gtk_widget_get_width(darktable.gui->scrollbars.vscrollbar);
   if(gtk_widget_get_visible(darktable.gui->scrollbars.vscrollbar)
      && nblines <= table->rows - 1)
   {
@@ -506,7 +512,7 @@ static int _thumbs_remove_unneeded(dt_thumbtable_t *table,
   for(const GList *l = *th_invalid; l; l = g_list_next(l))
   {
     dt_thumbnail_t *th = l->data;
-    gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(th->w_main)), th->w_main);
+    gtk_widget_unparent(th->w_main);
     dt_thumbnail_destroy(th);
     changed++;
   }
@@ -553,7 +559,7 @@ static void _thumb_move_or_create(dt_thumbtable_t *table,
                                 gtk_widget_get_margin_start(first->w_image_box));
     gtk_widget_set_margin_top(thumb->w_image_box,
                               gtk_widget_get_margin_top(first->w_image_box));
-    gtk_layout_put(GTK_LAYOUT(table->widget), thumb->w_main, posx, posy);
+    gtk_fixed_put(GTK_FIXED(table->widget), thumb->w_main, posx, posy);
   }
   else
   {
@@ -566,7 +572,7 @@ static void _thumb_move_or_create(dt_thumbtable_t *table,
     dt_thumbnail_reload_infos(thumb);
     dt_thumbnail_surface_destroy(thumb);
     thumb->img_surf_preview = FALSE;
-    gtk_layout_move(GTK_LAYOUT(table->widget), thumb->w_main, thumb->x, thumb->y);
+    gtk_fixed_move(GTK_FIXED(table->widget), thumb->w_main, thumb->x, thumb->y);
     *th_invalid = g_list_delete_link(*th_invalid, *th_invalid);
     // insert the thumb at the right place in the table->list
     if(top)
@@ -792,7 +798,7 @@ static gboolean _move(dt_thumbtable_t *table,
     }
     else
     {
-      gtk_layout_move(GTK_LAYOUT(table->widget), th->w_main, th->x, th->y);
+      gtk_fixed_move(GTK_FIXED(table->widget), th->w_main, th->x, th->y);
       l = g_list_next(l);
     }
   }
@@ -875,9 +881,14 @@ static void _zoomable_zoom(dt_thumbtable_t *table,
   if(table->mouse_inside)
   {
     // if the mouse is inside the table, let's use its position
-    gdk_window_get_origin(gtk_widget_get_window(table->widget), &x, &y);
-    x = table->last_x - x;
-    y = table->last_y - y;
+    // GTK4: last_x/last_y are surface-relative; subtract the widget's origin
+    // in surface coords to get widget coords (GTK3 used the window origin).
+    graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+    if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+    {
+      x = table->last_x - origin.x;
+      y = table->last_y - origin.y;
+    }
   }
   else
   {
@@ -917,7 +928,7 @@ static void _zoomable_zoom(dt_thumbtable_t *table,
 
     // we move the thumbnail to its new position.
     // in some case the thumbnail may be out of sight. This will be handled later.
-    gtk_layout_move(GTK_LAYOUT(table->widget), th->w_main, th->x, th->y);
+    gtk_fixed_move(GTK_FIXED(table->widget), th->w_main, th->x, th->y);
     l = g_list_next(l);
     dt_thumbnail_resize(th, new_size, new_size, FALSE, IMG_TO_FIT);
   }
@@ -991,9 +1002,14 @@ static void _filemanager_zoom(dt_thumbtable_t *table,
   if(table->mouse_inside)
   {
     // if the mouse is inside the table, let's use its position
-    gdk_window_get_origin(gtk_widget_get_window(table->widget), &x, &y);
-    x = table->last_x - x;
-    y = table->last_y - y;
+    // GTK4: last_x/last_y are surface-relative; subtract the widget's origin
+    // in surface coords to get widget coords (GTK3 used the window origin).
+    graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+    if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+    {
+      x = table->last_x - origin.x;
+      y = table->last_y - origin.y;
+    }
     thumb = _thumb_get_at_pos(table, x, y);
   }
 
@@ -1125,7 +1141,7 @@ static void _event_scroll(GtkEventControllerScroll *controller,
 {
   GdkEvent *event = dt_gui_get_current_event(GTK_EVENT_CONTROLLER(controller));
   if(!event) return;
-  const GdkEventScroll *e = (const GdkEventScroll *)event;
+  const GdkEvent *e = event; // GdkEventScroll union type is gone in GTK4
   const GdkModifierType state = dt_gdk_event_get_state(event);
 
   // file manager can either scroll fractionally and smoothly for precision
@@ -1265,13 +1281,14 @@ static void _line_to_module(cairo_t *cr,
 
   GtkAllocation allocation;
   gtk_widget_get_allocation(lib->expander, &allocation);
+  double tx = allocation.x, ty = allocation.y;
   gtk_widget_translate_coordinates(gtk_widget_get_parent(lib->expander),
                                    dt_ui_center(darktable.gui->ui),
                                    allocation.x, allocation.y,
-                                   &allocation.x, &allocation.y);
+                                   &tx, &ty);
   _line_to(cr, ink, offx, offy, n, h,
-           allocation.x > 0 ? width : 0,
-           allocation.y + allocation.height / 2);
+           tx > 0 ? width : 0,
+           ty + allocation.height / 2);
 }
 
 
@@ -1339,7 +1356,7 @@ static void _lighttable_expose_empty(cairo_t *cr,
     pango_layout_line_get_pixel_extents(line, NULL, &ink);
 
     const int button_width =
-      gtk_widget_get_allocated_width(darktable.gui->focus_peaking_button);
+      gtk_widget_get_width(darktable.gui->focus_peaking_button);
 
     cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(3));
     cairo_new_path(cr);
@@ -1372,13 +1389,13 @@ static gboolean _event_draw(GtkWidget *widget,
                             cairo_t *cr,
                             dt_thumbtable_t *table)
 {
-  if(!GTK_IS_CONTAINER(gtk_widget_get_parent(widget)))
+  if(!gtk_widget_get_parent(widget))
     return TRUE;
 
   // we render the background (can be visible if before first image / after last image)
   GtkStyleContext *context = gtk_widget_get_style_context(widget);
-  gtk_render_background(context, cr, 0, 0, gtk_widget_get_allocated_width(widget),
-                        gtk_widget_get_allocated_height(widget));
+  gtk_render_background(context, cr, 0, 0, gtk_widget_get_width(widget),
+                        gtk_widget_get_height(widget));
 
   // but we don't really want to draw something, this is just to know
   // when the widget is really ready
@@ -2621,7 +2638,7 @@ static void _thumbtable_init_accels();
 dt_thumbtable_t *dt_thumbtable_new()
 {
   dt_thumbtable_t *table = calloc(1, sizeof(dt_thumbtable_t));
-  table->widget = gtk_layout_new(NULL, NULL);
+  table->widget = gtk_fixed_new();
   dt_gui_add_help_link(table->widget, "lighttable_filemanager");
 
   // get thumb generation pref for reference in case of change
@@ -2884,7 +2901,7 @@ void dt_thumbtable_full_redraw(dt_thumbtable_t *table,
         {
           thumb->x = posx;
           thumb->y = posy;
-          gtk_layout_move(GTK_LAYOUT(table->widget), thumb->w_main, posx, posy);
+          gtk_fixed_move(GTK_FIXED(table->widget), thumb->w_main, posx, posy);
         }
         dt_thumbnail_resize(thumb, table->thumb_size,
                             table->thumb_size, FALSE, IMG_TO_FIT);
@@ -2915,7 +2932,7 @@ void dt_thumbtable_full_redraw(dt_thumbtable_t *table,
         table->list = g_list_prepend(table->list, thumb);
         gtk_widget_set_margin_start(thumb->w_image_box, old_margin_start);
         gtk_widget_set_margin_top(thumb->w_image_box, old_margin_top);
-        gtk_layout_put(GTK_LAYOUT(table->widget), thumb->w_main, posx, posy);
+        gtk_fixed_put(GTK_FIXED(table->widget), thumb->w_main, posx, posy);
         nbnew++;
       }
       _pos_get_next(table, &posx, &posy);
@@ -2977,12 +2994,12 @@ void dt_thumbtable_set_parent(dt_thumbtable_t *table,
                               const dt_thumbtable_mode_t mode)
 {
   GtkWidget *parent = gtk_widget_get_parent(table->widget);
-  if(!GTK_IS_CONTAINER(new_parent))
+  if(!new_parent)
   {
     if(parent)
     {
       // we just want to remove thumbtable from its parent
-      gtk_container_remove(GTK_CONTAINER(parent), table->widget);
+      gtk_widget_unparent(table->widget);
     }
     return;
   }
@@ -2990,7 +3007,7 @@ void dt_thumbtable_set_parent(dt_thumbtable_t *table,
   // if table already has parent, then we remove it
   if(parent && parent != new_parent)
   {
-    gtk_container_remove(GTK_CONTAINER(parent), table->widget);
+    gtk_widget_unparent(table->widget);
   }
 
   // mode change
@@ -3060,16 +3077,27 @@ void dt_thumbtable_set_parent(dt_thumbtable_t *table,
       // be sure that log msg is always placed on top
       if(new_parent == dt_ui_center_base(darktable.gui->ui))
       {
+#if GTK_CHECK_VERSION(4, 0, 0)
+        // gtk_overlay_reorder_overlay is removed in GTK4; children are
+        // painted in add order (last on top), so re-adding the log and toast
+        // messages restores them above the just-added table overlay
+        GtkWidget *overlay = GTK_WIDGET(new_parent);
+        gtk_widget_unparent(dt_ui_log_msg(darktable.gui->ui));
+        gtk_overlay_add_overlay(GTK_OVERLAY(overlay), dt_ui_log_msg(darktable.gui->ui));
+        gtk_widget_unparent(dt_ui_toast_msg(darktable.gui->ui));
+        gtk_overlay_add_overlay(GTK_OVERLAY(overlay), dt_ui_toast_msg(darktable.gui->ui));
+#else
         gtk_overlay_reorder_overlay
           (GTK_OVERLAY(dt_ui_center_base(darktable.gui->ui)),
            gtk_widget_get_parent(dt_ui_log_msg(darktable.gui->ui)), -1);
         gtk_overlay_reorder_overlay
           (GTK_OVERLAY(dt_ui_center_base(darktable.gui->ui)),
            gtk_widget_get_parent(dt_ui_toast_msg(darktable.gui->ui)), -1);
+#endif
       }
     }
     else
-      gtk_container_add(GTK_CONTAINER(new_parent), table->widget);
+      gtk_box_append(GTK_BOX(new_parent), table->widget);
   }
   table->code_scrolling = FALSE;
 }

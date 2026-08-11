@@ -20,6 +20,14 @@
 
 G_BEGIN_DECLS
 
+/* GtkMenu/GtkMenuItem/GtkMenuShell are removed from GTK4's installed
+ * headers.  The style menu is a GtkMenu hierarchy used by export.c,
+ * print_settings.c and darkroom.c -- part of the GtkMenu->GtkPopoverMenu
+ * migration (TODO P2); guarded GTK3-only like the other GtkMenu
+ * subsystems.  The callers' popup callbacks are GTK3-guarded as well and
+ * degrade to the "no styles" log path on GTK4. */
+#if !GTK_CHECK_VERSION(4, 0, 0)
+
 typedef struct {
   gchar *name;
   gpointer user_data;
@@ -37,6 +45,8 @@ GtkMenuShell *dtgtk_build_style_menu_hierarchy(gboolean allow_none,
                                                dtgtk_menuitem_activate_callback_fn *activate_callback,
                                                dtgtk_menuitem_button_callback_fn *button_callback,
                                                gpointer user_data);
+
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 G_END_DECLS
 

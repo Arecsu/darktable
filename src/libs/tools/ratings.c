@@ -102,7 +102,8 @@ void gui_init(dt_lib_module_t *self)
   dt_gui_connect_click(drawing, _lib_ratings_button_press_callback, _lib_ratings_button_release_callback, self);
   dt_gui_connect_motion(drawing, _lib_ratings_motion_notify_callback, NULL, _lib_ratings_leave_notify_callback, self);
 
-  gtk_box_pack_start(GTK_BOX(self->widget), drawing, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), drawing);
+  gtk_widget_set_hexpand(drawing, TRUE);
 
   /* set size of navigation draw area */
   gtk_widget_set_name(self->widget, "lib-rating-stars");

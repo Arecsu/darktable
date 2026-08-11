@@ -1369,6 +1369,9 @@ static void _signal_module_moved(gpointer instance, dt_iop_module_t *self)
   dt_dev_reprocess_all(self->dev);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
+// TODO P3: GTK3 drag & drop (gtk_drag_dest_set + GdkDragContext signals) is
+// removed from GTK4; rework as GdkDropTarget (see migrating-3to4.md).
 static void _drag_and_drop_received(GtkWidget *widget,
                                     GdkDragContext *context,
                                     gint x,
@@ -1432,7 +1435,9 @@ static void _drag_and_drop_received(GtkWidget *widget,
   }
   gtk_drag_finish(context, success, FALSE, time);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _on_drag_motion(GtkWidget *widget,
                                 GdkDragContext *dc,
                                 gint x,
@@ -1457,6 +1462,7 @@ static void _on_drag_leave(GtkWidget *widget,
   g->drop_inside = FALSE;
   gtk_widget_queue_draw(widget);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void gui_init(dt_iop_module_t *self)
 {
@@ -1475,6 +1481,7 @@ void gui_init(dt_iop_module_t *self)
 
   gtk_widget_grab_focus(GTK_WIDGET(g->area));
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_drag_dest_set
     (GTK_WIDGET(g->area),  /* widget that will accept a drop */
      GTK_DEST_DEFAULT_ALL, /* default actions for dest on DnD */
@@ -1489,6 +1496,7 @@ void gui_init(dt_iop_module_t *self)
                    "drag-motion", G_CALLBACK(_on_drag_motion), self);
   g_signal_connect(GTK_WIDGET(g->area),
                    "drag-leave", G_CALLBACK(_on_drag_leave), self);
+#endif
 
   self->widget = dt_gui_vbox(grid);
 

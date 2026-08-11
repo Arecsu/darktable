@@ -335,7 +335,7 @@ gboolean dt_view_manager_switch_by_view(dt_view_manager_t *vm,
           so remove the child before that
           */
         if(plugin->widget)
-          gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(plugin->widget)), plugin->widget);
+          gtk_widget_unparent(plugin->widget);
         if(plugin->expander)
           gtk_widget_destroy(plugin->expander);
       }
@@ -426,7 +426,10 @@ gboolean dt_view_manager_switch_by_view(dt_view_manager_t *vm,
     if(!strcmp(plugin->plugin_name,"module_toolbox")
       || !strcmp(plugin->plugin_name,"view_toolbox"))
     {
-      gtk_container_foreach(GTK_CONTAINER(w), _show_hide_toolbox_widget, GINT_TO_POINTER(view_type));
+      for(GtkWidget *child = gtk_widget_get_first_child(w);
+          child;
+          child = gtk_widget_get_next_sibling(child))
+        _show_hide_toolbox_widget(child, GINT_TO_POINTER(view_type));
       if(view_type == DT_VIEW_LIGHTTABLE)
         dt_gui_add_help_link(w, "lighttable_mode");
       if(view_type == DT_VIEW_DARKROOM)
@@ -1607,7 +1610,7 @@ static void _accels_window_sticky(GtkWidget *widget,
   if(!vm->accels_window.window) return;
 
   // creating new window
-  GtkWindow *win = GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
+  GtkWindow *win = GTK_WINDOW(gtk_window_new());
   dt_gui_add_class(GTK_WIDGET(win), "dt_accels_window");
   gtk_window_set_title(win, _("darktable - accels window"));
   GtkAllocation alloc;
@@ -1677,7 +1680,8 @@ void dt_view_accels_show(dt_view_manager_t *vm)
   gtk_orientable_set_orientation(GTK_ORIENTABLE(vm->accels_window.flow_box),
                                  GTK_ORIENTATION_HORIZONTAL);
 
-  gtk_box_pack_start(GTK_BOX(hb), vm->accels_window.flow_box, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), vm->accels_window.flow_box);
+  gtk_widget_set_hexpand(vm->accels_window.flow_box, TRUE);
 
   GtkWidget *vb = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   vm->accels_window.sticky_btn = dtgtk_button_new_full(dtgtk_cairo_paint_multiinstance, 0, NULL,
@@ -1687,8 +1691,8 @@ void dt_view_accels_show(dt_view_manager_t *vm)
         .clicked_data = vm,
       });
   dt_gui_add_class(vm->accels_window.sticky_btn, "dt_accels_stick");
-  gtk_box_pack_start(GTK_BOX(vb), vm->accels_window.sticky_btn, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(hb), vb, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(vb), vm->accels_window.sticky_btn);
+  gtk_box_append(GTK_BOX(hb), vb);
 
   dt_view_accels_refresh(vm);
 
@@ -1708,6 +1712,7 @@ void dt_view_accels_show(dt_view_manager_t *vm)
                               alloc.width, alloc.height);
   gtk_window_set_transient_for(GTK_WINDOW(vm->accels_window.window),
                                GTK_WINDOW(dt_ui_main_window(darktable.gui->ui)));
+#if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_window_set_keep_above(GTK_WINDOW(vm->accels_window.window), TRUE);
   // needed on macOS to avoid fullscreening the popup with newer GTK
   gtk_window_set_type_hint(GTK_WINDOW(vm->accels_window.window),
@@ -1716,6 +1721,7 @@ void dt_view_accels_show(dt_view_manager_t *vm)
   gtk_window_set_gravity(GTK_WINDOW(vm->accels_window.window), GDK_GRAVITY_STATIC);
   gtk_window_set_position(GTK_WINDOW(vm->accels_window.window),
                           GTK_WIN_POS_CENTER_ON_PARENT);
+#endif
   gtk_widget_show_all(vm->accels_window.window);
 }
 
@@ -1734,14 +1740,13 @@ void dt_view_accels_refresh(dt_view_manager_t *vm)
     return;
 
   // drop all existing tables
-  GList *lw = gtk_container_get_children(GTK_CONTAINER(vm->accels_window.flow_box));
-
-  for(const GList *lw_iter = lw; lw_iter; lw_iter = g_list_next(lw_iter))
+  GtkWidget *child = gtk_widget_get_first_child(vm->accels_window.flow_box);
+  while(child)
   {
-    GtkWidget *w = (GtkWidget *)lw_iter->data;
-    gtk_widget_destroy(w);
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_widget_destroy(child);
+    child = next;
   }
-  g_list_free(lw);
 
   // get the list of valid accel for this view
   const dt_view_t *cv = dt_view_manager_get_current_view(vm);
@@ -1782,7 +1787,7 @@ void dt_view_accels_refresh(dt_view_manager_t *vm)
     // the title
     GtkWidget *lb = gtk_label_new(category->label);
     dt_gui_add_class(lb, "dt_accels_cat_title");
-    gtk_box_pack_start(GTK_BOX(box), lb, FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(box), lb);
 
     // the list of accels
     GtkTreeModel *model = GTK_TREE_MODEL(g_hash_table_lookup(blocks, category));
@@ -1798,7 +1803,7 @@ void dt_view_accels_refresh(dt_view_manager_t *vm)
                                                         renderer, "text", 1, NULL);
       gtk_tree_view_append_column(GTK_TREE_VIEW(list), column);
 
-      gtk_box_pack_start(GTK_BOX(box), list, FALSE, FALSE, 0);
+      gtk_box_append(GTK_BOX(box), list);
 
       gtk_flow_box_insert(GTK_FLOW_BOX(vm->accels_window.flow_box), box, -1);
     }

@@ -53,7 +53,7 @@ static void _metadata_save(GtkWidget *widget,
 {
   const char *name = dt_metadata_get_tag_subkey((char *)g_object_get_data(G_OBJECT(widget), "tagname"));
   gchar *setting = g_strdup_printf("ui_last/import_last_%s", name);
-  dt_conf_set_string(setting, gtk_entry_get_text(GTK_ENTRY(widget)));
+  dt_conf_set_string(setting, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(widget))));
   g_free(setting);
 }
 
@@ -71,7 +71,7 @@ static void _import_metadata_reset_cb(GtkGestureSingle *gesture, int n_press,
 {
   if(n_press >= 2)
   {
-    gtk_entry_set_text(GTK_ENTRY(widget), "");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(widget)), "");
   }
 }
 
@@ -85,7 +85,7 @@ static void _metadata_reset_all(dt_import_metadata_t *metadata,
     {
       const gboolean visible = gtk_widget_get_visible(w);
       if(hard || visible)
-        gtk_entry_set_text(GTK_ENTRY(w), "");
+        gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(w)), "");
     }
   }
   if(hard)
@@ -139,7 +139,7 @@ static void _import_tags_changed(GtkWidget *widget,
   GtkWidget *w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 1, metadata->num_grid_rows + DT_META_META_VALUE);
   gtk_combo_box_set_active(GTK_COMBO_BOX(w), -1);
   w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 1, metadata->num_grid_rows + DT_META_TAGS_HEADER);
-  dt_conf_set_string("ui_last/import_last_tags", gtk_entry_get_text(GTK_ENTRY(w)));
+  dt_conf_set_string("ui_last/import_last_tags", gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(w))));
 }
 
 static void _update_layout(dt_import_metadata_t *metadata)
@@ -222,7 +222,7 @@ static void _fill_textview(gpointer key,
     if(!g_strcmp0(tagname, (char *)key))
     {
       g_signal_handlers_block_by_func(w, _import_metadata_changed, metadata);
-      gtk_entry_set_text(GTK_ENTRY(w), value);
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(w)), value);
       g_signal_handlers_unblock_by_func(w, _import_metadata_changed, metadata);
       _metadata_save(w, metadata);
       break;
@@ -298,7 +298,7 @@ static void _import_tags_presets_changed(GtkWidget *widget,
     gtk_tree_model_get(model, &iter, 1, &tags, -1);
     GtkWidget *w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 1, metadata->num_grid_rows + DT_META_TAGS_HEADER);
     g_signal_handlers_block_by_func(w, _import_tags_changed, metadata);
-    gtk_entry_set_text(GTK_ENTRY(w), tags);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(w)), tags);
     g_signal_handlers_unblock_by_func(w, _import_tags_changed, metadata);
     dt_conf_set_string("ui_last/import_last_tags", tags);
     g_free(tags);
@@ -367,12 +367,8 @@ static GtkWidget *_set_up_label(GtkWidget *label,
   gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
   gtk_widget_set_halign(label, align);
   gtk_label_set_xalign(GTK_LABEL(label), 0.0);
-  GtkWidget *labelev = gtk_event_box_new();
-  gtk_widget_set_visible(labelev, TRUE);
-  gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
-  gtk_grid_attach(GTK_GRID(metadata->grid), labelev, 0, line, 1, 1);
-  return labelev;
+  gtk_grid_attach(GTK_GRID(metadata->grid), label, 0, line, 1, 1);
+  return label;
 }
 
 static GtkWidget *_set_up_combobox(GtkListStore *model,
@@ -398,9 +394,9 @@ static void _set_up_entry(GtkWidget *entry,
                           dt_import_metadata_t *metadata)
 {
   gtk_widget_set_name(entry, name);
-  gtk_entry_set_text(GTK_ENTRY(entry), str);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(entry)), str);
   gtk_widget_set_halign(entry, GTK_ALIGN_FILL);
-  gtk_entry_set_width_chars(GTK_ENTRY(entry), 5);
+  gtk_editable_set_width_chars(GTK_EDITABLE(entry), 5);
   gtk_widget_set_hexpand(entry, TRUE);
   gtk_grid_attach(GTK_GRID(metadata->grid), entry, 1, line, 1, 1);
 }
@@ -467,10 +463,9 @@ void dt_import_metadata_init(dt_import_metadata_t *metadata)
   // default metadata
   GtkWidget *grid = gtk_grid_new();
   metadata->grid = grid;
-  gtk_box_pack_start(GTK_BOX(metadata->box), grid, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(metadata->box), grid);
   gtk_grid_set_column_spacing(GTK_GRID(grid), DT_PIXEL_APPLY_DPI(5));
-  gtk_widget_show_all(grid);
-  gtk_widget_set_no_show_all(grid, TRUE);
+  gtk_widget_set_visible(grid, TRUE);
 
   metadata->m_model = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_POINTER);
   _import_metadata_presets_update(metadata);
@@ -561,7 +556,7 @@ void dt_import_metadata_update(dt_import_metadata_t *metadata)
     gchar *setting = g_strdup_printf("ui_last/import_last_%s", metadata_name);
     const char *meta = dt_conf_get_string_const(setting);
     g_signal_handlers_block_by_func(w, _import_metadata_changed, metadata);
-    gtk_entry_set_text(GTK_ENTRY(w), meta);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(w)), meta);
     g_signal_handlers_unblock_by_func(w, _import_metadata_changed, metadata);
     g_free(setting);
     w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 2, i + DT_META_META_VALUE);
@@ -578,7 +573,7 @@ void dt_import_metadata_update(dt_import_metadata_t *metadata)
   GtkWidget *w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 1, metadata->num_grid_rows + DT_META_TAGS_HEADER);
   const char *tags = dt_conf_get_string_const("ui_last/import_last_tags");
   g_signal_handlers_block_by_func(w, _import_tags_changed, metadata);
-  gtk_entry_set_text(GTK_ENTRY(w), tags);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(w)), tags);
   g_signal_handlers_unblock_by_func(w, _import_tags_changed, metadata);
   w = gtk_grid_get_child_at(GTK_GRID(metadata->grid), 2, metadata->num_grid_rows + DT_META_TAGS_HEADER);
   const gboolean imported = dt_conf_get_bool("ui_last/import_last_tags_imported");

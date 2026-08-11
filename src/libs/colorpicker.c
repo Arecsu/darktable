@@ -354,6 +354,13 @@ static void _setup_sample(dt_lib_module_t *self,
   data->primary_sample.pick_output = pick_output;
 }
 
+static void _sample_tooltip_view_destroyed(gpointer data, GObject *where_the_object_was)
+{
+  (void)where_the_object_was;
+  GtkWidget **view = data;
+  *view = NULL;
+}
+
 static gboolean _sample_tooltip_callback(GtkWidget *widget,
                                          const gint x,
                                          const gint y,
@@ -406,8 +413,7 @@ static gboolean _sample_tooltip_callback(GtkWidget *widget,
     view = gtk_text_view_new();
     dt_gui_add_class(view, "dt_transparent_background");
     dt_gui_add_class(view, "dt_monospace");
-    g_signal_connect(G_OBJECT(view), "destroy",
-                     G_CALLBACK(gtk_widget_destroyed), &view);
+    g_object_weak_ref(G_OBJECT(view), _sample_tooltip_view_destroyed, &view);
   }
 
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
@@ -461,7 +467,8 @@ static void _label_size_allocate_callback(GtkWidget *widget,
 
   PangoStretch stretch = PANGO_STRETCH_NORMAL;
 
-  while(gtk_widget_get_preferred_width(widget, NULL, &label_width),
+  while(gtk_widget_measure(widget, GTK_ORIENTATION_HORIZONTAL, -1, NULL,
+                           &label_width, NULL, NULL),
         label_width > allocation->width && stretch != PANGO_STRETCH_ULTRA_CONDENSED)
   {
     stretch--;
@@ -614,7 +621,7 @@ static void _add_sample(GtkButton *widget,
   sample->locked = FALSE;
   sample->copied = FALSE;
 
-  sample->container = gtk_event_box_new();
+  sample->container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   dt_gui_connect_motion(sample->container, NULL, _sample_enter_callback, _sample_leave_callback, sample);
 
   sample->color_patch = gtk_drawing_area_new();
@@ -645,10 +652,10 @@ static void _add_sample(GtkButton *widget,
   g_signal_connect(G_OBJECT(delete_button), "clicked",
                    G_CALLBACK(_remove_sample_cb), sample);
 
-  gtk_container_add(GTK_CONTAINER(sample->container),
-                    dt_gui_hbox(color_patch_wrapper,
-                                dt_gui_expand(sample->output_label),
-                                delete_button));
+  gtk_box_append(GTK_BOX(sample->container),
+                 dt_gui_hbox(color_patch_wrapper,
+                             dt_gui_expand(sample->output_label),
+                             delete_button));
   dt_gui_box_add(data->samples_container, sample->container);
   gtk_widget_show_all(sample->container);
 
@@ -773,7 +780,7 @@ void gui_init(dt_lib_module_t *self)
                    data->picker_button, &dt_action_def_color_picker);
 
   // The small sample, label and add button
-  GtkWidget *sample_row_events = gtk_event_box_new();
+  GtkWidget *sample_row_events = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   dt_gui_connect_motion(sample_row_events, NULL, _sample_enter_callback, _sample_leave_callback, &data->primary_sample);
 
   data->primary_sample.color_patch = color_patch = gtk_drawing_area_new();
@@ -807,10 +814,10 @@ void gui_init(dt_lib_module_t *self)
       });
   gtk_widget_set_sensitive(data->add_sample_button, FALSE);
 
-  gtk_container_add(GTK_CONTAINER(sample_row_events),
-                    dt_gui_hbox(sample_patch_wrapper,
-                                dt_gui_expand(label),
-                                data->add_sample_button));
+  gtk_box_append(GTK_BOX(sample_row_events),
+                 dt_gui_hbox(sample_patch_wrapper,
+                             dt_gui_expand(label),
+                             data->add_sample_button));
 
   data->samples_container = dt_gui_vbox();
 
@@ -819,7 +826,7 @@ void gui_init(dt_lib_module_t *self)
   dt_action_define(DT_ACTION(self), NULL, N_("display samples"),
                    data->display_samples_check_box, &dt_action_def_toggle);
   gtk_label_set_ellipsize
-    (GTK_LABEL(gtk_bin_get_child(GTK_BIN(data->display_samples_check_box))),
+    (GTK_LABEL(gtk_button_get_child(GTK_BUTTON(data->display_samples_check_box))),
      PANGO_ELLIPSIZE_MIDDLE);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(data->display_samples_check_box),
                                dt_conf_get_bool("ui_last/colorpicker_display_samples"));
@@ -831,7 +838,7 @@ void gui_init(dt_lib_module_t *self)
   dt_action_define(DT_ACTION(self), NULL, N_("restrict scope"),
                    restrict_button, &dt_action_def_toggle);
   gtk_label_set_ellipsize
-    (GTK_LABEL(gtk_bin_get_child(GTK_BIN(restrict_button))),
+    (GTK_LABEL(gtk_button_get_child(GTK_BUTTON(restrict_button))),
      PANGO_ELLIPSIZE_MIDDLE);
   gboolean restrict_histogram = dt_conf_get_bool("ui_last/colorpicker_restrict_histogram");
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(restrict_button), restrict_histogram);

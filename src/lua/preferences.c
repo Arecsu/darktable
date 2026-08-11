@@ -177,12 +177,11 @@ static void _attach_pref_row(GtkWidget *grid, pref_element *cur_elt, GtkWidget *
                              GtkSizeGroup *label_sg)
 {
   GtkWidget *label = dt_ui_label_new(cur_elt->label);
-  GtkWidget *labelev = gtk_event_box_new();
+  GtkWidget *labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
+  gtk_box_append(GTK_BOX(labelev), label);
   cur_elt->update_widget(cur_elt, dialog, labelev);
   gtk_widget_set_tooltip_text(labelev, cur_elt->tooltip_reset);
-  gtk_event_box_set_visible_window(GTK_EVENT_BOX(labelev), FALSE);
   gtk_widget_set_tooltip_text(cur_elt->widget, cur_elt->tooltip);
   gtk_size_group_add_widget(label_sg, labelev);
   gtk_grid_attach(GTK_GRID(grid), labelev, 0, line, 1, 1);
@@ -344,9 +343,20 @@ static void response_callback_filechooser(GtkDialog *dialog, gint response_id, p
   {
     char pref_name[1024];
     get_pref_name(pref_name, sizeof(pref_name), cur_elt->script, cur_elt->name);
-    gchar *path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(cur_elt->widget));
+#if GTK_CHECK_VERSION(4, 0, 0)
+    const char *text = gtk_editable_get_text(GTK_EDITABLE(cur_elt->widget));
+    dt_conf_set_string(pref_name, text);
+#else
+    gchar *path = NULL;
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(cur_elt->widget));
+    if(file)
+    {
+      path = g_file_get_path(file);
+      g_object_unref(file);
+    }
     dt_conf_set_string(pref_name, path);
     g_free(path);
+#endif
   }
 }
 
@@ -357,7 +367,7 @@ static void response_callback_string(GtkDialog *dialog, gint response_id, pref_e
   {
     char pref_name[1024];
     get_pref_name(pref_name, sizeof(pref_name), cur_elt->script, cur_elt->name);
-    dt_conf_set_string(pref_name, gtk_entry_get_text(GTK_ENTRY(cur_elt->widget)));
+    dt_conf_set_string(pref_name, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(cur_elt->widget))));
   }
 }
 
@@ -419,12 +429,26 @@ static void reset_widget_enum_cb(GtkGestureSingle *gesture, gint n_press, gdoubl
 }
 
 
+static void file_chooser_set_path(GtkWidget *widget, const char *path, const gboolean is_dir)
+{
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_editable_set_text(GTK_EDITABLE(widget), path);
+#else
+  GtkFileChooser *chooser = GTK_FILE_CHOOSER(widget);
+  if(is_dir)
+    gtk_file_chooser_set_current_folder(chooser, path);
+  else
+    gtk_file_chooser_set_filename(chooser, path);
+#endif
+}
+
+
 static void reset_widget_dir_cb(GtkGestureSingle *gesture, gint n_press, gdouble x, gdouble y, pref_element *cur_elt)
 {
   if(n_press == 2)
   {
-    gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(cur_elt->widget),
-                                        cur_elt->type_data.dir_data.default_value);
+    file_chooser_set_path(cur_elt->widget,
+                          cur_elt->type_data.dir_data.default_value, TRUE);
   }
 }
 
@@ -433,8 +457,8 @@ static void reset_widget_file_cb(GtkGestureSingle *gesture, gint n_press, gdoubl
 {
   if(n_press == 2)
   {
-    gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(cur_elt->widget),
-                                  cur_elt->type_data.file_data.default_value);
+    file_chooser_set_path(cur_elt->widget,
+                          cur_elt->type_data.file_data.default_value, FALSE);
   }
 }
 
@@ -443,7 +467,7 @@ static void reset_widget_string_cb(GtkGestureSingle *gesture, gint n_press, gdou
 {
   if(n_press == 2)
   {
-    gtk_entry_set_text(GTK_ENTRY(cur_elt->widget), cur_elt->type_data.string_data.default_value);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(cur_elt->widget)), cur_elt->type_data.string_data.default_value);
   }
 }
 
@@ -452,7 +476,7 @@ static void click_widget_bool_cb(GtkGestureSingle *gesture, gint n_press, gdoubl
 {
   if(n_press == 1)
   {
-    gtk_button_clicked(GTK_BUTTON(cur_elt->widget));
+    gtk_widget_activate(cur_elt->widget);
   }
   else if(n_press == 2)
   {
@@ -537,7 +561,7 @@ static void update_widget_dir(pref_element* cur_elt, GtkWidget* dialog, GtkWidge
   char pref_name[1024];
   get_pref_name(pref_name, sizeof(pref_name), cur_elt->script, cur_elt->name);
   const char *str = dt_conf_get_string_const(pref_name);
-  gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(cur_elt->widget), str);
+  file_chooser_set_path(cur_elt->widget, str, TRUE);
   dt_gui_connect_click(labelev, reset_widget_dir_cb, NULL, cur_elt);
   g_signal_connect(G_OBJECT(dialog), "response", G_CALLBACK(response_callback_filechooser), cur_elt);
 }
@@ -548,7 +572,7 @@ static void update_widget_file(pref_element* cur_elt, GtkWidget* dialog, GtkWidg
   char pref_name[1024];
   get_pref_name(pref_name, sizeof(pref_name), cur_elt->script, cur_elt->name);
   const char *str = dt_conf_get_string_const(pref_name);
-  gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(cur_elt->widget), str);
+  file_chooser_set_path(cur_elt->widget, str, FALSE);
   dt_gui_connect_click(labelev, reset_widget_file_cb, NULL, cur_elt);
   g_signal_connect(G_OBJECT(dialog), "response", G_CALLBACK(response_callback_filechooser), cur_elt);
 }
@@ -561,7 +585,7 @@ static void update_widget_string(pref_element* cur_elt, GtkWidget* dialog, GtkWi
   dt_gui_connect_click(labelev, reset_widget_string_cb, NULL, cur_elt);
   g_signal_connect(G_OBJECT(dialog), "response", G_CALLBACK(response_callback_string), cur_elt);
   const char *str = dt_conf_get_string_const(pref_name);
-  gtk_entry_set_text(GTK_ENTRY(cur_elt->widget), str);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(cur_elt->widget)), str);
 }
 
 
@@ -675,8 +699,17 @@ static int register_pref_sub(lua_State *L)
       if(!dt_conf_key_exists(pref_name)) {
         dt_conf_set_string(pref_name, built_elt->type_data.dir_data.default_value);
       }
+      built_elt->widget = NULL;
+#if GTK_CHECK_VERSION(4, 0, 0)
+      // GtkFileChooserButton is removed in GTK4; plain entry until the
+      // GtkFileDialog rework (TODO P4), same slot as the generated dir prefs.
+      built_elt->widget = gtk_entry_new();
+      gtk_widget_set_halign(built_elt->widget, GTK_ALIGN_FILL);
+      gtk_widget_set_hexpand(built_elt->widget, TRUE);
+#else
       built_elt->widget = gtk_file_chooser_button_new(_("select directory"), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
       gtk_file_chooser_button_set_width_chars(GTK_FILE_CHOOSER_BUTTON(built_elt->widget), 20);
+#endif
       g_object_ref_sink(G_OBJECT(built_elt->widget));
       built_elt->tooltip_reset = g_strdup_printf( _("double-click to reset to `%s'"), built_elt->type_data.dir_data.default_value);
       built_elt->update_widget = update_widget_dir;
@@ -688,8 +721,15 @@ static int register_pref_sub(lua_State *L)
       if(!dt_conf_key_exists(pref_name))
         dt_conf_set_string(pref_name, built_elt->type_data.file_data.default_value);
 
+      built_elt->widget = NULL;
+#if GTK_CHECK_VERSION(4, 0, 0)
+      built_elt->widget = gtk_entry_new();
+      gtk_widget_set_halign(built_elt->widget, GTK_ALIGN_FILL);
+      gtk_widget_set_hexpand(built_elt->widget, TRUE);
+#else
       built_elt->widget = gtk_file_chooser_button_new(_("select file"), GTK_FILE_CHOOSER_ACTION_OPEN);
       gtk_file_chooser_button_set_width_chars(GTK_FILE_CHOOSER_BUTTON(built_elt->widget), 20);
+#endif
       built_elt->tooltip_reset= g_strdup_printf( _("double-click to reset to `%s'"), built_elt->type_data.file_data.default_value);
       g_object_ref_sink(G_OBJECT(built_elt->widget));
       built_elt->update_widget = update_widget_file;
@@ -845,14 +885,16 @@ void init_tab_lua(GtkWidget *dialog, GtkWidget *stack)
   if(!pref_list) return; // no option registered => don't create the tab
 
   GtkWidget *viewport = gtk_viewport_new(NULL, NULL);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_viewport_set_shadow_type(GTK_VIEWPORT(viewport), GTK_SHADOW_NONE);
+#endif
   GtkWidget *scroll = dt_gui_scroll_wrap(viewport);
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
   gtk_stack_add_titled(GTK_STACK(stack), scroll, _("Lua options"), _("Lua options"));
 
   GtkWidget *content_box = dt_gui_vbox();
   gtk_widget_set_valign(content_box, GTK_ALIGN_START);
-  gtk_container_add(GTK_CONTAINER(viewport), content_box);
+  gtk_viewport_set_child(GTK_VIEWPORT(viewport), content_box);
 
   // shared size group so the selector label and all pref labels are the same width,
   // causing the combobox to align with the input widgets in the pref rows
@@ -943,7 +985,7 @@ void destroy_tab_lua(void)
     {
       GtkWidget *parent = gtk_widget_get_parent(cur_elt->widget);
       if(parent)
-        gtk_container_remove(GTK_CONTAINER(parent), cur_elt->widget);
+        gtk_widget_unparent(cur_elt->widget);
     }
   }
 }

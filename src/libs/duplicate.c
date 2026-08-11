@@ -92,7 +92,7 @@ static gboolean _lib_duplicate_caption_out_callback(GtkWidget *widget,
 
   // we write the content of the textbox to the caption field
   dt_metadata_set(imgid, "Xmp.darktable.version_name",
-                  gtk_entry_get_text(GTK_ENTRY(widget)), FALSE);
+                  gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(widget))), FALSE);
   dt_image_synch_xmp(imgid);
 
   return FALSE;
@@ -271,7 +271,7 @@ void gui_post_expose(dt_lib_module_t *self,
 static void _thumb_remove(gpointer user_data)
 {
   dt_thumbnail_t *thumb = (dt_thumbnail_t *)user_data;
-  gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(thumb->w_main)), thumb->w_main);
+  gtk_widget_unparent(thumb->w_main);
   dt_thumbnail_destroy(thumb);
 }
 
@@ -347,7 +347,7 @@ static void _lib_duplicate_init_callback(gpointer instance, dt_lib_module_t *sel
     g_snprintf(chl, sizeof(chl), "%d", sqlite3_column_int(stmt, 0));
 
     GtkWidget *tb = dt_ui_entry_new(0);
-    if(path) gtk_entry_set_text(GTK_ENTRY(tb), path);
+    if(path) gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(tb)), path);
     gtk_widget_set_hexpand(tb, TRUE);
     g_object_set_data (G_OBJECT(tb), "imgid", GINT_TO_POINTER(imgid));
     gtk_widget_add_events(tb, GDK_FOCUS_CHANGE_MASK);

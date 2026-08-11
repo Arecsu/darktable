@@ -119,7 +119,7 @@ uint32_t container(dt_lib_module_t *self)
 void gui_reset(dt_lib_module_t *self)
 {
   dt_lib_location_t *lib = self->data;
-  gtk_entry_set_text(lib->search, "");
+  gtk_editable_set_text(GTK_EDITABLE(lib->search), "");
   clear_search(lib);
 }
 
@@ -170,7 +170,7 @@ static GtkWidget *_lib_location_place_widget_new(dt_lib_location_t *lib,
                                                  _lib_location_result_t *place)
 {
   GtkWidget *eb, *vb, *w;
-  eb = gtk_event_box_new();
+  eb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_name(eb, "dt-map-location");
   dt_gui_connect_motion(eb, NULL, _event_box_enter, _event_box_leave, NULL);
 
@@ -178,7 +178,7 @@ static GtkWidget *_lib_location_place_widget_new(dt_lib_location_t *lib,
 
   /* add name */
   w = gtk_label_new(place->name);
-  gtk_label_set_line_wrap(GTK_LABEL(w), TRUE);
+  gtk_label_set_wrap(GTK_LABEL(w), TRUE);
   gtk_widget_set_halign(w, GTK_ALIGN_START);
   g_object_set(G_OBJECT(w), "xalign", 0.0, (gchar *)0);
   gtk_box_pack_start(GTK_BOX(vb), w, FALSE, FALSE, 0);
@@ -191,7 +191,7 @@ static GtkWidget *_lib_location_place_widget_new(dt_lib_location_t *lib,
   g_free(lat);
   g_free(lon);
   g_free(location);
-  gtk_label_set_line_wrap(GTK_LABEL(w), TRUE);
+  gtk_label_set_wrap(GTK_LABEL(w), TRUE);
   gtk_widget_set_halign(w, GTK_ALIGN_START);
   gtk_box_pack_start(GTK_BOX(vb), w, FALSE, FALSE, 0);
 
@@ -365,7 +365,7 @@ static gboolean _lib_location_search(dt_lib_module_t *self)
   gchar *query = NULL, *text = NULL;
 
   /* get escaped search text */
-  text = g_uri_escape_string(gtk_entry_get_text(lib->search), NULL, FALSE);
+  text = g_uri_escape_string(gtk_editable_get_text(GTK_EDITABLE(lib->search)), NULL, FALSE);
 
   if(!(text && *text)) goto bail_out;
 
@@ -450,7 +450,7 @@ void _lib_location_entry_activated(GtkButton *button,
                                    dt_lib_module_t *self)
 {
   dt_lib_location_t *lib = self->data;
-  const gchar *text = gtk_entry_get_text(lib->search);
+  const gchar *text = gtk_editable_get_text(GTK_EDITABLE(lib->search));
   if(!text || text[0] == '\0') return;
 
   /* lock the widget while search job is performing */
@@ -802,7 +802,7 @@ int set_params(dt_lib_module_t *self,
 
   clear_search(lib);
   lib->places = g_list_append(lib->places, location);
-  gtk_entry_set_text(lib->search, "");
+  gtk_editable_set_text(GTK_EDITABLE(lib->search), "");
   _lib_location_search_finish(self);
 
   return 0;

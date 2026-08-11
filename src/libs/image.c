@@ -302,7 +302,7 @@ static void _image_preference_changed(gpointer instance,
 {
   dt_lib_image_t *d = self->data;
   gboolean trash = dt_conf_get_bool("send_to_trash");
-  gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(d->delete_button))),
+  gtk_label_set_text(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(d->delete_button))),
                      trash ? _("delete (trash)")
                            : _("delete"));
   gtk_widget_set_tooltip_text(d->delete_button,
@@ -487,7 +487,7 @@ static void _pastemode_combobox_changed(GtkWidget *widget,
   dt_conf_set_int("plugins/lighttable/copy_metadata/pastemode", mode);
 }
 
-#define ellipsize_button(button) gtk_label_set_ellipsize(GTK_LABEL(gtk_bin_get_child(GTK_BIN(button))), PANGO_ELLIPSIZE_END);
+#define ellipsize_button(button) gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(button))), PANGO_ELLIPSIZE_END);
 
 void gui_init(dt_lib_module_t *self)
 {
@@ -507,7 +507,7 @@ void gui_init(dt_lib_module_t *self)
   d->page1 = gtk_grid_new();
 
   GtkGrid *grid = GTK_GRID(d->page1);
-  gtk_container_add(GTK_CONTAINER(page1), d->page1);
+  gtk_box_append(GTK_BOX(page1), d->page1);
   gtk_grid_set_column_homogeneous(grid, TRUE);
   int line = 0;
 
@@ -600,7 +600,7 @@ void gui_init(dt_lib_module_t *self)
 
   // metadata operations
   grid = GTK_GRID(gtk_grid_new());
-  gtk_container_add(GTK_CONTAINER(page2), GTK_WIDGET(grid));
+  gtk_box_append(GTK_BOX(page2), GTK_WIDGET(grid));
   gtk_grid_set_column_homogeneous(grid, TRUE);
 
   dt_lib_module_t *meta = (dt_lib_module_t *)dt_action_section(DT_ACTION(self),

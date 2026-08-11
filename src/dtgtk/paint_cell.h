@@ -23,6 +23,13 @@
 
 G_BEGIN_DECLS
 
+/* GtkCellRenderer is removed from GTK4's installed headers; the only
+ * consumer of this renderer is preferences_ai.c's GtkTreeView, which needs
+ * the GtkTreeView->GtkColumnView migration (TODO P2).  Guarded GTK3-only;
+ * the GTK4 side of that rework replaces the info-icon column with a
+ * GtkColumnView widget. */
+#if !GTK_CHECK_VERSION(4, 0, 0)
+
 #define DTGTK_TYPE_PAINT_CELL dtgtk_paint_cell_get_type()
 G_DECLARE_FINAL_TYPE(GtkDarktablePaintCell, dtgtk_paint_cell,
                      DTGTK, PAINT_CELL, GtkCellRenderer)
@@ -46,6 +53,8 @@ struct _GtkDarktablePaintCell
 GtkCellRenderer *dtgtk_paint_cell_new(DTGTKCairoPaintIconFunc paint,
                                       gint paint_flags,
                                       void *paint_data);
+
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 G_END_DECLS
 

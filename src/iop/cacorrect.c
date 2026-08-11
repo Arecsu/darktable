@@ -1311,7 +1311,7 @@ void gui_init(dt_iop_module_t *self)
   // start building top level widget
   GtkWidget *box_raw = self->widget;
   self->widget = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(self->widget), FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(self->widget), FALSE);
   gtk_stack_add_named(GTK_STACK(self->widget), box_raw, "bayer");
 
   GtkWidget *label_other = dt_ui_label_new(_("automatic chromatic aberration correction\nonly for Bayer raw files with 3 color channels"));

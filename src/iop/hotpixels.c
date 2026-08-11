@@ -462,7 +462,7 @@ void gui_init(dt_iop_module_t *self)
 
   // start building top level widget
   self->widget = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(self->widget), FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(self->widget), FALSE);
 
   GtkWidget *label_non_raw = dt_ui_label_new(_("hot pixel correction\nonly works for raw images."));
 

@@ -142,7 +142,8 @@ void dt_gui_presets_add_with_blendop(const char *name,
   sqlite3_finalize(stmt);
 }
 
-static void _menuitem_delete_preset(GtkMenuItem *menuitem,
+#if !GTK_CHECK_VERSION(4, 0, 0)
+static void _menuitem_delete_preset(gpointer menuitem,
                                     dt_iop_module_t *module)
 {
   gboolean writeprotect = FALSE;
@@ -168,15 +169,18 @@ static void _menuitem_delete_preset(GtkMenuItem *menuitem,
   }
   g_free(name);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _edit_preset_final_callback(dt_gui_presets_edit_dialog_t *g)
 {
-  const char *name = gtk_entry_get_text(g->name);
+  const char *name = gtk_editable_get_text(GTK_EDITABLE(g->name));
 
   dt_iop_update_multi_name(g->iop, name, g->iop->multi_name_hand_edited, FALSE, FALSE);
 
   dt_gui_store_last_preset(name);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _edit_preset_response(GtkDialog *dialog,
                                   const gint response_id,
@@ -201,7 +205,7 @@ static void _edit_preset_response(GtkDialog *dialog,
     sqlite3_stmt *stmt;
 
     // we verify eventual name collisions
-    const gchar *name = gtk_entry_get_text(g->name);
+    const gchar *name = gtk_editable_get_text(GTK_EDITABLE(g->name));
     if(((g->old_id >= 0)
         && (strcmp(g->original_name, name) != 0))
        || (g->old_id < 0))
@@ -317,21 +321,21 @@ static void _edit_preset_response(GtkDialog *dialog,
     DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db), query, -1, &stmt, NULL);
     g_free(query);
     DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 1, name, -1, SQLITE_TRANSIENT);
-    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 2, gtk_entry_get_text(g->description),
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 2, gtk_editable_get_text(GTK_EDITABLE(g->description)),
                                -1, SQLITE_TRANSIENT);
 
-    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 3, gtk_entry_get_text(GTK_ENTRY(g->model)),
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 3, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->model))),
                                -1, SQLITE_TRANSIENT);
-    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 4, gtk_entry_get_text(GTK_ENTRY(g->maker)),
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 4, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->maker))),
                                -1, SQLITE_TRANSIENT);
-    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 5, gtk_entry_get_text(GTK_ENTRY(g->lens)),
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 5, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->lens))),
                                -1, SQLITE_TRANSIENT);
 
-    const gchar *iso_min_entered_text = gtk_entry_get_text(GTK_ENTRY(g->iso_min));
+    const gchar *iso_min_entered_text = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->iso_min)));
     if(iso_min_entered_text[0] == '\0') iso_min_entered_text = "0";
     DT_DEBUG_SQLITE3_BIND_DOUBLE(stmt, 6, atof(iso_min_entered_text));
 
-    const gchar *iso_max_entered_text = gtk_entry_get_text(GTK_ENTRY(g->iso_max));
+    const gchar *iso_max_entered_text = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(g->iso_max)));
     // We want FLT_MAX value in the database when iso_max field was empty.
     if(iso_max_entered_text[0] == '\0')
     {
@@ -423,7 +427,7 @@ static void _edit_preset_response(GtkDialog *dialog,
   }
   else if(response_id == GTK_RESPONSE_YES && g->old_id)
   {
-    const gchar *name = gtk_entry_get_text(g->name);
+    const gchar *name = gtk_editable_get_text(GTK_EDITABLE(g->name));
 
     // ask for destination directory
     GtkFileChooserNative *filechooser = gtk_file_chooser_native_new(
@@ -433,11 +437,13 @@ static void _edit_preset_response(GtkDialog *dialog,
                                        GTK_FILE_CHOOSER(filechooser));
 
     // save if accepted
-    if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+    if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
     {
-      char *filedir = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+      GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+      char *filedir = file ? g_file_get_path(file) : NULL;
       dt_presets_save_to_file(g->old_id, name, filedir);
       dt_control_log(_("preset %s was successfully exported"), name);
+      g_clear_object(&file);
       g_free(filedir);
       dt_conf_set_folder_from_file_chooser("ui_last/export_path",
                                            GTK_FILE_CHOOSER(filechooser));
@@ -582,8 +588,8 @@ static void _presets_show_edit_dialog(dt_gui_presets_edit_dialog_t *g,
   dt_osx_disallow_fullscreen(dialog);
 #endif
   g->name = GTK_ENTRY(gtk_entry_new());
-  gtk_entry_set_text(g->name, g->original_name);
-  gtk_entry_set_width_chars(g->name, 10 + g_utf8_strlen(title, -1));
+  gtk_editable_set_text(GTK_EDITABLE(g->name), g->original_name);
+  gtk_editable_set_width_chars(GTK_EDITABLE(g->name), 10 + g_utf8_strlen(title, -1));
   if(allow_name_change)
     gtk_entry_set_activates_default(g->name, TRUE);
   else
@@ -789,16 +795,15 @@ static void _presets_show_edit_dialog(dt_gui_presets_edit_dialog_t *g,
   if(sqlite3_step(stmt) == SQLITE_ROW)
   {
     g->old_id = sqlite3_column_int(stmt, 0);
-    gtk_entry_set_text(GTK_ENTRY(g->description),
-                       (const char *)sqlite3_column_text(stmt, 1));
-    gtk_entry_set_text(GTK_ENTRY(g->model), (const char *)sqlite3_column_text(stmt, 2));
-    gtk_entry_set_text(GTK_ENTRY(g->maker), (const char *)sqlite3_column_text(stmt, 3));
-    gtk_entry_set_text(GTK_ENTRY(g->lens), (const char *)sqlite3_column_text(stmt, 4));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->description)), (const char *)sqlite3_column_text(stmt, 1));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->model)), (const char *)sqlite3_column_text(stmt, 2));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->maker)), (const char *)sqlite3_column_text(stmt, 3));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->lens)), (const char *)sqlite3_column_text(stmt, 4));
 
     char *iso_min_fromdb = (char *)sqlite3_column_text(stmt, 5);
     char *iso_max_fromdb = (char *)sqlite3_column_text(stmt, 6);
 
-    gtk_entry_set_text(GTK_ENTRY(g->iso_min), strtok(iso_min_fromdb,"."));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->iso_min)), strtok(iso_min_fromdb,"."));
 
     // A simple way to check if FLT_MAX has been written to the database is to check if
     // there is "e+38" in the text representation of the read value.
@@ -808,7 +813,7 @@ static void _presets_show_edit_dialog(dt_gui_presets_edit_dialog_t *g,
     }
     else
     {
-      gtk_entry_set_text(GTK_ENTRY(g->iso_max), strtok(iso_max_fromdb,"."));
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->iso_max)), strtok(iso_max_fromdb,"."));
     }
 
     float val = sqlite3_column_double(stmt, 7);
@@ -851,11 +856,11 @@ static void _presets_show_edit_dialog(dt_gui_presets_edit_dialog_t *g,
   }
   else
   {
-    gtk_entry_set_text(GTK_ENTRY(g->description), "");
-    gtk_entry_set_text(GTK_ENTRY(g->model), "%");
-    gtk_entry_set_text(GTK_ENTRY(g->maker), "%");
-    gtk_entry_set_text(GTK_ENTRY(g->lens), "%");
-    gtk_entry_set_text(GTK_ENTRY(g->iso_min), "0");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->description)), "");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->model)), "%");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->maker)), "%");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->lens)), "%");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->iso_min)), "0");
     gtk_entry_set_placeholder_text(GTK_ENTRY(g->iso_max), _("∞"));
 
     dt_bauhaus_combobox_set(g->exposure_min, 0);
@@ -967,6 +972,7 @@ void dt_gui_presets_show_edit_dialog(const char *name_in,
     sqlite3_finalize(stmt);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _edit_preset(const char *name_in, dt_iop_module_t *module)
 {
   gchar *name = NULL;
@@ -990,13 +996,15 @@ static void _edit_preset(const char *name_in, dt_iop_module_t *module)
      FALSE, GTK_WINDOW(dt_ui_main_window(darktable.gui->ui)));
   g_free(name);
 }
+#endif
 
-static void _menuitem_edit_preset(GtkMenuItem *menuitem, dt_iop_module_t *module)
+#if !GTK_CHECK_VERSION(4, 0, 0)
+static void _menuitem_edit_preset(gpointer menuitem, dt_iop_module_t *module)
 {
   _edit_preset(NULL, module);
 }
 
-static void _menuitem_update_preset(GtkMenuItem *menuitem, dt_iop_module_t *module)
+static void _menuitem_update_preset(gpointer menuitem, dt_iop_module_t *module)
 {
   gchar *name = g_object_get_data(G_OBJECT(menuitem), "dt-preset-name");
 
@@ -1028,8 +1036,10 @@ static void _menuitem_update_preset(GtkMenuItem *menuitem, dt_iop_module_t *modu
     sqlite3_finalize(stmt);
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-static void _menuitem_new_preset(GtkMenuItem *menuitem,
+#if !GTK_CHECK_VERSION(4, 0, 0)
+static void _menuitem_new_preset(gpointer menuitem,
                                  dt_iop_module_t *module)
 {
   // add new preset
@@ -1041,6 +1051,7 @@ static void _menuitem_new_preset(GtkMenuItem *menuitem,
   // then show edit dialog
   _edit_preset(_("new preset"), module);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void dt_gui_presets_apply_preset(const gchar* name,
                                  dt_iop_module_t *module)
@@ -1258,6 +1269,9 @@ gboolean dt_gui_presets_autoapply_for_module(dt_iop_module_t *module, GtkWidget 
   return found;
 }
 
+// GtkMenuItem / GtkCheckMenuItem are gone in GTK4 (the whole preset-menu
+// subsystem is deferred to the GtkMenu->GtkPopoverMenu migration, TODO P2).
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static guint _click_time = G_MAXUINT;
 
 static gpointer _active_menu_item = NULL;
@@ -1310,7 +1324,7 @@ static void _menuitem_button_preset_released(GtkGestureSingle *gesture,
 {
   if(gtk_gesture_single_get_current_button(gesture) != GDK_BUTTON_SECONDARY) return;
 
-  GtkMenuItem *menuitem = GTK_MENU_ITEM(dt_gui_get_widget(gesture));
+  GtkWidget *menuitem = dt_gui_get_widget(gesture);
   gchar *name = g_object_get_data(G_OBJECT(menuitem), "dt-preset-name");
   const gboolean long_click =
     dt_gui_long_click(gdk_event_get_time(gtk_gesture_get_last_event(GTK_GESTURE(gesture), NULL)),
@@ -1333,7 +1347,7 @@ static void _menuitem_button_preset_released(GtkGestureSingle *gesture,
 }
 
 // need to catch "activate" signal as well to handle keyboard
-static void _menuitem_activate_preset(GtkMenuItem *menuitem,
+static void _menuitem_activate_preset(gpointer menuitem,
                                       dt_iop_module_t *module)
 {
   if(dt_gui_menuitem_activated_by_keyboard(GTK_WIDGET(menuitem)))
@@ -1353,6 +1367,7 @@ static void _menuitem_connect_preset(GtkWidget *mi,
   dt_gui_connect_click(mi, _menuitem_button_preset_pressed, _menuitem_button_preset_released, iop);
   gtk_widget_set_has_tooltip(mi, TRUE);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 /* quick presets list
   The list of presets to show is saved in darktablerc
@@ -1361,6 +1376,10 @@ static void _menuitem_connect_preset(GtkWidget *mi,
     ꬹiop_name_0|preset_name_0ꬹꬹiop_name_1|preset_name_1ꬹ...
 */
 
+// the quick-presets manager is a GtkTreeView dialog, only reachable from the
+// GTK3-only favorite-presets menu; GtkTreeView is removed in GTK4 (TODO P2:
+// GtkTreeView->GtkColumnView / GtkMenu->GtkPopoverMenu migration).
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _menuitem_manage_quick_presets_traverse(GtkTreeModel *model,
                                                         GtkTreePath *path,
                                                         GtkTreeIter *iter,
@@ -1407,7 +1426,9 @@ static void _menuitem_manage_quick_presets_toggle(GtkCellRendererToggle *cell_re
   dt_conf_set_string("plugins/darkroom/quick_preset_list", txt);
   g_free(txt);
 }
+#endif
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static int _menuitem_manage_quick_presets_sort(gconstpointer a, gconstpointer b)
 {
   const dt_iop_module_so_t *ma = (dt_iop_module_so_t *)a;
@@ -1423,8 +1444,10 @@ static int _menuitem_manage_quick_presets_sort(gconstpointer a, gconstpointer b)
   g_free(sb);
   return res;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
-static void _menuitem_manage_quick_presets(GtkMenuItem *menuitem,
+#if !GTK_CHECK_VERSION(4, 0, 0)
+static void _menuitem_manage_quick_presets(gpointer menuitem,
                                            gpointer data)
 {
   sqlite3_stmt *stmt;
@@ -1539,6 +1562,7 @@ static void _menuitem_manage_quick_presets(GtkMenuItem *menuitem,
   gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
   gtk_widget_show_all(dialog);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 #if GTK_CHECK_VERSION(4, 0, 0)
 // TODO P2: GtkMenu->GtkPopoverMenu migration; favorite-presets popup deferred.

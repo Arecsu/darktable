@@ -199,7 +199,7 @@ static GtkWidget *_lib_history_create_button(dt_lib_module_t *self,
   /* create toggle button */
   GtkWidget *widget = gtk_toggle_button_new_with_label("");
   dt_gui_add_class(widget, "dt_transparent_background");
-  GtkWidget *lab = gtk_bin_get_child(GTK_BIN(widget));
+  GtkWidget *lab = gtk_button_get_child(GTK_BUTTON(widget));
   gtk_widget_set_halign(lab, GTK_ALIGN_START);
   gtk_label_set_xalign(GTK_LABEL(lab), 0);
   gtk_label_set_ellipsize(GTK_LABEL(lab), PANGO_ELLIPSIZE_END);
@@ -251,9 +251,11 @@ static GtkWidget *_lib_history_create_button(dt_lib_module_t *self,
   g_object_set_data(G_OBJECT(widget), "history-number", GINT_TO_POINTER(num + 1));
   g_object_set_data(G_OBJECT(widget), "label", (gpointer)label);
 
-  gtk_box_pack_start(GTK_BOX(hbox), numwidget, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), widget, TRUE, TRUE, 0);
-  gtk_box_pack_end(GTK_BOX(hbox), onoff, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(hbox), numwidget);
+  gtk_box_append(GTK_BOX(hbox), widget);
+  gtk_widget_set_hexpand(widget, TRUE);
+  gtk_box_append(GTK_BOX(hbox), onoff);
+  gtk_widget_set_halign(onoff, GTK_ALIGN_START);
 
   return hbox;
 }
@@ -666,8 +668,10 @@ static void _lib_history_will_change_callback(gpointer instance,
 {
   dt_lib_history_t *lib = self->data;
 
-  gtk_container_foreach(GTK_CONTAINER(lib->history_box),
-                        (GtkCallback)gtk_widget_set_has_tooltip, NULL);
+  for(GtkWidget *child = gtk_widget_get_first_child(lib->history_box);
+      child;
+      child = gtk_widget_get_next_sibling(child))
+    gtk_widget_set_has_tooltip(child, FALSE);
 
   if(lib->record_history_level++ == 0 && lib->record_undo)
   {
@@ -884,6 +888,13 @@ static gchar *_lib_history_change_text(dt_introspection_field_t *field,
   return NULL;
 }
 
+static void _changes_tooltip_view_destroyed(gpointer data, GObject *where_the_object_was)
+{
+  (void)where_the_object_was;
+  GtkWidget **view = data;
+  *view = NULL;
+}
+
 static gboolean _changes_tooltip_callback(GtkWidget *widget,
                                           const gint x,
                                           const gint y,
@@ -1047,7 +1058,7 @@ static gboolean _changes_tooltip_callback(GtkWidget *widget,
       view = gtk_text_view_new();
       dt_gui_add_class(view, "dt_transparent_background");
       dt_gui_add_class(view, "dt_monospace");
-      g_signal_connect(G_OBJECT(view), "destroy", G_CALLBACK(gtk_widget_destroyed), &view);
+      g_object_weak_ref(G_OBJECT(view), _changes_tooltip_view_destroyed, &view);
     }
 
     // find tabs to align columns and decimals
@@ -1149,7 +1160,10 @@ void gui_update(dt_lib_module_t *self)
     _lib_history_create_button(self, -1, _("original"),
                                FALSE, FALSE, TRUE,
                                darktable.develop->history_end == 0, FALSE);
-  gtk_box_pack_end(GTK_BOX(d->history_box), widget, FALSE, FALSE, 0);
+  /* The history list was built with GTK3 pack_end: the first pack_end
+   * child sits at the end (bottom), so the newest item ends up on top
+   * and "original" at the bottom.  Prepend reproduces that order. */
+  gtk_box_prepend(GTK_BOX(d->history_box), widget);
 
   int num = 0;
 
@@ -1175,7 +1189,7 @@ void gui_update(dt_lib_module_t *self)
     g_signal_connect(G_OBJECT(widget), "query-tooltip",
                      G_CALLBACK(_changes_tooltip_callback), (void *)hitem);
 
-    gtk_box_pack_end(GTK_BOX(d->history_box), widget, FALSE, FALSE, 0);
+    gtk_box_prepend(GTK_BOX(d->history_box), widget);
     num++;
   }
 
@@ -1292,6 +1306,15 @@ static void _lib_history_button_clicked_callback(GtkGestureSingle *gesture,
   reset = TRUE;
 
   /* deactivate all toggle buttons */
+#if GTK_CHECK_VERSION(4, 0, 0)
+  for(GtkWidget *w = gtk_widget_get_first_child(d->history_box);
+      w; w = gtk_widget_get_next_sibling(w))
+  {
+    GtkToggleButton *b = GTK_TOGGLE_BUTTON(dt_gui_container_nth_child(w, HIST_WIDGET_MODULE));
+    if(b != GTK_TOGGLE_BUTTON(widget))
+      g_object_set(G_OBJECT(b), "active", FALSE, (gchar *)0);
+  }
+#else
   GList *children = gtk_container_get_children(GTK_CONTAINER(d->history_box));
   for(GList *l = children; l != NULL; l = g_list_next(l))
   {
@@ -1301,6 +1324,7 @@ static void _lib_history_button_clicked_callback(GtkGestureSingle *gesture,
       g_object_set(G_OBJECT(b), "active", FALSE, (gchar *)0);
   }
   g_list_free(children);
+#endif
 
   reset = FALSE;
   if(dt_atomic_get_int(&darktable.gui->reset) != 0) return;

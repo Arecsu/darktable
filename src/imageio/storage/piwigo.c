@@ -352,11 +352,11 @@ static void _piwigo_set_account(dt_storage_piwigo_gui_data_t *ui)
   JsonBuilder *builder = json_builder_new();
   json_builder_begin_object(builder);
   json_builder_set_member_name(builder, "server");
-  json_builder_add_string_value(builder, gtk_entry_get_text(ui->server_entry));
+  json_builder_add_string_value(builder, gtk_editable_get_text(GTK_EDITABLE(ui->server_entry)));
   json_builder_set_member_name(builder, "username");
-  json_builder_add_string_value(builder, gtk_entry_get_text(ui->user_entry));
+  json_builder_add_string_value(builder, gtk_editable_get_text(GTK_EDITABLE(ui->user_entry)));
   json_builder_set_member_name(builder, "password");
-  json_builder_add_string_value(builder, gtk_entry_get_text(ui->pwd_entry));
+  json_builder_add_string_value(builder, gtk_editable_get_text(GTK_EDITABLE(ui->pwd_entry)));
 
   json_builder_end_object(builder);
 
@@ -373,7 +373,7 @@ static void _piwigo_set_account(dt_storage_piwigo_gui_data_t *ui)
   g_object_unref(builder);
 
   GHashTable *table = dt_pwstorage_get("piwigo");
-  g_hash_table_insert(table, g_strdup(gtk_entry_get_text(ui->server_entry)), data);
+  g_hash_table_insert(table, g_strdup(gtk_editable_get_text(GTK_EDITABLE(ui->server_entry))), data);
   dt_pwstorage_set("piwigo", table);
   g_hash_table_destroy(table);
 }
@@ -589,9 +589,9 @@ static void _piwigo_authenticate(dt_storage_piwigo_gui_data_t *ui)
 {
   if(!ui->api) ui->api = _piwigo_ctx_init();
 
-  ui->api->server = g_strdup(gtk_entry_get_text(ui->server_entry));
-  ui->api->username = g_uri_escape_string(gtk_entry_get_text(ui->user_entry), NULL, FALSE);
-  ui->api->password = g_uri_escape_string(gtk_entry_get_text(ui->pwd_entry), NULL, FALSE);
+  ui->api->server = g_strdup(gtk_editable_get_text(GTK_EDITABLE(ui->server_entry)));
+  ui->api->username = g_uri_escape_string(gtk_editable_get_text(GTK_EDITABLE(ui->user_entry)), NULL, FALSE);
+  ui->api->password = g_uri_escape_string(gtk_editable_get_text(GTK_EDITABLE(ui->pwd_entry)), NULL, FALSE);
 
   _piwigo_api_authenticate(ui->api);
 
@@ -665,9 +665,9 @@ static void _piwigo_account_changed(GtkComboBox *cb,
 
   if(account)
   {
-    gtk_entry_set_text(ui->server_entry, account->server);
-    gtk_entry_set_text(ui->user_entry, account->username);
-    gtk_entry_set_text(ui->pwd_entry, account->password);
+    gtk_editable_set_text(GTK_EDITABLE(ui->server_entry), account->server);
+    gtk_editable_set_text(GTK_EDITABLE(ui->user_entry), account->username);
+    gtk_editable_set_text(GTK_EDITABLE(ui->pwd_entry), account->password);
   }
 }
 
@@ -1027,7 +1027,7 @@ const char *name(const struct dt_imageio_module_storage_t *self)
 static void _filname_pattern_entry_changed_callback(GtkEntry *entry,
                                                     gpointer user_data)
 {
-  dt_conf_set_string("plugins/imageio/storage/export/piwigo/filename_pattern", gtk_entry_get_text(entry));
+  dt_conf_set_string("plugins/imageio/storage/export/piwigo/filename_pattern", gtk_editable_get_text(GTK_EDITABLE(entry)));
 }
 
 void gui_init(dt_imageio_module_storage_t *self)
@@ -1139,8 +1139,8 @@ void gui_init(dt_imageio_module_storage_t *self)
   // new album
   ui->new_album_entry = GTK_ENTRY(gtk_entry_new()); // Album title
   gtk_widget_set_hexpand(GTK_WIDGET(ui->new_album_entry), TRUE);
-  gtk_entry_set_text(ui->new_album_entry, _("new album"));
-  gtk_entry_set_width_chars(GTK_ENTRY(ui->new_album_entry), 0);
+  gtk_editable_set_text(GTK_EDITABLE(ui->new_album_entry), _("new album"));
+  gtk_editable_set_width_chars(GTK_EDITABLE(ui->new_album_entry), 0);
 
   // parent album list
   ui->parent_album_list =
@@ -1537,7 +1537,7 @@ void *get_params(dt_imageio_module_storage_t *self)
           p->parent_album_id =
             _piwigo_album_id(dt_bauhaus_combobox_get_text(ui->parent_album_list),
                              ui->albums);
-          p->album = g_strdup(gtk_entry_get_text(ui->new_album_entry));
+          p->album = g_strdup(gtk_editable_get_text(GTK_EDITABLE(ui->new_album_entry)));
           p->new_album = TRUE;
           break;
 
@@ -1579,7 +1579,7 @@ int set_params(dt_imageio_module_storage_t *self,
   dt_storage_piwigo_gui_data_t *g = self->gui_data;
   dt_storage_piwigo_params_t *d = (dt_storage_piwigo_params_t *)params;
 
-  gtk_entry_set_text(GTK_ENTRY(g->filename_pattern_entry), d->preset_data.filename_pattern);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->filename_pattern_entry)), d->preset_data.filename_pattern);
   dt_bauhaus_combobox_set(g->conflict_action, d->preset_data.conflict_action);
 
   if(dt_bauhaus_combobox_set_from_text(g->account_list, d->preset_data.server))
@@ -1587,9 +1587,9 @@ int set_params(dt_imageio_module_storage_t *self,
     const _piwigo_account_t *account = _piwigo_get_account(g, d->preset_data.server);
     if(account)
     {
-      gtk_entry_set_text(g->server_entry, account->server);
-      gtk_entry_set_text(g->user_entry, account->username);
-      gtk_entry_set_text(g->pwd_entry, account->password);
+      gtk_editable_set_text(GTK_EDITABLE(g->server_entry), account->server);
+      gtk_editable_set_text(GTK_EDITABLE(g->user_entry), account->username);
+      gtk_editable_set_text(GTK_EDITABLE(g->pwd_entry), account->password);
 
       // if we have a server name, do auto-login
       if(dt_conf_get_bool("plugins/imageio/storage/export/auto_login"))

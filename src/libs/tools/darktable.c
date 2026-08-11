@@ -93,7 +93,7 @@ void gui_init(dt_lib_module_t *self)
   self->data = (void *)d;
 
   /* create drawing area */
-  self->widget = gtk_event_box_new();
+  self->widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
   /* connect callbacks */
   g_signal_connect(G_OBJECT(self->widget), "draw",

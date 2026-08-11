@@ -1248,7 +1248,7 @@ void gui_init(dt_iop_module_t *self)
   gtk_widget_set_tooltip_text(monochromes, _("no highlights reconstruction for monochrome images"));
 
   self->widget = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(self->widget), FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(self->widget), FALSE);
   gtk_stack_add_named(GTK_STACK(self->widget), monochromes, "monochrome");
   gtk_stack_add_named(GTK_STACK(self->widget), box_enabled, "default");
 }

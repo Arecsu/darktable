@@ -159,9 +159,15 @@ static void _duplicates_widget_init(dt_lib_filtering_rule_t *rule, const dt_coll
   dt_bauhaus_widget_hide_label(duplicates->combo);
 
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), duplicates->combo, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), duplicates->combo);
+    gtk_widget_set_hexpand(duplicates->combo, TRUE);
+  }
   else
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), duplicates->combo, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box), duplicates->combo);
+    gtk_widget_set_hexpand(duplicates->combo, TRUE);
+  }
 
   if(top)
   {

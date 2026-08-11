@@ -1401,7 +1401,7 @@ void gui_init(dt_lib_module_t *self)
   self->widget = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
   /* creating timeline box*/
-  d->timeline = gtk_event_box_new();
+  d->timeline = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
   gtk_widget_add_events(d->timeline, 0);
 
@@ -1412,7 +1412,8 @@ void gui_init(dt_lib_module_t *self)
                                   | GTK_EVENT_CONTROLLER_SCROLL_DISCRETE,
                         _lib_timeline_scroll_cb, self);
 
-  gtk_box_pack_start(GTK_BOX(self->widget), d->timeline, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), d->timeline);
+  gtk_widget_set_vexpand(d->timeline, TRUE);
 
   gtk_widget_show_all(self->widget);
   /* initialize view manager proxy */

@@ -2274,9 +2274,12 @@ void dt_control_copy_images()
 
   dt_conf_get_folder_to_file_chooser("ui_last/copy_path",
                                      GTK_FILE_CHOOSER(filechooser));
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    dir = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    // GTK4's deprecated GtkFileChooser returns GFile* everywhere
+    GFile *dir_file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    dir = dir_file ? g_file_get_path(dir_file) : NULL;
+    if(dir_file) g_object_unref(dir_file);
     dt_conf_set_folder_from_file_chooser("ui_last/copy_path",
                                          GTK_FILE_CHOOSER(filechooser));
   }

@@ -95,7 +95,7 @@ static int get_widget_params(lua_State *L)
     luaL_error(L, "Trying to create a widget of an abstract type : %s\n", widget_type->name);
   }
   lua_widget widget= malloc(widget_type->alloc_size);
-  widget->widget = gtk_widget_new(widget_type->gtk_type, NULL);
+  widget->widget = g_object_new(widget_type->gtk_type, NULL);
   gtk_widget_show(widget->widget);// widgets are invisible by default
   g_object_ref_sink(widget->widget);
   widget->type = widget_type;
@@ -207,9 +207,15 @@ static int tooltip_member(lua_State *L)
     }
     return 0;
   }
-  char* result = gtk_widget_get_tooltip_text(widget->widget);
+  // GTK4 returns a const, non-owned string (GTK3 returned an owned gchar *)
+#if GTK_CHECK_VERSION(4, 0, 0)
+  const char *result = gtk_widget_get_tooltip_text(widget->widget);
+  lua_pushstring(L, result);
+#else
+  char *result = gtk_widget_get_tooltip_text(widget->widget);
   lua_pushstring(L, result);
   free(result);
+#endif
   return 1;
 }
 

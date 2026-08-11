@@ -689,6 +689,7 @@ static void _bt_add_shape_cb(GtkGestureSingle *gesture, int n_press, double x, d
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _tree_add_exist(GtkButton *button, dt_masks_form_t *grp)
 {
   if(!grp || !(grp->type & DT_MASKS_GROUP)) return;
@@ -755,6 +756,7 @@ static void _tree_group(GtkButton *button, dt_lib_module_t *self)
   _lib_masks_recreate_list(self);
   // dt_masks_change_form_gui(grp);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _set_iter_name(dt_lib_masks_t *lm,
                            dt_masks_form_t *form,
@@ -803,20 +805,25 @@ static void _set_iter_name(dt_lib_masks_t *lm,
                      -1);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _tree_cleanup(GtkButton *button, dt_lib_module_t *self)
 {
   dt_masks_cleanup_unused(darktable.develop);
   _lib_masks_recreate_list(self);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _add_masks_history_item(dt_lib_masks_t *lm)
 {
   DT_ENTER_GUI_UPDATE();
   dt_dev_add_masks_history_item(darktable.develop, NULL, FALSE);
   DT_LEAVE_GUI_UPDATE();
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _tree_operation(GtkButton *button, gpointer user_data)
 {
   dt_masks_state_t change_state = GPOINTER_TO_INT(user_data);
@@ -874,7 +881,9 @@ static void _tree_operation(GtkButton *button, gpointer user_data)
   if(change)
     _add_masks_history_item(lm);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _add_tree_operation(GtkMenuShell *menu,
                                 gchar *label,
                                 dt_masks_state_t state,
@@ -889,7 +898,9 @@ static void _add_tree_operation(GtkMenuShell *menu,
                     GINT_TO_POINTER(state));
   gtk_menu_shell_append(menu, item);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _swap_last_secondlast_item_visibility(dt_lib_masks_t *lm,
                                                    GtkTreeIter *iter,
                                                    const dt_mask_id_t secondlast_id,
@@ -942,7 +953,9 @@ static gboolean _is_last_tree_item(GtkTreeModel *model, GtkTreeIter *iter)
   gtk_tree_iter_free(tmp);
   return is_last_item;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _tree_moveup(GtkButton *button, dt_lib_module_t *self)
 {
   dt_lib_masks_t *lm = self->data;
@@ -1034,7 +1047,9 @@ static void _tree_movedown(GtkButton *button, dt_lib_module_t *self)
   dt_dev_add_masks_history_item(darktable.develop, NULL, TRUE);
   _lib_masks_recreate_list(self);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _tree_delete_shape(GtkButton *button, dt_lib_module_t *self)
 {
   dt_lib_masks_t *lm = self->data;
@@ -1092,6 +1107,7 @@ static void _tree_delete_shape(GtkButton *button, dt_lib_module_t *self)
   _lib_masks_recreate_list(self);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _tree_duplicate_shape(GtkButton *button, dt_lib_module_t *self)
 {
   dt_lib_masks_t *lm = self->data;
@@ -1117,6 +1133,8 @@ static void _tree_duplicate_shape(GtkButton *button, dt_lib_module_t *self)
   }
   g_list_free_full(items, (GDestroyNotify)gtk_tree_path_free);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _tree_cell_edited(GtkCellRendererText *cell,
                               gchar *path_string,
@@ -1268,6 +1286,8 @@ static void _tree_button_pressed_cb(GtkGestureSingle *gesture, int n_press, doub
     }
 
     // and we display the context-menu
+#if !GTK_CHECK_VERSION(4, 0, 0)
+    // TODO P2: GtkMenu->GtkPopoverMenu migration
     GtkMenuShell *menu = GTK_MENU_SHELL(gtk_menu_new());
     GtkWidget *item;
 
@@ -1518,6 +1538,7 @@ static void _tree_button_pressed_cb(GtkGestureSingle *gesture, int n_press, doub
 
     const GdkEvent *event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), NULL);
     gtk_menu_popup_at_pointer(GTK_MENU(menu), event);
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
   }
 }
 
@@ -1581,7 +1602,7 @@ static gboolean _tree_query_tooltip(GtkWidget *widget,
   gchar *tmp = NULL;
   gboolean show = FALSE;
 
-  if(!gtk_tree_view_get_tooltip_context(tree_view, &x, &y,
+  if(!gtk_tree_view_get_tooltip_context(tree_view, x, y,
                                         keyboard_tip, &model, &path, &iter))
     return FALSE;
 
@@ -2481,13 +2502,10 @@ void gui_init(dt_lib_module_t *self)
   // "size" scales the shape live; "shrink or grow" insets/outsets its outline.
   // They are the two resize controls, so keep the grow/shrink slider right below
   // "size" instead of at the end of the property list.
-  {
-    GList *kids = gtk_container_get_children(GTK_CONTAINER(d->cs.container));
-    const gint size_pos = g_list_index(kids, d->property[DT_MASKS_PROPERTY_SIZE]);
-    if(size_pos >= 0)
-      gtk_box_reorder_child(d->cs.container, d->resize_amount, size_pos + 1);
-    g_list_free(kids);
-  }
+  // GTK3 used an index-based reorder; GTK4 reorders after the size widget directly.
+  if(gtk_widget_get_parent(d->property[DT_MASKS_PROPERTY_SIZE]) == GTK_WIDGET(d->cs.container))
+    gtk_box_reorder_child_after(d->cs.container, d->resize_amount,
+                                d->property[DT_MASKS_PROPERTY_SIZE]);
 
   // set proxy functions
   darktable.develop->proxy.masks.module = self;

@@ -137,7 +137,7 @@ static void _lib_navigation_control_redraw_callback(gpointer instance,
   DT_LEAVE_GUI_UPDATE();
   g_free(zoomline);
 
-  gtk_widget_queue_draw(gtk_bin_get_child(GTK_BIN(self->widget)));
+  gtk_widget_queue_draw(gtk_overlay_get_child(GTK_OVERLAY(self->widget)));
 }
 
 
@@ -234,7 +234,7 @@ void gui_init(dt_lib_module_t *self)
   // FIXME: Make helper function for zoom gesture. If discrete zooming
   //        as here is a well-used pattern, make proxy which handles
   //        this so don't need to implement a "begin" handler here.
-  GtkGesture *zoom_gesture = gtk_gesture_zoom_new(thumbnail);
+  GtkGesture *zoom_gesture = gtk_gesture_zoom_new();
   dt_gui_add_controller(thumbnail, zoom_gesture);
   g_signal_connect(zoom_gesture, "begin", G_CALLBACK(_lib_navigation_pinch_begin_callback), self);
   g_signal_connect(zoom_gesture, "scale-changed", G_CALLBACK(_lib_navigation_pinch_scale_callback), self);
@@ -286,7 +286,7 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_name(d->zoom, "nav-zoom");
 
   self->widget = gtk_overlay_new();
-  gtk_container_add(GTK_CONTAINER(self->widget), thumbnail);
+  gtk_overlay_set_child(GTK_OVERLAY(self->widget), thumbnail);
   gtk_overlay_add_overlay(GTK_OVERLAY(self->widget), d->zoom);
   dt_gui_add_class(self->widget, "dt_plugin_ui_main");
   gtk_widget_show_all(self->widget);
@@ -676,6 +676,12 @@ static void _lib_navigation_button_press_callback(GtkGestureSingle *gesture, int
   }
   else if(button == GDK_BUTTON_MIDDLE)
   {
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // GTK4: no gdk_event_new()/gtk_widget_event() event synthesis; the
+    // middle-click pan is handled by the center view's own controllers.
+    (void)x;
+    (void)y;
+#else
     GtkWidget *center = dt_ui_center(darktable.gui->ui);
     GtkAllocation center_alloc;
     gtk_widget_get_allocation(center, &center_alloc);
@@ -691,6 +697,7 @@ static void _lib_navigation_button_press_callback(GtkGestureSingle *gesture, int
     if(ev->button.window) g_object_ref(ev->button.window);
     gtk_widget_event(center, ev);
     gdk_event_free(ev);
+#endif
   }
 }
 

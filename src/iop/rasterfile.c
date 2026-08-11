@@ -382,7 +382,9 @@ static void _fbutton_clicked(GtkWidget *widget, dt_iop_module_t *self)
         _("select raster mask file"), GTK_WINDOW(win), GTK_FILE_CHOOSER_ACTION_OPEN,
         _("_select"), _("_cancel"));
   gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(filechooser), FALSE);
-  gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), mfolder);
+  GFile *folder = g_file_new_for_path(mfolder);
+  gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), folder, NULL);
+  g_object_unref(folder);
   GtkFileFilter *filter = GTK_FILE_FILTER(gtk_file_filter_new());
   // only pfm/png files yet supported
   gtk_file_filter_add_pattern(filter, "*.pfm");
@@ -392,9 +394,11 @@ static void _fbutton_clicked(GtkWidget *widget, dt_iop_module_t *self)
   gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(filechooser), filter);
   gtk_file_chooser_set_filter(GTK_FILE_CHOOSER(filechooser), filter);
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *filepath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    gchar *filepath = file ? g_file_get_path(file) : NULL;
+    if(file) g_object_unref(file);
     const gboolean within = (strlen(filepath) > strlen(mfolder))
                          && (memcmp(filepath, mfolder, strlen(mfolder)) == 0);
     if(within)

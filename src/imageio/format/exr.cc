@@ -623,7 +623,8 @@ void gui_init(dt_imageio_module_format_t *self)
                                N_("16 bit (float)"), N_("32 bit (float)"));
   const int bpp_default = dt_confgen_get_int("plugins/imageio/format/exr/bpp", DT_DEFAULT);
   dt_bauhaus_combobox_set_default(gui->bpp, (bpp_default >> 4) - EXR_PT_HALF);
-  gtk_box_pack_start(GTK_BOX(self->widget), gui->bpp, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), gui->bpp);
+  gtk_widget_set_vexpand(GTK_WIDGET(gui->bpp), TRUE);
 
   // Compression combo box
   const int compression_last = dt_conf_get_int("plugins/imageio/format/exr/compression");
@@ -649,7 +650,8 @@ void gui_init(dt_imageio_module_format_t *self)
   dt_bauhaus_combobox_set_default(gui->compression,
                                   dt_confgen_get_int("plugins/imageio/format/exr/compression",
                                   DT_DEFAULT));
-  gtk_box_pack_start(GTK_BOX(self->widget), gui->compression, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), gui->compression);
+  gtk_widget_set_vexpand(GTK_WIDGET(gui->compression), TRUE);
 }
 
 void gui_cleanup(dt_imageio_module_format_t *self)

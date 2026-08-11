@@ -322,7 +322,12 @@ GtkWidget *dt_iop_button_new(dt_iop_module_t *self, const gchar *label,
   dt_action_t *ac = dt_action_define_iop(self, NULL, label, button, &dt_action_def_button);
     dt_shortcut_register(ac, 0, 0, accel_key, mods);
 
-  if(GTK_IS_BOX(box)) gtk_box_pack_start(GTK_BOX(box), button, TRUE, TRUE, 0);
+  if(GTK_IS_BOX(box))
+  {
+    gtk_box_append(GTK_BOX(box), button);
+    gtk_widget_set_hexpand(button, TRUE);
+    gtk_widget_set_vexpand(button, TRUE);
+  }
 
   return button;
 }

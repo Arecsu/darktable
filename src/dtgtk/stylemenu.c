@@ -25,6 +25,12 @@
 #include "gui/gtk.h"
 #include "gui/styles.h"
 
+/* GtkMenu/GtkMenuItem/GtkMenuShell are removed from GTK4's installed
+ * headers; the style menu hierarchy needs the GtkMenu->GtkPopoverMenu
+ * migration (TODO P2, with the export/print_settings/darkroom callers).
+ * Guarded GTK3-only like the other GtkMenu subsystems. */
+#if !GTK_CHECK_VERSION(4, 0, 0)
+
 static gboolean _styles_tooltip_callback(GtkWidget* self,
                                          const gint x,
                                          const gint y,
@@ -205,6 +211,8 @@ GtkMenuShell *dtgtk_build_style_menu_hierarchy(gboolean allow_none,
   }
   return menu;
 }
+
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

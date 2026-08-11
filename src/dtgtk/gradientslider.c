@@ -35,13 +35,14 @@ G_DEFINE_TYPE(GtkDarktableGradientSlider, _gradient_slider, GTK_TYPE_DRAWING_ARE
 #define parent_class _gradient_slider_parent_class
 
 // Class overrides
-static void _gradient_slider_get_preferred_height(GtkWidget *widget,
-                                                  gint *min_height,
-                                                  gint *nat_height);
-static void _gradient_slider_get_preferred_width(GtkWidget *widget,
-                                                 gint *min_width,
-                                                 gint *nat_width);
-static gboolean _gradient_slider_draw(GtkWidget *widget, cairo_t *cr);
+static void _gradient_slider_measure(GtkWidget *widget,
+                                     GtkOrientation orientation,
+                                     int for_size,
+                                     int *minimum,
+                                     int *natural,
+                                     int *minimum_baseline,
+                                     int *natural_baseline);
+static void _gradient_slider_snapshot(GtkWidget *widget, GtkSnapshot *snapshot);
 static void _gradient_slider_dispose(GObject *object);
 
 // Events
@@ -493,9 +494,8 @@ static void _gradient_slider_class_init(GtkDarktableGradientSliderClass *klass)
 {
   GtkWidgetClass *widget_class = (GtkWidgetClass *)klass;
 
-  widget_class->get_preferred_height = _gradient_slider_get_preferred_height;
-  widget_class->get_preferred_width = _gradient_slider_get_preferred_width;
-  widget_class->draw = _gradient_slider_draw;
+  widget_class->measure = _gradient_slider_measure;
+  widget_class->snapshot = _gradient_slider_snapshot;
   GObjectClass *object_class = (GObjectClass *)klass;
   object_class->dispose = _gradient_slider_dispose;
 
@@ -518,18 +518,7 @@ static void _gradient_slider_init(GtkDarktableGradientSlider *gslider)
   g_return_if_fail(gslider != NULL);
 
   GtkWidget *widget = GTK_WIDGET(gslider);
-  gtk_widget_add_events(widget,
-                        GDK_EXPOSURE_MASK |
-                        GDK_BUTTON_PRESS_MASK |
-                        GDK_BUTTON_RELEASE_MASK |
-                        GDK_ENTER_NOTIFY_MASK |
-                        GDK_LEAVE_NOTIFY_MASK |
-                        GDK_KEY_PRESS_MASK |
-                        GDK_KEY_RELEASE_MASK |
-                        GDK_POINTER_MOTION_MASK |
-                        darktable.gui->scroll_mask);
 
-  gtk_widget_set_has_window(widget, TRUE);
   gtk_widget_set_can_focus(widget, TRUE);
 
   // GTK3 class handlers (button-press-event & friends) are gone in GTK4:
@@ -547,9 +536,13 @@ static void _gradient_slider_init(GtkDarktableGradientSlider *gslider)
   dt_gui_connect_key(widget, _gradient_slider_key_pressed, NULL);
 }
 
-static void _gradient_slider_get_preferred_height(GtkWidget *widget,
-                                                  gint *min_height,
-                                                  gint *nat_height)
+static void _gradient_slider_measure(GtkWidget *widget,
+                                     GtkOrientation orientation,
+                                     int for_size,
+                                     int *minimum,
+                                     int *natural,
+                                     int *minimum_baseline,
+                                     int *natural_baseline)
 {
   g_return_if_fail(widget != NULL);
 
@@ -557,33 +550,30 @@ static void _gradient_slider_get_preferred_height(GtkWidget *widget,
   GtkStateFlags state = gtk_widget_get_state_flags(widget);
 
   GtkBorder margin, border, padding;
-  int css_min_height;
-  dt_gui_style_context_get(context, state, "min-height", &css_min_height, NULL);
+  int css_min_size;
+  dt_gui_style_context_get(context, state,
+                           orientation == GTK_ORIENTATION_HORIZONTAL ? "min-width" : "min-height",
+                           &css_min_size, NULL);
   gtk_style_context_get_margin(context, state, &margin);
   gtk_style_context_get_border(context, state, &border);
   gtk_style_context_get_padding(context, state, &padding);
-  *min_height = *nat_height = css_min_height + padding.top + padding.bottom + border.top + border.bottom + margin.top + margin.bottom;
-}
 
-static void _gradient_slider_get_preferred_width(GtkWidget *widget,
-                                                 gint *min_width,
-                                                 gint *nat_width)
-{
-  g_return_if_fail(DTGTK_IS_GRADIENT_SLIDER(widget));
+  int size;
+  if(orientation == GTK_ORIENTATION_HORIZONTAL)
+  {
+    size = css_min_size + padding.left + padding.right + border.left + border.right + margin.left + margin.right;
+    DTGTK_GRADIENT_SLIDER(widget)->margin_left = padding.left + border.left + margin.left;
+    DTGTK_GRADIENT_SLIDER(widget)->margin_right = padding.right + border.right + margin.right;
+  }
+  else
+  {
+    size = css_min_size + padding.top + padding.bottom + border.top + border.bottom + margin.top + margin.bottom;
+  }
 
-  GtkStyleContext *context = gtk_widget_get_style_context(widget);
-  GtkStateFlags state = gtk_widget_get_state_flags(widget);
-
-  GtkBorder margin, border, padding;
-  int css_min_width;
-  gtk_style_context_get (context, state, "min-width", &css_min_width, NULL);
-  gtk_style_context_get_margin(context, state, &margin);
-  gtk_style_context_get_border(context, state, &border);
-  gtk_style_context_get_padding(context, state, &padding);
-  *min_width = *nat_width = css_min_width + padding.left + padding.right + border.left + border.right + margin.left + margin.right;
-
-  DTGTK_GRADIENT_SLIDER(widget)->margin_left = padding.left + border.left + margin.left;
-  DTGTK_GRADIENT_SLIDER(widget)->margin_right = padding.right + border.right + margin.right;
+  if(minimum) *minimum = size;
+  if(natural) *natural = size;
+  if(minimum_baseline) *minimum_baseline = -1;
+  if(natural_baseline) *natural_baseline = -1;
 }
 
 static void _gradient_slider_dispose(GObject *object)
@@ -605,13 +595,16 @@ static void _gradient_slider_dispose(GObject *object)
   G_OBJECT_CLASS(parent_class)->dispose(object);
 }
 
-static gboolean _gradient_slider_draw(GtkWidget *widget,
-                                      cairo_t *cr)
+static void _gradient_slider_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
 {
-  g_return_val_if_fail(DTGTK_IS_GRADIENT_SLIDER(widget), FALSE);
+  g_return_if_fail(DTGTK_IS_GRADIENT_SLIDER(widget));
   GtkDarktableGradientSlider *gslider = DTGTK_GRADIENT_SLIDER(widget);
 
   assert(gslider->position > 0);
+
+  const int width = gtk_widget_get_width(widget);
+  const int height = gtk_widget_get_height(widget);
+  cairo_t *cr = gtk_snapshot_append_cairo(snapshot, &GRAPHENE_RECT_INIT(0, 0, width, height));
 
   GtkStyleContext *context = gtk_widget_get_style_context(widget);
   GtkStateFlags state = gtk_widget_get_state_flags(widget);
@@ -619,9 +612,7 @@ static gboolean _gradient_slider_draw(GtkWidget *widget,
   GdkRGBA color;
   gtk_style_context_get_color(context, state, &color);
 
-  GtkAllocation allocation;
   GtkBorder margin, border, padding;
-  gtk_widget_get_allocation(widget, &allocation);
   gtk_style_context_get_margin(context, state, &margin);
   gtk_style_context_get_border(context, state, &border);
   gtk_style_context_get_padding(context, state, &padding);
@@ -630,8 +621,8 @@ static gboolean _gradient_slider_draw(GtkWidget *widget,
   // for frame and background, we remove css margin from allocation
   int startx = margin.left;
   int starty = margin.top;
-  int cwidth = allocation.width - margin.left - margin.right;
-  int cheight = allocation.height - margin.top - margin.bottom;
+  int cwidth = width - margin.left - margin.right;
+  int cheight = height - margin.top - margin.bottom;
   gtk_render_background(context, cr, startx, starty, cwidth, cheight);
   gtk_render_frame(context, cr, startx, starty, cwidth, cheight);
 
@@ -720,7 +711,7 @@ static gboolean _gradient_slider_draw(GtkWidget *widget,
     }
   }
 
-  return FALSE;
+  cairo_destroy(cr);
 }
 
 gint _list_find_by_position(gconstpointer a, gconstpointer b)

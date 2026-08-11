@@ -142,7 +142,8 @@ void gui_init(dt_lib_module_t *self)
     d->buttons[k] = button;
     dt_gui_add_class(d->buttons[k], "dt_no_hover");
     dt_gui_add_class(d->buttons[k], "dt_dimmed");
-    gtk_box_pack_start(GTK_BOX(self->widget), button, TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(self->widget), button);
+    gtk_widget_set_hexpand(button, TRUE);
     dt_gui_connect_click_all(button, _lib_colorlabels_button_press_callback, NULL, self);
     dt_gui_connect_motion(button, NULL, _lib_colorlabels_enter_notify_callback, NULL, self);
     ac = dt_action_widget(button);
@@ -165,6 +166,19 @@ void gui_cleanup(dt_lib_module_t *self)
 
 #define FLOATING_ENTRY_WIDTH DT_PIXEL_APPLY_DPI(150)
 
+static void _lib_colorlabels_destroy_floating(dt_lib_module_t *self)
+{
+  dt_lib_colorlabels_t *d = self->data;
+  if(!d->floating_window) return;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: popovers are torn down by unparenting them from their anchor
+  gtk_widget_unparent(d->floating_window);
+#else
+  gtk_widget_destroy(d->floating_window);
+#endif
+  d->floating_window = NULL;
+}
+
 static gboolean _lib_colorlabels_key_press_cb(GtkEventControllerKey *controller,
                                                   guint keyval,
                                                   guint keycode,
@@ -176,7 +190,7 @@ static gboolean _lib_colorlabels_key_press_cb(GtkEventControllerKey *controller,
   switch(keyval)
   {
     case GDK_KEY_Escape:
-      gtk_widget_destroy(d->floating_window);
+      _lib_colorlabels_destroy_floating(self);
       gtk_window_present(GTK_WINDOW(dt_ui_main_window(darktable.gui->ui)));
       return TRUE;
     case GDK_KEY_Tab:
@@ -186,7 +200,7 @@ static gboolean _lib_colorlabels_key_press_cb(GtkEventControllerKey *controller,
     {
       GtkWidget *entry = dt_gui_get_widget(controller);
       char confname[128];
-      const gchar *label = gtk_entry_get_text(GTK_ENTRY(entry));
+      const gchar *label = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry)));
       snprintf(confname, sizeof(confname), "colorlabel/%s",
                dt_colorlabels_name[d->colorlabel]);
       dt_conf_set_string(confname, label);
@@ -195,7 +209,7 @@ static gboolean _lib_colorlabels_key_press_cb(GtkEventControllerKey *controller,
       gtk_widget_set_tooltip_markup(d->buttons[d->colorlabel], tooltip);
       g_free(tooltip);
 
-      gtk_widget_destroy(d->floating_window);
+      _lib_colorlabels_destroy_floating(self);
       gtk_window_present(GTK_WINDOW(dt_ui_main_window(darktable.gui->ui)));
       return TRUE;
     }
@@ -203,14 +217,10 @@ static gboolean _lib_colorlabels_key_press_cb(GtkEventControllerKey *controller,
   return FALSE; /* event not handled */
 }
 
-static gboolean _lib_colorlabels_destroy(GtkWidget *widget,
-                                         GdkEvent *event,
-                                         dt_lib_module_t *self)
+static void _lib_colorlabels_destroy(GtkEventControllerFocus *controller,
+                                     dt_lib_module_t *self)
 {
-  dt_lib_colorlabels_t *d = self->data;
-
-  gtk_widget_destroy(d->floating_window);
-  return FALSE;
+  _lib_colorlabels_destroy_floating(self);
 }
 
 static void _lib_colorlabels_edit(dt_lib_module_t *self,
@@ -219,19 +229,38 @@ static void _lib_colorlabels_edit(dt_lib_module_t *self,
 {
   dt_lib_colorlabels_t *d = self->data;
 
-  GtkWidget *window = dt_ui_main_window(darktable.gui->ui);
-
-  // Wayland: use a GtkPopover anchored to the clicked color label button (native xdg_popup semantics).
-  // Other session types: keep the lightweight undecorated GtkWindow (manual positioning via gtk_window_move()).
-  const gboolean use_popover = (dt_gui_get_session_type() == DT_GUI_SESSION_WAYLAND);
-
   GtkWidget *entry = gtk_entry_new();
   gtk_widget_set_size_request(entry, FLOATING_ENTRY_WIDTH, -1);
   gtk_widget_add_events(entry, GDK_FOCUS_CHANGE_MASK);
   gtk_editable_select_region(GTK_EDITABLE(entry), 0, -1);
-  g_signal_connect(entry, "focus-out-event", G_CALLBACK(_lib_colorlabels_destroy), self);
+  GtkEventController *focus = gtk_event_controller_focus_new();
+  g_signal_connect(focus, "leave", G_CALLBACK(_lib_colorlabels_destroy), self);
+  gtk_widget_add_controller(entry, focus);
   dt_gui_connect_key(entry, _lib_colorlabels_key_press_cb, self);
   gtk_widget_set_tooltip_text(entry, _("enter a description of how you use this color label"));
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4: GtkPopover is the native popup mechanism on every session type;
+  // the legacy undecorated-window path (gtk_window_move, type hints) is gone.
+  {
+    GtkWidget *button = d->buttons[d->colorlabel];
+    GtkAllocation alloc = {0};
+    gtk_widget_get_allocation(button, &alloc);
+    d->floating_window = gtk_popover_new();
+    gtk_widget_set_parent(d->floating_window, button);
+    GdkRectangle r = { 0, 0, alloc.width, alloc.height };
+    gtk_popover_set_pointing_to(GTK_POPOVER(d->floating_window), &r);
+    gtk_popover_set_position(GTK_POPOVER(d->floating_window), GTK_POS_TOP);
+    gtk_popover_set_child(GTK_POPOVER(d->floating_window), entry);
+    gtk_widget_set_visible(d->floating_window, TRUE);
+    gtk_widget_grab_focus(entry);
+  }
+#else
+  // Wayland: use a GtkPopover anchored to the clicked color label button (native xdg_popup semantics).
+  // Other session types: keep the lightweight undecorated GtkWindow (manual positioning via gtk_window_move()).
+  const gboolean use_popover = (dt_gui_get_session_type() == DT_GUI_SESSION_WAYLAND);
+
+  GtkWidget *window = dt_ui_main_window(darktable.gui->ui);
 
   if(use_popover)
   {
@@ -271,6 +300,7 @@ static void _lib_colorlabels_edit(dt_lib_module_t *self,
     gtk_widget_grab_focus(entry);
     gtk_window_present(GTK_WINDOW(d->floating_window));
   }
+#endif
 }
 
 static void _lib_colorlabels_button_press_callback(GtkGestureSingle *gesture, int n_press,

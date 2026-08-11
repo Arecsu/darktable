@@ -25,25 +25,41 @@ static GtkSizeRequestMode dtgtk_drawing_area_get_request_mode(GtkWidget *widget)
   return GTK_SIZE_REQUEST_HEIGHT_FOR_WIDTH;
 };
 
-static void dtgtk_drawing_area_get_preferred_height_for_width(GtkWidget *widget, gint for_width,
-                                                              gint *min_height, gint *nat_height)
+static void dtgtk_drawing_area_measure(GtkWidget *widget,
+                                       GtkOrientation orientation,
+                                       int for_size,
+                                       int *minimum,
+                                       int *natural,
+                                       int *minimum_baseline,
+                                       int *natural_baseline)
 {
   GtkDarktableDrawingArea *da = DTGTK_DRAWING_AREA(widget);
 
-  if(da->height == 0)
+  int size;
+  if(orientation == GTK_ORIENTATION_HORIZONTAL)
+  {
+    // width is not constrained; the drawing area expands to its allocation
+    size = 0;
+  }
+  else if(da->height == 0)
   {
     // initialize with height = width
-    *min_height = *nat_height = for_width;
+    size = for_size;
   }
   else if(da->height == -1)
   {
     // initialize with aspect ratio
-    *min_height = *nat_height = for_width * da->aspect;
+    size = for_size * da->aspect;
   }
   else
   {
-    *min_height = *nat_height = da->height;
+    size = da->height;
   }
+
+  if(minimum) *minimum = size;
+  if(natural) *natural = size;
+  if(minimum_baseline) *minimum_baseline = -1;
+  if(natural_baseline) *natural_baseline = -1;
 }
 
 static void dtgtk_drawing_area_class_init(GtkDarktableDrawingAreaClass *class)
@@ -51,7 +67,7 @@ static void dtgtk_drawing_area_class_init(GtkDarktableDrawingAreaClass *class)
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(class);
 
   widget_class->get_request_mode = dtgtk_drawing_area_get_request_mode;
-  widget_class->get_preferred_height_for_width = dtgtk_drawing_area_get_preferred_height_for_width;
+  widget_class->measure = dtgtk_drawing_area_measure;
 }
 
 static void dtgtk_drawing_area_init(GtkDarktableDrawingArea *da)

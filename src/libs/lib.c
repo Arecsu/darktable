@@ -141,6 +141,7 @@ static void _set_module_preset_label(dt_lib_module_t *module,
   g_free(preset_label_text);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _edit_preset(const char *name_in,
                          dt_lib_module_info_t *minfo)
 {
@@ -183,7 +184,6 @@ static void _edit_preset(const char *name_in,
 
 // The lib preset menu is GtkMenu-based; GtkMenu is gone in GTK4.  Deferred to the
 // GtkMenu->GtkPopoverMenu migration (TODO P2).
-#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _menuitem_update_preset(GtkMenuItem *menuitem,
                                     dt_lib_module_info_t *minfo)
 {
@@ -284,6 +284,7 @@ static void _menuitem_delete_preset(GtkMenuItem *menuitem,
   }
   g_free(name);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 gchar *dt_lib_presets_duplicate(const gchar *preset,
                                 const gchar *module_name,
@@ -443,6 +444,7 @@ void dt_lib_presets_update(const gchar *preset,
   sqlite3_finalize(stmt);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _menuitem_activate_preset(GtkMenuItem *menuitem,
                                       dt_lib_module_info_t *minfo)
 {
@@ -1163,6 +1165,7 @@ static void _body_leave_callback(GtkEventControllerMotion *controller,
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _on_drag_motion(GtkWidget *widget,
                                 GdkDragContext *dc,
                                 gint x, gint y, guint time,
@@ -1271,6 +1274,7 @@ static gboolean _on_drag_drop(GtkWidget *widget,
 {
   return _on_drag_motion(widget, dc, DND_DROP, y, time, dest);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 GtkWidget *dt_lib_gui_get_expander(dt_lib_module_t *module)
 {
@@ -1313,12 +1317,14 @@ GtkWidget *dt_lib_gui_get_expander(dt_lib_module_t *module)
   dt_ui_container_t container = module->container(module);
   if(container == DT_UI_CONTAINER_PANEL_LEFT_CENTER || container == DT_UI_CONTAINER_PANEL_RIGHT_CENTER)
   {
+#if !GTK_CHECK_VERSION(4, 0, 0)
     static const GtkTargetEntry target_list[] = { { "lib", GTK_TARGET_SAME_APP, DND_TARGET_LIB } };
 
     gtk_drag_source_set(header_evb, GDK_BUTTON1_MASK, target_list, 1, GDK_ACTION_COPY);
     gtk_drag_dest_set(expander, GTK_DEST_DEFAULT_DROP | GTK_DEST_DEFAULT_HIGHLIGHT, target_list, 1, GDK_ACTION_COPY);
     g_signal_connect(expander, "drag-motion", G_CALLBACK(_on_drag_motion), module);
     g_signal_connect(expander, "drag-drop", G_CALLBACK(_on_drag_drop), module);
+#endif
   }
 
   /* setup the header box */
@@ -1339,12 +1345,12 @@ GtkWidget *dt_lib_gui_get_expander(dt_lib_module_t *module)
       });
 
   dt_gui_connect_click_all(module->arrow, _lib_plugin_arrow_button_press_cb, NULL, module);
-  gtk_box_pack_start(GTK_BOX(header), module->arrow, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(header), module->arrow);
 
   /* add module label */
   GtkWidget *label = gtk_label_new("");
-  GtkWidget *label_evb = gtk_event_box_new();
-  gtk_container_add(GTK_CONTAINER(label_evb), label);
+  GtkWidget *label_evb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_box_append(GTK_BOX(label_evb), label);
   gchar *mname = g_markup_escape_text(module->name(module), -1);
   gtk_label_set_markup(GTK_LABEL(label), mname);
   if(module->description)
@@ -1356,7 +1362,7 @@ GtkWidget *dt_lib_gui_get_expander(dt_lib_module_t *module)
   g_object_set(G_OBJECT(label), "halign", GTK_ALIGN_START, "xalign", 0.0, (gchar *)0);
   gtk_widget_set_name(label, "lib-panel-label");
   dt_action_define(&module->actions, NULL, NULL, label_evb, NULL);
-  gtk_box_pack_start(GTK_BOX(header), label_evb, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(header), label_evb);
 
   /* add preset label */
   module->preset_label = gtk_label_new(NULL);
@@ -1364,7 +1370,7 @@ GtkWidget *dt_lib_gui_get_expander(dt_lib_module_t *module)
   gtk_label_set_ellipsize(GTK_LABEL(module->preset_label), PANGO_ELLIPSIZE_MIDDLE);
   gtk_widget_set_valign(module->preset_label, GTK_ALIGN_BASELINE);
   g_object_set(G_OBJECT(module->preset_label), "xalign", 0.0, (gchar *)0);
-  gtk_box_pack_start(GTK_BOX(header), module->preset_label, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(header), module->preset_label);
 
   /* add preset button if module has implementation */
   module->presets_button = dtgtk_button_new_full(dtgtk_cairo_paint_presets, 0, NULL,
@@ -1378,7 +1384,6 @@ GtkWidget *dt_lib_gui_get_expander(dt_lib_module_t *module)
   if(!module->get_params
      && !module->set_preferences)
     gtk_widget_set_sensitive(GTK_WIDGET(module->presets_button), FALSE);
-  gtk_box_pack_end(GTK_BOX(header), module->presets_button, FALSE, FALSE, 0);
 
   /* add reset button if module has implementation */
   module->reset_button = dtgtk_button_new_full(dtgtk_cairo_paint_reset, 0, NULL,
@@ -1390,11 +1395,17 @@ GtkWidget *dt_lib_gui_get_expander(dt_lib_module_t *module)
   /* "clicked" rather than a custom gesture: see _lib_gui_reset_button_clicked_callback */
   dt_gui_connect_motion(module->reset_button, NULL, _header_enter_notify_callback, NULL, GINT_TO_POINTER(DT_ACTION_ELEMENT_RESET));
   if(!module->gui_reset) gtk_widget_set_sensitive(module->reset_button, FALSE);
-  gtk_box_pack_end(GTK_BOX(header), module->reset_button, FALSE, FALSE, 0);
 
   /* add button box - for module's specific action button */
   if(module->gui_tool_box)
-    gtk_box_pack_end(GTK_BOX(header), module->gui_tool_box(module), FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(header), module->gui_tool_box(module));
+
+  /* The three right-hand buttons were GTK3 pack_end children: the first
+   * pack_end child sits at the end of the box, so the GTK3 visual order
+   * was gui_tool_box, reset, presets (left to right).  Appends must
+   * therefore happen in reverse creation order to reproduce it. */
+  gtk_box_append(GTK_BOX(header), module->reset_button);
+  gtk_box_append(GTK_BOX(header), module->presets_button);
 
   gtk_widget_show_all(expander);
 
@@ -1428,7 +1439,23 @@ void dt_lib_gui_set_label(dt_lib_module_t *module,
 {
   if(!module->expander) return;
   GtkWidget *header = DTGTK_EXPANDER(module->expander)->header;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GtkBox lost its center widget in GTK4; a centered hexpanding label gives
+  // the same "current order name in the middle of the header" layout.
+  // Track it on the header so repeated calls replace instead of stacking.
+  GtkWidget *l = g_object_get_data(G_OBJECT(header), "dt-lib-header-label");
+  if(l) gtk_widget_unparent(l);
+  l = gtk_label_new(label);
+  gtk_widget_set_hexpand(l, TRUE);
+  gtk_widget_set_halign(l, GTK_ALIGN_CENTER);
+  if(module->preset_label)
+    gtk_box_insert_child_after(GTK_BOX(header), l, module->preset_label);
+  else
+    gtk_box_append(GTK_BOX(header), l);
+  g_object_set_data(G_OBJECT(header), "dt-lib-header-label", l);
+#else
   gtk_box_set_center_widget(GTK_BOX(header), gtk_label_new(label));
+#endif
   gtk_widget_show_all(header);
 }
 

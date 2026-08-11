@@ -3292,24 +3292,6 @@ static void _widget_measure(GtkWidget *widget,
   if(minimum_baseline) *minimum_baseline = -1;
   if(natural_baseline) *natural_baseline = -1;
 }
-static void _widget_get_preferred_height(GtkWidget *widget,
-                                         gint *minimum_height,
-                                         gint *natural_height)
-{
-  dt_bauhaus_widget_t *w = (dt_bauhaus_widget_t *)widget;
-  _margins_retrieve(w);
-
-  *minimum_height = w->margin.top + w->margin.bottom + w->padding.top + w->padding.bottom
-                    + darktable.bauhaus->line_height;
-  if(w->type == DT_BAUHAUS_SLIDER)
-  {
-    // the lower thing to draw is indicator. See _draw_baseline for compute details
-    *minimum_height += INNER_PADDING
-      + darktable.bauhaus->baseline_size + 1.5f * darktable.bauhaus->border_width;
-  }
-
-  *natural_height = *minimum_height;
-}
 
 static void _popup_hide()
 {
@@ -4572,15 +4554,11 @@ static gboolean _find_nth_bauhaus(gpointer *w,
        : gtk_stack_get_visible_child(GTK_STACK(*w));
     return _find_nth_bauhaus(w, num, type);
   }
-  if(GTK_IS_CONTAINER(*w))
+  for(GtkWidget *c = gtk_widget_get_first_child(*w);
+      c && *num >= 0; c = gtk_widget_get_next_sibling(c))
   {
-    GList *l = gtk_container_get_children(GTK_CONTAINER(*w));
-    for(GList *c = l; c && *num >= 0; c = c->next)
-    {
-      *w = c->data;
-      _find_nth_bauhaus(w, num, type);
-    }
-    g_list_free(l);
+    *w = c;
+    _find_nth_bauhaus(w, num, type);
   }
   return *num < 0;
 }

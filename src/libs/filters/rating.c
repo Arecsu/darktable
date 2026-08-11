@@ -203,7 +203,7 @@ static void _rating_widget_init(dt_lib_filtering_rule_t *rule, const dt_collecti
   gtk_widget_set_no_show_all(rating_legacy->comparator, TRUE);
   dt_gui_add_class(rating_legacy->comparator, "dt_transparent_background");
   gtk_overlay_add_overlay(GTK_OVERLAY(rating_legacy->overlay), rating_legacy->comparator);
-  gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(rating_legacy->overlay), rating_legacy->comparator, TRUE);
+  gtk_widget_set_can_target(rating_legacy->comparator, FALSE);
 
   /* create the filter combobox */
   DT_BAUHAUS_COMBOBOX_NEW_FULL(rating_legacy->stars, self, N_("rules"), N_("ratings"), _("filter by images rating"), 0,
@@ -213,13 +213,17 @@ static void _rating_widget_init(dt_lib_filtering_rule_t *rule, const dt_collecti
   // we increase the left padding of the 5 star entry to be sure it's visible with the comparator on top
   // we do that here to not cause trouble with shortcuts
   dt_bauhaus_combobox_set_entry_label(rating_legacy->stars, 6, "           ★ ★ ★ ★ ★");
-  gtk_container_add(GTK_CONTAINER(rating_legacy->overlay), rating_legacy->stars);
+  gtk_overlay_set_child(GTK_OVERLAY(rating_legacy->overlay), rating_legacy->stars);
 
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), rating_legacy->overlay, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), rating_legacy->overlay);
+    gtk_widget_set_hexpand(rating_legacy->overlay, TRUE);
+  }
   else
   {
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), rating_legacy->overlay, TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(rule->w_special_box), rating_legacy->overlay);
+    gtk_widget_set_hexpand(rating_legacy->overlay, TRUE);
     gtk_widget_set_halign(rating_legacy->overlay, GTK_ALIGN_CENTER);
   }
 

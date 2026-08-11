@@ -140,7 +140,7 @@ gboolean _styles_tooltip_callback(GtkWidget* widget,
   GtkTreeIter iter;
   dt_imgid_t imgid = NO_IMGID;
 
-  if(gtk_tree_view_get_tooltip_context(GTK_TREE_VIEW(widget), &x, &y, FALSE, &model, &path, &iter))
+  if(gtk_tree_view_get_tooltip_context(GTK_TREE_VIEW(widget), x, y, FALSE, &model, &path, &iter))
   {
     gchar *name = NULL;
     gtk_tree_model_get(model, &iter, DT_STYLES_COL_FULLNAME, &name, -1);
@@ -178,7 +178,7 @@ static void _gui_styles_update_view(dt_lib_styles_t *d)
   gtk_tree_view_set_model(GTK_TREE_VIEW(d->tree), NULL);
   gtk_tree_store_clear(GTK_TREE_STORE(model));
 
-  GList *result = dt_styles_get_list(gtk_entry_get_text(d->entry));
+  GList *result = dt_styles_get_list(gtk_editable_get_text(GTK_EDITABLE(d->entry)));
   if(result)
   {
     for(const GList *res_iter = result; res_iter; res_iter = g_list_next(res_iter))
@@ -459,9 +459,11 @@ static void _export_clicked(GtkWidget *w, dt_lib_styles_t *d)
   dt_conf_get_folder_to_file_chooser("ui_last/export_path", GTK_FILE_CHOOSER(filechooser));
   gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(filechooser), FALSE);
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    char *filedir = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    char *filedir = file ? g_file_get_path(file) : NULL;
+    if(file) g_object_unref(file);
 
     for(const GList *style = style_names; style; style = g_list_next(style))
     {
@@ -610,9 +612,19 @@ static void _import_clicked(GtkWidget *w, dt_lib_styles_t *d)
 
   gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(filechooser), filter);
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    GSList *filenames = gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(filechooser));
+    GListModel *files = gtk_file_chooser_get_files(GTK_FILE_CHOOSER(filechooser));
+    GSList *filenames = NULL;
+    for(guint i = 0; i < g_list_model_get_n_items(files); i++)
+    {
+      GFile *file = g_list_model_get_item(files, i);
+      gchar *path = file ? g_file_get_path(file) : NULL;
+      if(path) filenames = g_slist_prepend(filenames, path);
+      if(file) g_object_unref(file);
+    }
+    g_object_unref(files);
+    filenames = g_slist_reverse(filenames);
 
     for(const GSList *filename = filenames; filename; filename = g_slist_next(filename))
     {
@@ -741,7 +753,7 @@ static void _entry_callback(GtkEntry *entry, dt_lib_styles_t *d)
 
 static void _entry_activated(GtkEntry *entry, dt_lib_styles_t *d)
 {
-  const gchar *name = gtk_entry_get_text(d->entry);
+  const gchar *name = gtk_editable_get_text(GTK_EDITABLE(d->entry));
   if(name)
   {
     GList *imgs = dt_act_on_get_images(TRUE, TRUE, FALSE);
@@ -889,7 +901,7 @@ void gui_init(dt_lib_module_t *self)
   d->hide_preview = gtk_check_button_new_with_label(_("hide preview"));
   dt_action_define(DT_ACTION(self), NULL, N_("hide preview"),
                    d->hide_preview, &dt_action_def_toggle);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_bin_get_child(GTK_BIN(d->hide_preview))), PANGO_ELLIPSIZE_START);
+  gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(d->hide_preview))), PANGO_ELLIPSIZE_START);
   g_signal_connect(d->hide_preview, "toggled", G_CALLBACK(_hide_preview_callback), d);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->hide_preview),
                                dt_conf_get_bool("ui_last/styles_hide_preview"));
@@ -899,7 +911,7 @@ void gui_init(dt_lib_module_t *self)
   d->duplicate = gtk_check_button_new_with_label(_("create duplicate"));
   dt_action_define(DT_ACTION(self), NULL, N_("create duplicate"),
                    d->duplicate, &dt_action_def_toggle);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_bin_get_child(GTK_BIN(d->duplicate))), PANGO_ELLIPSIZE_START);
+  gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(d->duplicate))), PANGO_ELLIPSIZE_START);
   g_signal_connect(d->duplicate, "toggled", G_CALLBACK(_duplicate_callback), d);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(d->duplicate),
                                dt_conf_get_bool("ui_last/styles_create_duplicate"));
@@ -1010,6 +1022,7 @@ void gui_reset(dt_lib_module_t *self)
   dt_lib_gui_queue_update(self);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 void _menuitem_preferences(GtkMenuItem *menuitem,
                            dt_lib_module_t *self)
 {
@@ -1042,12 +1055,15 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
   }
   gtk_widget_destroy(dialog);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void set_preferences(void *menu, dt_lib_module_t *self)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
   g_signal_connect(G_OBJECT(mi), "activate", G_CALLBACK(_menuitem_preferences), self);
   gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+#endif
 }
 
 

@@ -3013,7 +3013,7 @@ void gui_init(dt_iop_module_t *self)
   g->stack = GTK_STACK(gtk_stack_new());
   dt_gui_box_add(box, g->stack);
   dt_action_define_iop(self, NULL, N_("sliders"), GTK_WIDGET(g->stack), NULL);
-  gtk_stack_set_homogeneous(g->stack, FALSE);
+  gtk_stack_set_vhomogeneous(g->stack, FALSE);
   // this should really be set in gui_update depending on whether sliders are
   // shown to prevent the module size changing when changing tabs
   // (as is the custom elsewhere and less confusing)

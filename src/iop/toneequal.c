@@ -1979,7 +1979,7 @@ static void switch_cursors(dt_iop_module_t *self)
     // display default cursor
     GdkCursor *const cursor =
       gdk_cursor_new_from_name("default", NULL);
-    gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
+    gtk_widget_set_cursor(widget, cursor);
     g_object_unref(cursor);
 
     return;
@@ -2004,7 +2004,7 @@ static void switch_cursors(dt_iop_module_t *self)
     // if pipe is busy or dirty but cursor is on preview,
     // display waiting cursor while pipe reprocesses
     GdkCursor *const cursor = gdk_cursor_new_from_name("wait", NULL);
-    gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
+    gtk_widget_set_cursor(widget, cursor);
     g_object_unref(cursor);
 
     dt_control_queue_redraw_center();
@@ -2026,7 +2026,7 @@ static void switch_cursors(dt_iop_module_t *self)
     // display default cursor
     GdkCursor *const cursor =
       gdk_cursor_new_from_name("default", NULL);
-    gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
+    gtk_widget_set_cursor(widget, cursor);
     g_object_unref(cursor);
 
     dt_control_queue_redraw_center();
@@ -2037,7 +2037,7 @@ static void switch_cursors(dt_iop_module_t *self)
     // reset the cursor but don't launch a redraw
     GdkCursor *const cursor =
       gdk_cursor_new_from_name("default", NULL);
-    gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
+    gtk_widget_set_cursor(widget, cursor);
     g_object_unref(cursor);
   }
 }
@@ -2104,7 +2104,7 @@ int mouse_leave(dt_iop_module_t *self)
   // display default cursor
   GtkWidget *widget = dt_ui_main_window(darktable.gui->ui);
   GdkCursor *cursor = gdk_cursor_new_from_name("default", NULL);
-  gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
+  gtk_widget_set_cursor(widget, cursor);
   g_object_unref(cursor);
   dt_control_queue_redraw_center();
   gtk_widget_queue_draw(GTK_WIDGET(g->area));

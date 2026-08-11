@@ -19,6 +19,10 @@
 #include "lua/types.h"
 #include "lua/widget/common.h"
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
+/* GtkFileChooserButton is removed from GTK4 (GtkFileDialog is async-only);
+ * TODO P4: rework the lua widget on GtkFileDialog or drop it. */
+
 static dt_lua_widget_type_t file_chooser_button_type = {
   .name = "file_chooser_button",
   .gui_init = NULL,
@@ -113,6 +117,16 @@ int dt_lua_init_widget_file_chooser_button(lua_State* L)
 
   return 0;
 }
+
+#else
+/* GtkFileChooserButton is removed from GTK4 (GtkFileDialog is async-only);
+ * TODO P4: rework the lua widget on GtkFileDialog or drop it.  For now the
+ * lua file_chooser_button type is simply not registered. */
+int dt_lua_init_widget_file_chooser_button(lua_State *L)
+{
+  return 0;
+}
+#endif
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py
 // vim: shiftwidth=2 expandtab tabstop=2 cindent

@@ -29,20 +29,27 @@ static GtkSizeRequestMode dtgtk_side_panel_get_request_mode(GtkWidget *widget)
   return GTK_SIZE_REQUEST_CONSTANT_SIZE;
 }
 
-static void dtgtk_side_panel_get_preferred_width(GtkWidget *widget,
-                                                 gint *minimum_size,
-                                                 gint *natural_size)
+static void dtgtk_side_panel_measure(GtkWidget *widget,
+                                     GtkOrientation orientation,
+                                     int for_size,
+                                     int *minimum,
+                                     int *natural,
+                                     int *minimum_baseline,
+                                     int *natural_baseline)
 {
-  GTK_WIDGET_CLASS(dtgtk_side_panel_parent_class)->get_preferred_width
-    (widget, minimum_size, natural_size);
+  GTK_WIDGET_CLASS(dtgtk_side_panel_parent_class)->measure
+    (widget, orientation, for_size, minimum, natural, minimum_baseline, natural_baseline);
 
-  const int width =
-    dt_ui_panel_get_size(darktable.gui->ui,
-                         strcmp(gtk_widget_get_name(widget), "right")
-                         ? DT_UI_PANEL_LEFT : DT_UI_PANEL_RIGHT);
+  if(orientation == GTK_ORIENTATION_HORIZONTAL)
+  {
+    const int width =
+      dt_ui_panel_get_size(darktable.gui->ui,
+                           strcmp(gtk_widget_get_name(widget), "right")
+                           ? DT_UI_PANEL_LEFT : DT_UI_PANEL_RIGHT);
 
-  if(width > 10)
-    *natural_size = MAX(*minimum_size, width);
+    if(width > 10)
+      *natural = MAX(*minimum, width);
+  }
 }
 
 static void dtgtk_side_panel_class_init(GtkDarktableSidePanelClass *class)
@@ -50,7 +57,7 @@ static void dtgtk_side_panel_class_init(GtkDarktableSidePanelClass *class)
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(class);
 
   widget_class->get_request_mode = dtgtk_side_panel_get_request_mode;
-  widget_class->get_preferred_width = dtgtk_side_panel_get_preferred_width;
+  widget_class->measure = dtgtk_side_panel_measure;
 }
 
 static void dtgtk_side_panel_init(GtkDarktableSidePanel *panel)

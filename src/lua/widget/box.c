@@ -77,23 +77,51 @@ static void box_init(lua_State* L)
 
 void _get_packing_info(lua_box box, gboolean *expand, gboolean *fill, guint *padding)
 {
-  GList *children = gtk_container_get_children(GTK_CONTAINER(box->widget));
-  for(const GList *l = children; l; l = g_list_next(l))
+  GtkWidget *child = gtk_widget_get_first_child(box->widget);
+  if(!child)
   {
-    gtk_box_query_child_packing(GTK_BOX(box->widget), GTK_WIDGET(l->data), expand, fill, padding, NULL);
-    break;
+    *expand = FALSE;
+    *fill = FALSE;
+    *padding = 0;
+    return;
   }
-  g_list_free(children);
+  const GtkOrientation o = gtk_orientable_get_orientation(GTK_ORIENTABLE(box->widget));
+  if(o == GTK_ORIENTATION_HORIZONTAL)
+  {
+    *expand = gtk_widget_get_hexpand(child);
+    *fill = gtk_widget_get_halign(child) == GTK_ALIGN_FILL;
+    *padding = gtk_widget_get_margin_start(child);
+  }
+  else
+  {
+    *expand = gtk_widget_get_vexpand(child);
+    *fill = gtk_widget_get_valign(child) == GTK_ALIGN_FILL;
+    *padding = gtk_widget_get_margin_top(child);
+  }
 }
 
 void _set_packing_info(lua_box box, gboolean expand, gboolean fill, guint padding)
 {
-  GList *children = gtk_container_get_children(GTK_CONTAINER(box->widget));
-  for(const GList *l = children; l; l = g_list_next(l))
+  const GtkOrientation o = gtk_orientable_get_orientation(GTK_ORIENTABLE(box->widget));
+  for(GtkWidget *child = gtk_widget_get_first_child(box->widget);
+      child;
+      child = gtk_widget_get_next_sibling(child))
   {
-    gtk_box_set_child_packing(GTK_BOX(box->widget), GTK_WIDGET(l->data), expand, fill, padding, GTK_PACK_START);
+    if(o == GTK_ORIENTATION_HORIZONTAL)
+    {
+      gtk_widget_set_hexpand(child, expand);
+      gtk_widget_set_halign(child, fill ? GTK_ALIGN_FILL : GTK_ALIGN_START);
+      gtk_widget_set_margin_start(child, padding);
+      gtk_widget_set_margin_end(child, padding);
+    }
+    else
+    {
+      gtk_widget_set_vexpand(child, expand);
+      gtk_widget_set_valign(child, fill ? GTK_ALIGN_FILL : GTK_ALIGN_START);
+      gtk_widget_set_margin_top(child, padding);
+      gtk_widget_set_margin_bottom(child, padding);
+    }
   }
-  g_list_free(children);
 }
 
 static int orientation_member(lua_State *L)
@@ -106,12 +134,7 @@ static int orientation_member(lua_State *L)
     gtk_orientable_set_orientation(GTK_ORIENTABLE(box->widget), orientation);
     if(gtk_orientable_get_orientation(GTK_ORIENTABLE(box->widget)) == GTK_ORIENTATION_HORIZONTAL)
     {
-      GList *children = gtk_container_get_children(GTK_CONTAINER(box->widget));
-      for(const GList *l = children; l; l = g_list_next(l))
-      {
-        gtk_box_set_child_packing(GTK_BOX(box->widget), GTK_WIDGET(l->data), TRUE, TRUE, 0, GTK_PACK_START);
-      }
-      g_list_free(children);
+      _set_packing_info(box, TRUE, TRUE, 0);
       gboolean old_expand, old_fill;
       guint old_padding;
       if(expand_store.used)

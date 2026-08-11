@@ -450,8 +450,13 @@ void enter(dt_view_t *self)
   GdkRectangle rect;
 
   GdkDisplay *display = gtk_widget_get_display(window);
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GdkMonitor *mon = gdk_display_get_monitor_at_surface(
+    display, gtk_native_get_surface(gtk_widget_get_native(window)));
+#else
   GdkMonitor *mon = gdk_display_get_monitor_at_window(display,
                                                       gtk_widget_get_window(window));
+#endif
   gdk_monitor_get_geometry(mon, &rect);
 
   dt_pthread_mutex_lock(&d->lock);

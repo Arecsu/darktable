@@ -1422,6 +1422,9 @@ static void _event_star_leave_cb(GtkEventControllerMotion *controller,
 }
 
 // we only want to specify that the mouse is hovereing the thumbnail
+// GTK3 DnD (GdkDragContext); GTK4 DnD is a different API (GdkDrag/GdkDrop,
+// TODO P3) -- the whole drag_dest machinery is GTK3-only.
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _event_main_drag_motion(GtkWidget *widget,
                                         GdkDragContext *dc,
                                         const gint x,
@@ -1439,6 +1442,7 @@ static gboolean _event_main_drag_motion(GtkWidget *widget,
   }
   return TRUE;
 }
+#endif
 
 static void _event_image_style_updated(GtkWidget *w,
                                        dt_thumbnail_t *thumb)
@@ -1476,10 +1480,12 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
   {
     // this is only here to ensure that mouse-over value is updated correctly
     // all dragging actions take place inside thumbatble.c
+#if !GTK_CHECK_VERSION(4, 0, 0)
     gtk_drag_dest_set(thumb->w_main, GTK_DEST_DEFAULT_MOTION,
                       target_list_all, n_targets_all, GDK_ACTION_MOVE);
     g_signal_connect(G_OBJECT(thumb->w_main), "drag-motion",
                      G_CALLBACK(_event_main_drag_motion), thumb);
+#endif
 
     g_object_set_data(G_OBJECT(thumb->w_main), "thumb", thumb);
     DT_CONTROL_SIGNAL_CONNECT(DT_SIGNAL_ACTIVE_IMAGES_CHANGE,
@@ -1496,11 +1502,11 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
                               _dt_collection_changed_callback, thumb);
 
     // the background
-    thumb->w_back = gtk_event_box_new();
+    thumb->w_back = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_set_name(thumb->w_back, "thumb-back");
     dt_gui_connect_motion(thumb->w_back, _event_main_motion_cb, NULL, NULL, thumb);
-    gtk_widget_show(thumb->w_back);
-    gtk_container_add(GTK_CONTAINER(thumb->w_main), thumb->w_back);
+    gtk_widget_set_visible(thumb->w_back, TRUE);
+    gtk_overlay_add_overlay(GTK_OVERLAY(thumb->w_main), thumb->w_back);
 
     // the file extension label
     thumb->w_ext = gtk_label_new("");
@@ -1510,7 +1516,7 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
     gtk_label_set_justify(GTK_LABEL(thumb->w_ext), GTK_JUSTIFY_CENTER);
     gtk_widget_show(thumb->w_ext);
     gtk_overlay_add_overlay(GTK_OVERLAY(thumb->w_main), thumb->w_ext);
-    gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(thumb->w_main), thumb->w_ext, TRUE);
+    gtk_widget_set_can_target(thumb->w_ext, FALSE);
 
     // the image drawing area
     thumb->w_image_box = gtk_overlay_new();
@@ -1521,7 +1527,7 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
     gtk_widget_show(thumb->w_image_box);
     // we add a eventbox which cover all the w_image_box otherwise
     // event don't work in areas not covered by w_image itself
-    GtkWidget *evt_image = gtk_event_box_new();
+    GtkWidget *evt_image = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_set_valign(evt_image, GTK_ALIGN_FILL);
     gtk_widget_set_halign(evt_image, GTK_ALIGN_FILL);
     dt_gui_connect_motion(evt_image, _event_main_motion_cb, _event_image_enter_cb, _event_image_leave_cb, thumb);
@@ -1556,7 +1562,7 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
       overlays_parent = thumb->w_image_box;
 
     // the infos background
-    thumb->w_bottom_eb = gtk_event_box_new();
+    thumb->w_bottom_eb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_set_name(thumb->w_bottom_eb, "thumb-bottom");
     dt_gui_connect_motion(thumb->w_bottom_eb, NULL, _event_box_enter_cb, _event_box_leave_cb, thumb);
     gtk_widget_set_valign(thumb->w_bottom_eb, GTK_ALIGN_END);
@@ -1581,7 +1587,7 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
     gtk_widget_show(thumb->w_bottom);
     gtk_label_set_yalign(GTK_LABEL(thumb->w_bottom), 0.05);
     gtk_label_set_ellipsize(GTK_LABEL(thumb->w_bottom), PANGO_ELLIPSIZE_MIDDLE);
-    gtk_container_add(GTK_CONTAINER(thumb->w_bottom_eb), thumb->w_bottom);
+    gtk_box_append(GTK_BOX(thumb->w_bottom_eb), thumb->w_bottom);
     gtk_overlay_add_overlay(GTK_OVERLAY(overlays_parent), thumb->w_bottom_eb);
 
     // the reject icon
@@ -1672,7 +1678,7 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
     gtk_overlay_add_overlay(GTK_OVERLAY(overlays_parent), thumb->w_audio);
 
     // the zoom indicator
-    thumb->w_zoom_eb = gtk_event_box_new();
+    thumb->w_zoom_eb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     dt_gui_connect_motion(thumb->w_zoom_eb, NULL, _event_btn_enter_cb, NULL, thumb);
     gtk_widget_set_name(thumb->w_zoom_eb, "thumb-zoom");
     gtk_widget_set_valign(thumb->w_zoom_eb, GTK_ALIGN_START);
@@ -1683,7 +1689,7 @@ GtkWidget *dt_thumbnail_create_widget(dt_thumbnail_t *thumb,
       thumb->w_zoom = gtk_label_new("mini");
     gtk_widget_set_name(thumb->w_zoom, "thumb-zoom-label");
     gtk_widget_show(thumb->w_zoom);
-    gtk_container_add(GTK_CONTAINER(thumb->w_zoom_eb), thumb->w_zoom);
+    gtk_box_append(GTK_BOX(thumb->w_zoom_eb), thumb->w_zoom);
     gtk_overlay_add_overlay(GTK_OVERLAY(overlays_parent), thumb->w_zoom_eb);
 
     dt_thumbnail_resize(thumb, thumb->width, thumb->height, TRUE, zoom_ratio);
@@ -2090,22 +2096,19 @@ void dt_thumbnail_resize(dt_thumbnail_t *thumb,
     GtkStyleContext *context = gtk_widget_get_style_context(thumb->w_image);
     if(!gtk_style_context_has_class(context, cl))
     {
-      // we remove all previous size class if any
-      GList *l = gtk_style_context_list_classes(context);
-      for(GList *l_iter = l; l_iter; l_iter = g_list_next(l_iter))
-      {
-        gchar *ll = (gchar *)l_iter->data;
-        if(g_str_has_prefix(ll, "dt_thumbnails_"))
-        {
-          gtk_style_context_remove_class(context, ll);
-        }
-      }
-      g_list_free(l);
+      // GTK4 has no gtk_style_context_list_classes; track the applied size
+      // class on the widget (only one dt_thumbnails_* class is live at a time)
+      const gchar *old = g_object_get_data(G_OBJECT(thumb->w_image), "dt-thumbnails-class");
+      if(old) gtk_style_context_remove_class(context, old);
 
       // we set the new class
       gtk_style_context_add_class(context, cl);
+      g_object_set_data_full(G_OBJECT(thumb->w_image), "dt-thumbnails-class", cl, g_free);
     }
-    g_free(cl);
+    else
+    {
+      g_free(cl);
+    }
   }
 
   // file extension
@@ -2194,6 +2197,7 @@ void dt_thumbnail_set_mouseover(dt_thumbnail_t *thumb,
 void dt_thumbnail_set_drop(dt_thumbnail_t *thumb,
                            const gboolean accept_drop)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   if(accept_drop)
   {
     gtk_drag_dest_set(thumb->w_main, GTK_DEST_DEFAULT_MOTION,
@@ -2203,6 +2207,7 @@ void dt_thumbnail_set_drop(dt_thumbnail_t *thumb,
   {
     gtk_drag_dest_unset(thumb->w_main);
   }
+#endif
 }
 
 // force the image to be reloaded from cache if any
@@ -2281,7 +2286,7 @@ static void _widget_change_parent_overlay(GtkWidget *w,
                                           GtkOverlay *new_parent)
 {
   g_object_ref(w);
-  gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(w)), w);
+  gtk_widget_unparent(w);
   gtk_overlay_add_overlay(new_parent, w);
   gtk_widget_show(w);
   g_object_unref(w);

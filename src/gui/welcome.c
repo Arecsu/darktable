@@ -155,7 +155,7 @@ static void _on_answer_toggled(GtkToggleButton *btn, gpointer data)
 
 static void _on_dir_entry_changed(GtkEntry *entry, gpointer data)
 {
-  dt_conf_set_string((const char *)data, gtk_entry_get_text(entry));
+  dt_conf_set_string((const char *)data, gtk_editable_get_text(GTK_EDITABLE(entry)));
 }
 
 static void _on_browse_dir_clicked(GtkWidget *btn, gpointer data)
@@ -171,22 +171,35 @@ static void _on_browse_dir_clicked(GtkWidget *btn, gpointer data)
 
   // Strip pattern variables (e.g. "$(PICTURES_FOLDER)/...") before
   // passing the path to the chooser.
-  gchar *old = g_strdup(gtk_entry_get_text(entry));
+  gchar *old = g_strdup(gtk_editable_get_text(GTK_EDITABLE(entry)));
   char *dollar = g_strstr_len(old, -1, "$");
   if(dollar)
     *dollar = '\0';
   if(*old)
-    gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(fc), old);
+  {
+    GFile *dir = g_file_new_for_path(old);
+    GError *error = NULL;
+    if(!gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(fc), dir, &error))
+      g_warning("could not set current folder to '%s': %s", old,
+                error ? error->message : "unknown error");
+    g_clear_error(&error);
+    g_object_unref(dir);
+  }
   g_free(old);
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(fc)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(fc)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *dir = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(fc));
-    // Escape backslashes (needed on Windows; harmless elsewhere).
-    gchar *escaped = dt_util_str_replace(dir, "\\", "\\\\");
-    gtk_entry_set_text(entry, escaped); // "changed" signal writes to conf
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(fc));
+    gchar *dir = file ? g_file_get_path(file) : NULL;
+    if(dir)
+    {
+      // Escape backslashes (needed on Windows; harmless elsewhere).
+      gchar *escaped = dt_util_str_replace(dir, "\\", "\\\\");
+      gtk_editable_set_text(GTK_EDITABLE(entry), escaped); // "changed" signal writes to conf
+      g_free(escaped);
+    }
+    g_clear_object(&file);
     g_free(dir);
-    g_free(escaped);
   }
   g_object_unref(fc);
 }
@@ -225,11 +238,14 @@ typedef struct
 static void _update_navigation(_nav_t *nav)
 {
   // Update stack
-  GList *children = gtk_container_get_children(GTK_CONTAINER(nav->stack));
-  GtkWidget *target = g_list_nth_data(children, nav->current);
+  GtkWidget *target = NULL;
+  int i = 0;
+  for(GtkWidget *child = gtk_widget_get_first_child(nav->stack);
+      child && !target;
+      child = gtk_widget_get_next_sibling(child), i++)
+    if(i == nav->current) target = child;
   if(target)
     gtk_stack_set_visible_child(GTK_STACK(nav->stack), target);
-  g_list_free(children);
 
   // Prev / Next: always visible, just grayed out when unavailable.
   const gboolean is_last = (nav->current == nav->n_stack_pages - 1);
@@ -237,14 +253,13 @@ static void _update_navigation(_nav_t *nav)
   gtk_widget_set_sensitive(nav->next_btn, !is_last);
 
   // Progress dots
-  GList *dots = gtk_container_get_children(GTK_CONTAINER(nav->progress_box));
   int idx = 0;
-  for(GList *l = dots; l; l = l->next, idx++)
+  for(GtkWidget *dot = gtk_widget_get_first_child(nav->progress_box);
+      dot;
+      dot = gtk_widget_get_next_sibling(dot), idx++)
   {
-    GtkWidget *dot = l->data;
     gtk_label_set_text(GTK_LABEL(dot), idx == nav->current ? "●" : "○");
   }
-  g_list_free(dots);
 }
 
 static void _on_prev(GtkWidget *btn, gpointer data)
@@ -288,7 +303,7 @@ static GtkWidget *_build_page_widget(_dt_page_t *pg)
       GtkWidget *para = gtk_label_new(NULL);
       gtk_label_set_markup(GTK_LABEL(para), q->label);
       gtk_widget_set_name(para, "welcome-paragraph");
-      gtk_label_set_line_wrap(GTK_LABEL(para), TRUE);
+      gtk_label_set_wrap(GTK_LABEL(para), TRUE);
       if(q->centered)
       {
         gtk_widget_set_halign(para, GTK_ALIGN_CENTER);
@@ -329,7 +344,7 @@ static GtkWidget *_build_page_widget(_dt_page_t *pg)
       gtk_widget_set_name(entry, "welcome-dir-entry");
       gtk_widget_set_hexpand(entry, TRUE);
       const char *cur = dt_conf_get_string_const(q->conf_key);
-      gtk_entry_set_text(GTK_ENTRY(entry), cur ? cur : "");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(entry)), cur ? cur : "");
       g_signal_connect(G_OBJECT(entry), "changed",
                        G_CALLBACK(_on_dir_entry_changed), q->conf_key);
 
@@ -353,7 +368,7 @@ static GtkWidget *_build_page_widget(_dt_page_t *pg)
         gtk_widget_set_halign(desc, GTK_ALIGN_FILL);
         gtk_widget_set_hexpand(desc, TRUE);
         gtk_label_set_xalign(GTK_LABEL(desc), 0.0f);
-        gtk_label_set_line_wrap(GTK_LABEL(desc), TRUE);
+        gtk_label_set_wrap(GTK_LABEL(desc), TRUE);
         dt_gui_box_add(GTK_BOX(col), desc);
       }
 
@@ -413,7 +428,7 @@ static GtkWidget *_build_page_widget(_dt_page_t *pg)
         gtk_widget_set_halign(desc, GTK_ALIGN_FILL);
         gtk_widget_set_hexpand(desc, TRUE);
         gtk_label_set_xalign(GTK_LABEL(desc), 0.0f);
-        gtk_label_set_line_wrap(GTK_LABEL(desc), TRUE);
+        gtk_label_set_wrap(GTK_LABEL(desc), TRUE);
         dt_gui_box_add(GTK_BOX(col), desc);
       }
 
@@ -460,7 +475,7 @@ static GtkWidget *_build_page_widget(_dt_page_t *pg)
         gtk_widget_set_halign(desc, GTK_ALIGN_FILL);
         gtk_widget_set_hexpand(desc, TRUE);
         gtk_label_set_xalign(GTK_LABEL(desc), 0.0f);
-        gtk_label_set_line_wrap(GTK_LABEL(desc), TRUE);
+        gtk_label_set_wrap(GTK_LABEL(desc), TRUE);
         dt_gui_box_add(GTK_BOX(col), desc);
       }
 
@@ -667,7 +682,7 @@ void dt_welcome_screen_show(dt_welcome_screen_t *ws)
 
   // Use a plain GtkWindow instead of GtkDialog so there is no
   // built-in (empty) action area leaving dead space at the bottom.
-  GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+  GtkWidget *window = gtk_window_new();
   gtk_window_set_title(GTK_WINDOW(window), _("Welcome to darktable!"));
   gtk_window_set_transient_for(GTK_WINDOW(window), main_win);
   gtk_window_set_modal(GTK_WINDOW(window), TRUE);
@@ -679,11 +694,10 @@ void dt_welcome_screen_show(dt_welcome_screen_t *ws)
 #endif
 
   gtk_window_set_default_size(GTK_WINDOW(window), 500, -1);
-  gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER_ON_PARENT);
 
   GtkWidget *content = dt_gui_vbox();
   gtk_widget_set_name(content, "welcome-content");
-  gtk_container_add(GTK_CONTAINER(window), content);
+  gtk_window_set_child(GTK_WINDOW(window), content);
 
   // ── static header (logo + app name) – never moves between pages ──────────
   dt_gui_box_add(GTK_BOX(content), _get_logo());

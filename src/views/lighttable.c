@@ -1470,10 +1470,23 @@ void gui_init(dt_view_t *self)
   gtk_widget_set_no_show_all(lib->culling->widget, TRUE);
   gtk_widget_set_no_show_all(lib->preview->widget, TRUE);
   // place behind toast/log messages
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4 overlays paint in add order (last on top): culling/preview were
+  // added after the log/toast messages, so re-add the messages to keep
+  // them on top (GTK3's reorder_overlay(index 1) did the same).
+  GtkWidget *overlay = dt_ui_center_base(darktable.gui->ui);
+  GtkWidget *log_msg = dt_ui_log_msg(darktable.gui->ui);
+  GtkWidget *toast_msg = dt_ui_toast_msg(darktable.gui->ui);
+  gtk_widget_unparent(log_msg);
+  gtk_widget_unparent(toast_msg);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), log_msg);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), toast_msg);
+#else
   gtk_overlay_reorder_overlay(GTK_OVERLAY(dt_ui_center_base(darktable.gui->ui)),
                               lib->culling->widget, 1);
   gtk_overlay_reorder_overlay(GTK_OVERLAY(dt_ui_center_base(darktable.gui->ui)),
                               lib->preview->widget, 1);
+#endif
 
   /* add the global focus peaking button in toolbox */
   dt_view_manager_module_toolbox_add(darktable.view_manager,
@@ -1489,14 +1502,15 @@ void gui_init(dt_view_t *self)
                                      profile_button, DT_VIEW_LIGHTTABLE);
 
   // and the popup window
-  lib->profile_floating_window = gtk_popover_new(profile_button);
+  lib->profile_floating_window = gtk_popover_new();
+  gtk_widget_set_parent(lib->profile_floating_window, profile_button);
 
   g_object_set(G_OBJECT(lib->profile_floating_window), "transitions-enabled", FALSE, NULL);
   dt_gui_connect_click_all(profile_button, _profile_popup_show_cb, NULL, lib->profile_floating_window);
 
   GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
-  gtk_container_add(GTK_CONTAINER(lib->profile_floating_window), vbox);
+  gtk_popover_set_child(GTK_POPOVER(lib->profile_floating_window), vbox);
 
   /** let's fill the encapsulating widgets */
 
@@ -1523,12 +1537,15 @@ void gui_init(dt_view_t *self)
   dt_bauhaus_widget_set_label(display2_profile, NULL, N_("preview display profile"));
 
   // pack entries
-  gtk_box_pack_start(GTK_BOX(vbox), display_profile, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(vbox), display_intent, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(vbox),
-                     gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(vbox), display2_profile, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(vbox), display2_intent, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(vbox), display_profile);
+  gtk_widget_set_vexpand(display_profile, TRUE);
+  gtk_box_append(GTK_BOX(vbox), display_intent);
+  gtk_widget_set_vexpand(display_intent, TRUE);
+  gtk_box_append(GTK_BOX(vbox), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
+  gtk_box_append(GTK_BOX(vbox), display2_profile);
+  gtk_widget_set_vexpand(display2_profile, TRUE);
+  gtk_box_append(GTK_BOX(vbox), display2_intent);
+  gtk_widget_set_vexpand(display2_intent, TRUE);
 
   for(GList *profiles = darktable.color_profiles->profiles;
       profiles;

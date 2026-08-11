@@ -75,7 +75,7 @@ static gboolean _lib_filmstrip_draw_callback(GtkWidget *widget,
                                              gpointer user_data)
 {
   // we only ensure that the thumbtable is inside our container
-  if(!gtk_bin_get_child(GTK_BIN(widget)))
+  if(!gtk_widget_get_first_child(widget))
   {
     dt_thumbtable_t *tt = dt_ui_thumbtable(darktable.gui->ui);
     dt_thumbtable_set_parent(tt, widget, DT_THUMBTABLE_MODE_FILMSTRIP);
@@ -132,7 +132,7 @@ static void _filmstrip_pin_in_second_window(dt_action_t *action)
 void gui_init(dt_lib_module_t *self)
 {
   /* creating container area */
-  self->widget = gtk_event_box_new();
+  self->widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
   /* connect callbacks */
   g_signal_connect(G_OBJECT(self->widget), "draw",

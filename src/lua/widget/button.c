@@ -70,36 +70,32 @@ static void clicked_callback(GtkButton *widget, gpointer user_data)
    GTK_TYPE_LABEL or GTK_TYPE_IMAGE), or NULL if none is found. */
 static GtkWidget *dt_lua_button_get_widget_in_box(GtkWidget *box, GType type)
 {
-  GList *children = gtk_container_get_children(GTK_CONTAINER(box));
-  GtkWidget *found = NULL;
-  for(GList *l = children; l; l = l->next)
+  for(GtkWidget *child = gtk_widget_get_first_child(box);
+      child;
+      child = gtk_widget_get_next_sibling(child))
   {
-    if(G_TYPE_CHECK_INSTANCE_TYPE(l->data, type))
-    {
-      found = GTK_WIDGET(l->data);
-      break;
-    }
+    if(G_TYPE_CHECK_INSTANCE_TYPE(child, type))
+      return child;
   }
-  g_list_free(children);
-  return found;
+  return NULL;
 }
 
 /* Return the index of `widget` among `box`'s children, or -1 if
    `widget` is not a child of `box`. */
 static int dt_lua_button_get_child_index(GtkWidget *box, GtkWidget *widget)
 {
-  GList *children = gtk_container_get_children(GTK_CONTAINER(box));
   int idx = -1;
   int i = 0;
-  for(GList *l = children; l; l = l->next, i++)
+  for(GtkWidget *child = gtk_widget_get_first_child(box);
+      child;
+      child = gtk_widget_get_next_sibling(child), i++)
   {
-    if(l->data == (gpointer)widget)
+    if(child == widget)
     {
       idx = i;
       break;
     }
   }
-  g_list_free(children);
   return idx;
 }
 
@@ -109,7 +105,7 @@ static int dt_lua_button_get_child_index(GtkWidget *box, GtkWidget *widget)
    to find the label before they can get/set a property on it. */
 static GtkWidget *dt_lua_button_get_current_label(lua_button button)
 {
-  GtkWidget *child = gtk_bin_get_child(GTK_BIN(button->widget));
+  GtkWidget *child = gtk_button_get_child(GTK_BUTTON(button->widget));
   if(GTK_IS_BOX(child))
     return dt_lua_button_get_widget_in_box(child, GTK_TYPE_LABEL);
   if(gtk_button_get_label(GTK_BUTTON(button->widget)))
@@ -178,7 +174,7 @@ static int label_member(lua_State *L)
   if(lua_gettop(L) > 2)
   {
     const char * label = luaL_checkstring(L, 3);
-    GtkWidget *child = gtk_bin_get_child(GTK_BIN(button->widget));
+    GtkWidget *child = gtk_button_get_child(GTK_BUTTON(button->widget));
     gboolean had_box = child && GTK_IS_BOX(child);
     if(had_box) g_object_ref(G_OBJECT(child));
 
@@ -186,15 +182,15 @@ static int label_member(lua_State *L)
 
     if(had_box)
     {
-      GtkWidget *new_child = gtk_bin_get_child(GTK_BIN(button->widget));
+      GtkWidget *new_child = gtk_button_get_child(GTK_BUTTON(button->widget));
       if(new_child != child)
       {
-        gtk_container_remove(GTK_CONTAINER(button->widget), new_child);
-        gtk_container_add(GTK_CONTAINER(button->widget), child);
+        gtk_widget_unparent(new_child);
+        gtk_button_set_child(GTK_BUTTON(button->widget), child);
       }
       g_object_unref(G_OBJECT(child));
     }
-    child = gtk_bin_get_child(GTK_BIN(button->widget));
+    child = gtk_button_get_child(GTK_BUTTON(button->widget));
     if(GTK_IS_BOX(child))
     {
       GtkWidget *label_widget = dt_lua_button_get_widget_in_box(child, GTK_TYPE_LABEL);
@@ -206,9 +202,9 @@ static int label_member(lua_State *L)
       {
         label_widget = gtk_label_new(label);
         GtkWidget *image_widget = dt_lua_button_get_widget_in_box(child, GTK_TYPE_IMAGE);
-        gtk_box_pack_start(GTK_BOX(child), label_widget, FALSE, FALSE, 0);
+        gtk_box_append(GTK_BOX(child), label_widget);
         if(image_widget && dt_lua_button_get_child_index(child, image_widget) == 1)
-          gtk_box_reorder_child(GTK_BOX(child), label_widget, 0);
+          gtk_box_reorder_child_after(GTK_BOX(child), label_widget, NULL);
         gtk_widget_show(label_widget);
       }
 
@@ -249,7 +245,7 @@ static int image_member(lua_State *L)
     const char * imagefile = luaL_checkstring(L, 3);
     image = gtk_image_new_from_file(imagefile);
 
-    GtkWidget *child = gtk_bin_get_child(GTK_BIN(button->widget));
+    GtkWidget *child = gtk_button_get_child(GTK_BUTTON(button->widget));
 
     if(GTK_IS_BOX(child))
     {
@@ -257,10 +253,10 @@ static int image_member(lua_State *L)
       int old_idx = old_image ? dt_lua_button_get_child_index(child, old_image) : -1;
 
       if(old_image)
-        gtk_container_remove(GTK_CONTAINER(child), old_image);
-      gtk_box_pack_start(GTK_BOX(child), image, FALSE, FALSE, 0);
-      if(old_idx >= 0)
-        gtk_box_reorder_child(GTK_BOX(child), image, old_idx);
+        gtk_widget_unparent(old_image);
+      gtk_box_append(GTK_BOX(child), image);
+      if(old_idx == 0)
+        gtk_box_reorder_child_after(GTK_BOX(child), image, NULL);
       gtk_widget_show(image);
     }
     else
@@ -286,10 +282,10 @@ static int image_member(lua_State *L)
       GtkWidget *new_label = (label_text && label_text[0]) ? gtk_label_new(label_text) : NULL;
 
       if(image_first)
-        gtk_box_pack_start(GTK_BOX(box), image, FALSE, FALSE, 0);
+        gtk_box_append(GTK_BOX(box), image);
       if(new_label)
       {
-        gtk_box_pack_start(GTK_BOX(box), new_label, FALSE, FALSE, 0);
+        gtk_box_append(GTK_BOX(box), new_label);
         if(has_label_style)
         {
           gtk_label_set_ellipsize(GTK_LABEL(new_label), ellipsize_mode);
@@ -297,16 +293,16 @@ static int image_member(lua_State *L)
         }
       }
       if(!image_first)
-        gtk_box_pack_start(GTK_BOX(box), image, FALSE, FALSE, 0);
+        gtk_box_append(GTK_BOX(box), image);
 
       g_object_set_data(G_OBJECT(box), "dt-image-pos", GINT_TO_POINTER(pos));
       position_type_store.used = FALSE;
 
       if(child)
-        gtk_container_remove(GTK_CONTAINER(button->widget), child);
+        gtk_widget_unparent(child);
       gtk_widget_set_halign(GTK_WIDGET(box), GTK_ALIGN_CENTER);
-      gtk_container_add(GTK_CONTAINER(button->widget), box);
-      gtk_widget_show_all(GTK_WIDGET(button->widget));
+      gtk_button_set_child(GTK_BUTTON(button->widget), box);
+      gtk_widget_show(GTK_WIDGET(box));
     }
     return 0;
   }
@@ -321,7 +317,7 @@ static int image_position_member(lua_State *L)
   if(lua_gettop(L) > 2)
   {
     luaA_to(L, dt_lua_position_type_t, &image_position, 3);
-    GtkWidget *child = gtk_bin_get_child(GTK_BIN(button->widget));
+    GtkWidget *child = gtk_button_get_child(GTK_BUTTON(button->widget));
     if(GTK_IS_BOX(child))
     {
       GtkWidget *image = dt_lua_button_get_widget_in_box(child, GTK_TYPE_IMAGE);
@@ -336,9 +332,9 @@ static int image_position_member(lua_State *L)
         gboolean image_should_be_first = (image_position == GTK_POS_LEFT
                                            || image_position == GTK_POS_TOP);
         if(image_should_be_first)
-          gtk_box_reorder_child(GTK_BOX(child), image, 0);
+          gtk_box_reorder_child_after(GTK_BOX(child), image, NULL);
         else if(label)
-          gtk_box_reorder_child(GTK_BOX(child), label, 0);
+          gtk_box_reorder_child_after(GTK_BOX(child), label, NULL);
 
         g_object_set_data(G_OBJECT(child), "dt-image-pos", GINT_TO_POINTER(image_position));
         gtk_widget_queue_resize(GTK_WIDGET(child));
@@ -351,7 +347,7 @@ static int image_position_member(lua_State *L)
     }
     return 0;
   }
-  GtkWidget *child = gtk_bin_get_child(GTK_BIN(button->widget));
+  GtkWidget *child = gtk_button_get_child(GTK_BUTTON(button->widget));
   if(GTK_IS_BOX(child))
   {
     GtkWidget *image = dt_lua_button_get_widget_in_box(child, GTK_TYPE_IMAGE);

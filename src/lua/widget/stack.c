@@ -32,28 +32,30 @@ static int active_member(lua_State*L)
   lua_stack stack;
   luaA_to(L,lua_stack,&stack,1);
   if(lua_gettop(L) > 2) {
-    GList * children = gtk_container_get_children(GTK_CONTAINER(stack->widget));
-    int length = g_list_length(children);
+    GtkWidget *first = gtk_widget_get_first_child(stack->widget);
+    int length = 0;
+    for(GtkWidget *w = first; w; w = gtk_widget_get_next_sibling(w)) length++;
     if(lua_isnumber(L,3)) {
       int index = lua_tointeger(L,3) ;
       if(index < 1 || index > length) {
-        g_list_free(children);
         return luaL_error(L,"Invalid index for stack widget : %d\n",index);
       }
-      gtk_stack_set_visible_child(GTK_STACK(stack->widget),g_list_nth_data(children,index-1));
+      GtkWidget *child = first;
+      for(int i = 1; i < index; i++) child = gtk_widget_get_next_sibling(child);
+      gtk_stack_set_visible_child(GTK_STACK(stack->widget),child);
     } else if(dt_lua_isa(L,3,lua_widget)) {
       lua_widget child;
       luaA_to(L,lua_widget,&child,3);
-      if(!g_list_find(children,child->widget)) {
-        g_list_free(children);
+      gboolean found = FALSE;
+      for(GtkWidget *w = first; w; w = gtk_widget_get_next_sibling(w))
+        if(w == child->widget) { found = TRUE; break; }
+      if(!found) {
         return luaL_error(L,"Active child of stack widget is not in the stack\n");
       }
       gtk_stack_set_visible_child(GTK_STACK(stack->widget),child->widget);
     } else {
-      g_list_free(children);
       return luaL_error(L,"Invalid type for stack active child\n");
     }
-    g_list_free(children);
     return 0;
   }
   GtkWidget * child = gtk_stack_get_visible_child(GTK_STACK(stack->widget));

@@ -47,9 +47,7 @@
 
 static gboolean handle_enter_key(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
-  guint keyval;
-
-  gdk_event_get_keyval ((GdkEvent*)event, &keyval);
+  guint keyval = dt_gdk_event_get_keyval(event);
 
   if(keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter)
     return TRUE;
@@ -85,14 +83,17 @@ static void set_widget_label_default(GtkWidget *widget,
   else if(GTK_IS_ENTRY(widget))
   {
     const gchar *c_default = dt_confgen_get(confstr, DT_DEFAULT);
-    const gchar *c_state = gtk_entry_get_text(GTK_ENTRY(widget));
+    const gchar *c_state = gtk_editable_get_text(GTK_EDITABLE(widget));
     is_default = (g_strcmp0(c_state, c_default) == 0);
   }
   else if(GTK_IS_FILE_CHOOSER(widget))
   {
     const gchar *c_default = dt_confgen_get(confstr, DT_DEFAULT);
-    const gchar *c_state = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(widget));
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(widget));
+    gchar *c_state = file ? g_file_get_path(file) : NULL;
     is_default = (g_strcmp0(c_state, c_default) == 0);
+    g_clear_object(&file);
+    g_free(c_state);
   }
   else
   {
@@ -130,8 +131,10 @@ static GtkWidget *create_tab(GtkWidget *stack,
   gchar *pref = g_strdup_printf("preferences-settings/%s", title);
   g_object_set_data_full(G_OBJECT(help), "dt-help-url", pref, g_free);
   g_signal_connect(help, "clicked", G_CALLBACK(dt_gui_show_help), NULL);
-  gtk_box_pack_start(GTK_BOX(tab_box), scroll, TRUE, TRUE, 0);
-  gtk_box_pack_end(GTK_BOX(tab_box), help, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(tab_box), scroll);
+  gtk_widget_set_hexpand(scroll, TRUE);
+  gtk_widget_set_vexpand(scroll, TRUE);
+  gtk_box_append(GTK_BOX(tab_box), help);
   gtk_stack_add_titled(GTK_STACK(stack), tab_box, l10n_title, l10n_title);
   return grid;
 }
@@ -155,10 +158,8 @@ static GtkWidget *setup_pref(GtkWidget **label,
   gtk_widget_set_name(labdef, "preference_non_default");
   *label = gtk_label_new_with_mnemonic(shortdes);
   gtk_label_set_xalign(GTK_LABEL(*label), .0);
-  *labelev = gtk_event_box_new();
-  gtk_widget_add_events(*labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(*labelev), *label);
-  gtk_event_box_set_visible_window(GTK_EVENT_BOX(*labelev), FALSE);
+  *labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_box_append(GTK_BOX(*labelev), *label);
   return labdef;
 }
 
@@ -186,25 +187,26 @@ static void wrapup_pref(const gchar *name,
                         GtkWidget *label,
                         GtkWidget *widget,
                         int *line,
-                        gboolean (*callback)(GtkWidget *, GdkEventButton *, GtkWidget*))
+                        void (*callback)(GtkGestureSingle *, gint, gdouble, gdouble, GtkWidget *))
 {
   gtk_widget_set_name(widget, name);
   gtk_grid_attach(GTK_GRID(grid), labelev, 0, *line, 1, 1);
   gtk_grid_attach(GTK_GRID(grid), labdef, 1, *line, 1, 1);
   gtk_grid_attach(GTK_GRID(grid), widget, 2, (*line)++, 1, 1);
   gtk_label_set_mnemonic_widget(GTK_LABEL(label), widget);
-  g_signal_connect(G_OBJECT(labelev), "button-press-event", G_CALLBACK(callback), (gpointer)widget);
+  // GTK4 dropped the "button-press-event" signal; the click gesture works in
+  // both GTK3 and GTK4 (n_press == 2 is the old GDK_2BUTTON_PRESS)
+  dt_gui_connect_click(labelev, callback, NULL, widget);
 }
 
-static gboolean click_widget_label(GtkWidget *label, GdkEventButton *event, GtkWidget *widget)
+static void click_widget_label(GtkGestureSingle *gesture,
+                               gint n_press,
+                               gdouble x,
+                               gdouble y,
+                               GtkWidget *widget)
 {
-  if(event->type == GDK_BUTTON_PRESS && GTK_IS_BUTTON(widget))
-  {
-    gtk_button_clicked(GTK_BUTTON(widget));
-    return TRUE;
-  }
-  else
-    return FALSE;
+  if(n_press == 1 && GTK_IS_BUTTON(widget))
+    gtk_widget_activate(widget);
 }
 
 static gboolean preferences_response_callback(GtkDialog *dialog, gint response_id, GtkWidget *widget)
@@ -224,46 +226,46 @@ static gboolean preferences_response_callback(GtkDialog *dialog, gint response_i
   return FALSE;
 }
 
-static gboolean click_widget_toggle_set(GtkWidget *label,
-                                        GdkEventButton *event,
-                                        GtkWidget *widget,
-                                        const gboolean value)
+static void click_widget_toggle_set(GtkGestureSingle *gesture,
+                                    gint n_press,
+                                    gdouble x,
+                                    gdouble y,
+                                    GtkWidget *widget,
+                                    const gboolean value)
 {
-  if(!click_widget_label(label, event, widget)
-     && event->type == GDK_2BUTTON_PRESS)
-  {
+  click_widget_label(gesture, n_press, x, y, widget);
+  if(n_press == 2)
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), value);
-    return TRUE;
-  }
-  return FALSE;
 }
 
-static gboolean click_widget_toggle_true(GtkWidget *label,
-                                         GdkEventButton *event,
-                                         GtkWidget *widget)
+static void click_widget_toggle_true(GtkGestureSingle *gesture,
+                                     gint n_press,
+                                     gdouble x,
+                                     gdouble y,
+                                     GtkWidget *widget)
 {
-  return click_widget_toggle_set(label, event, widget, TRUE);
+  click_widget_toggle_set(gesture, n_press, x, y, widget, TRUE);
 }
 
-static gboolean click_widget_toggle_false(GtkWidget *label,
-                                          GdkEventButton *event,
-                                          GtkWidget *widget)
+static void click_widget_toggle_false(GtkGestureSingle *gesture,
+                                      gint n_press,
+                                      gdouble x,
+                                      gdouble y,
+                                      GtkWidget *widget)
 {
-  return click_widget_toggle_set(label, event, widget, FALSE);
+  click_widget_toggle_set(gesture, n_press, x, y, widget, FALSE);
 }
 
-static gboolean click_widget_enum(GtkWidget *label,
-                                  GdkEventButton *event,
-                                  GtkWidget *widget)
+static void click_widget_enum(GtkGestureSingle *gesture,
+                              gint n_press,
+                              gdouble x,
+                              gdouble y,
+                              GtkWidget *widget)
 {
-  if(!click_widget_label(label, event, widget)
-     && event->type == GDK_2BUTTON_PRESS)
-  {
+  click_widget_label(gesture, n_press, x, y, widget);
+  if(n_press == 2)
     dt_bauhaus_widget_reset(widget);
-    return TRUE;
-  }
-  return FALSE;
-  }
+}
 
 gboolean restart_required = FALSE;
 
@@ -313,9 +315,9 @@ G_GNUC_UNUSED static void _welcomescreen_translation_stubs(void)
           <!-- do not generate CB as using a generic one -->
         </xsl:when>
         <xsl:otherwise>
-          <xsl:text>static gboolean&#xA;click_widget_</xsl:text><xsl:value-of select="generate-id(.)"/><xsl:text> (GtkWidget *label, GdkEventButton *event, GtkWidget *widget)&#xA;{&#xA;  if(!click_widget_label(label, event, widget)&#xA;     &amp;&amp; event->type == GDK_2BUTTON_PRESS)&#xA;  {</xsl:text>
+          <xsl:text>static void&#xA;click_widget_</xsl:text><xsl:value-of select="generate-id(.)"/><xsl:text> (GtkGestureSingle *gesture, gint n_press, gdouble x, gdouble y, GtkWidget *widget)&#xA;{&#xA;  click_widget_label(gesture, n_press, x, y, widget);&#xA;  if(n_press == 2)&#xA;  {</xsl:text>
           <xsl:apply-templates select="." mode="reset"/>
-          <xsl:text>&#xA;    return TRUE;&#xA;  }&#xA;  return FALSE;&#xA;}&#xA;&#xA;</xsl:text>
+          <xsl:text>&#xA;  }&#xA;}&#xA;&#xA;</xsl:text>
         </xsl:otherwise>
       </xsl:choose>
     </xsl:if>
@@ -376,7 +378,7 @@ static void init_tab_generated(GtkWidget *dialog, GtkWidget *stack)
     {
       GtkWidget *seclabel = gtk_label_new(_("</xsl:text><xsl:value-of select="@title"/><xsl:text>"));
       GtkWidget *lbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-      gtk_box_pack_start(GTK_BOX(lbox), seclabel, FALSE, FALSE, 0);
+      gtk_box_append(GTK_BOX(lbox), seclabel);
       gtk_widget_set_name(lbox, "pref_section");
       gtk_grid_attach(GTK_GRID(grid), lbox, 0, line++, 2, 1);
     }</xsl:text>
@@ -482,7 +484,7 @@ static void init_tab_generated(GtkWidget *dialog, GtkWidget *stack)
 <!-- RESET -->
   <xsl:template match="dtconfig[type='string']" mode="reset">
     <xsl:text>
-    gtk_entry_set_text(GTK_ENTRY(widget), "</xsl:text><xsl:value-of select="default"/><xsl:text>");</xsl:text>
+    gtk_editable_set_text(GTK_EDITABLE(widget), "</xsl:text><xsl:value-of select="default"/><xsl:text>");</xsl:text>
   </xsl:template>
 
   <xsl:template match="dtconfig[type='longstring']" mode="reset">
@@ -529,14 +531,14 @@ static void init_tab_generated(GtkWidget *dialog, GtkWidget *stack)
     dt_conf_set_string("</xsl:text><xsl:value-of select="name"/><xsl:text>", path);
     g_free(path);
     path = dt_conf_get_string("</xsl:text><xsl:value-of select="name"/><xsl:text>");
-    gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(widget), path);
+    gtk_editable_set_text(GTK_EDITABLE(widget), path);
     g_free(path);</xsl:text>
   </xsl:template>
 
 <!-- CHANGE -->
   <xsl:template match="dtconfig[type='string']" mode="change">
   <xsl:text>
-    dt_conf_set_string("</xsl:text><xsl:value-of select="name"/><xsl:text>", gtk_entry_get_text(GTK_ENTRY(widget)));</xsl:text>
+    dt_conf_set_string("</xsl:text><xsl:value-of select="name"/><xsl:text>", gtk_editable_get_text(GTK_EDITABLE(widget)));</xsl:text>
   </xsl:template>
 
   <xsl:template match="dtconfig[type='longstring']" mode="change">
@@ -581,9 +583,7 @@ static void init_tab_generated(GtkWidget *dialog, GtkWidget *stack)
 
   <xsl:template match="dtconfig[type='dir']" mode="change">
   <xsl:text>
-    gchar *folder = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(widget));
-    dt_conf_set_string("</xsl:text><xsl:value-of select="name"/><xsl:text>", folder);
-    g_free(folder);</xsl:text>
+    dt_conf_set_string("</xsl:text><xsl:value-of select="name"/><xsl:text>", gtk_editable_get_text(GTK_EDITABLE(widget)));</xsl:text>
   </xsl:template>
 
 <!-- TAB -->
@@ -609,7 +609,7 @@ static void init_tab_generated(GtkWidget *dialog, GtkWidget *stack)
     gtk_widget_set_halign(widget, GTK_ALIGN_FILL);
     gtk_widget_set_hexpand(widget, TRUE);
     gchar *setting = dt_conf_get_string("</xsl:text><xsl:value-of select="name"/><xsl:text>");
-    gtk_entry_set_text(GTK_ENTRY(widget), setting);
+    gtk_editable_set_text(GTK_EDITABLE(widget), setting);
     g_free(setting);
     gtk_label_set_mnemonic_widget(GTK_LABEL(label), widget);
     g_signal_connect(G_OBJECT(widget), "changed", G_CALLBACK(preferences_changed_callback_</xsl:text><xsl:value-of select="generate-id(.)"/><xsl:text>), labdef);
@@ -620,14 +620,15 @@ static void init_tab_generated(GtkWidget *dialog, GtkWidget *stack)
 
   <xsl:template match="dtconfig[type='dir']" mode="tab">
     <xsl:text>
-    widget = gtk_file_chooser_button_new(_("select directory"), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
-    gtk_file_chooser_button_set_width_chars(GTK_FILE_CHOOSER_BUTTON(widget), 20);
+    // GtkFileChooserButton is removed in GTK4; plain entry until the
+    // GtkFileDialog rework (TODO P4).
+    widget = gtk_entry_new();
     gtk_widget_set_halign(widget, GTK_ALIGN_FILL);
     gtk_widget_set_hexpand(widget, TRUE);
     gchar *setting = dt_conf_get_string("</xsl:text><xsl:value-of select="name"/><xsl:text>");
-    gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(widget), setting);
+    gtk_editable_set_text(GTK_EDITABLE(widget), setting);
     g_free(setting);
-    g_signal_connect(G_OBJECT(widget), "selection-changed", G_CALLBACK(preferences_changed_callback_</xsl:text><xsl:value-of select="generate-id(.)"/><xsl:text>), labdef);
+    g_signal_connect(G_OBJECT(widget), "changed", G_CALLBACK(preferences_changed_callback_</xsl:text><xsl:value-of select="generate-id(.)"/><xsl:text>), labdef);
     g_signal_connect(G_OBJECT(dialog), "response", G_CALLBACK(preferences_response_callback_</xsl:text><xsl:value-of select="generate-id(.)"/><xsl:text>), widget);
     gchar *default_path = dt_conf_expand_default_dir("</xsl:text><xsl:value-of select="default"/><xsl:text>");
     snprintf(tooltip, 1024, _("double click to reset to `%s'"), default_path);

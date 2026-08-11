@@ -47,10 +47,10 @@ static int text_member(lua_State *L)
   luaA_to(L,lua_entry,&entry,1);
   if(lua_gettop(L) > 2) {
     const char * text = luaL_checkstring(L,3);
-    gtk_entry_set_text(GTK_ENTRY(entry->widget),text);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(entry->widget)), text);
     return 0;
   }
-  lua_pushstring(L,gtk_entry_get_text(GTK_ENTRY(entry->widget)));
+  lua_pushstring(L,gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry->widget))));
   return 1;
 }
 
@@ -99,7 +99,7 @@ static int tostring_member(lua_State *L)
 {
   lua_entry widget;
   luaA_to(L, lua_entry, &widget, 1);
-  const gchar *text = gtk_entry_get_text(GTK_ENTRY(widget->widget));
+  const gchar *text = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(widget->widget)));
   gchar *res = g_strdup_printf("%s (\"%s\")", G_OBJECT_TYPE_NAME(widget->widget), text ? text : "");
   lua_pushstring(L, res);
   g_free(res);

@@ -75,10 +75,7 @@ static void _populate_list_box(dt_lib_module_t *self)
   if(!d || !d->list_box) return;
 
   // Remove existing rows
-  GList *children = gtk_container_get_children(GTK_CONTAINER(d->list_box));
-  for(GList *elem = children; elem; elem = elem->next)
-    gtk_widget_destroy(GTK_WIDGET(elem->data));
-  g_list_free(children);
+  gtk_list_box_remove_all(GTK_LIST_BOX(d->list_box));
 
   GList *entries = dt_control_log_history_get_entries();
 
@@ -175,7 +172,7 @@ void gui_init(dt_lib_module_t *self)
 
   // overlay container to host button and status badge
   GtkWidget *overlay = gtk_overlay_new();
-  gtk_container_add(GTK_CONTAINER(overlay), d->button);
+  gtk_overlay_set_child(GTK_OVERLAY(overlay), d->button);
 
   // small round badge indicating unread log entries
   d->badge = gtk_label_new("●");
@@ -186,7 +183,8 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_hide(d->badge);
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay), d->badge);
 
-  d->popover = gtk_popover_new(d->button);
+  d->popover = gtk_popover_new();
+  gtk_widget_set_parent(d->popover, d->button);
   gtk_widget_set_name(d->popover, "log-history-popover");
   gtk_popover_set_position(GTK_POPOVER(d->popover), GTK_POS_TOP);
 
@@ -194,7 +192,7 @@ void gui_init(dt_lib_module_t *self)
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(d->list_box), GTK_SELECTION_NONE);
   gtk_widget_set_name(d->list_box, "log-history-list");
 
-  d->scrolled = gtk_scrolled_window_new(NULL, NULL);
+  d->scrolled = gtk_scrolled_window_new();
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(d->scrolled),
                                  GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
   gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(d->scrolled),
@@ -204,8 +202,8 @@ void gui_init(dt_lib_module_t *self)
                               DT_PIXEL_APPLY_DPI(700),
                               DT_PIXEL_APPLY_DPI(200));
 
-  gtk_container_add(GTK_CONTAINER(d->scrolled), d->list_box);
-  gtk_container_add(GTK_CONTAINER(d->popover), d->scrolled);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(d->scrolled), d->list_box);
+  gtk_popover_set_child(GTK_POPOVER(d->popover), d->scrolled);
 
   dt_gui_connect_click_all(d->button, _button_press_cb, NULL, self);
 

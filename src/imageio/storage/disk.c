@@ -199,7 +199,7 @@ static void button_clicked(GtkWidget *widget,
         _("select directory"), GTK_WINDOW(win), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
         _("_select as output destination"), _("_cancel"));
 
-  gchar *old = g_strdup(gtk_entry_get_text(d->entry));
+  gchar *old = g_strdup(gtk_editable_get_text(GTK_EDITABLE(d->entry)));
   gchar *dirname;
   gchar *filename;
   if(g_file_test(old, G_FILE_TEST_IS_DIR))
@@ -215,13 +215,17 @@ static void button_clicked(GtkWidget *widget,
     filename = g_path_get_basename(old);
   }
 
-  gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), dirname);
+  GFile *folder = g_file_new_for_path(dirname);
+  gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), folder, NULL);
+  g_object_unref(folder);
   g_free(old);
   g_free(dirname);
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *dir = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    GFile *dir_file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    gchar *dir = dir_file ? g_file_get_path(dir_file) : NULL;
+    if(dir_file) g_object_unref(dir_file);
     char *composed = g_build_filename(dir, filename, NULL);
 
 #ifdef _WIN32
@@ -240,7 +244,7 @@ static void button_clicked(GtkWidget *widget,
     gchar *escaped = dt_util_str_replace(composed, "\\", "\\\\");
 #endif
 
-    gtk_entry_set_text(GTK_ENTRY(d->entry), escaped);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(d->entry)), escaped);
     // the signal handler will write this to conf
     gtk_editable_set_position(GTK_EDITABLE(d->entry), strlen(escaped));
     g_free(dir);
@@ -255,7 +259,7 @@ static void entry_changed_callback(GtkEntry *entry,
                                    gpointer user_data)
 {
   dt_conf_set_string("plugins/imageio/storage/disk/file_directory",
-                     gtk_entry_get_text(entry));
+                     gtk_editable_get_text(GTK_EDITABLE(entry)));
 }
 
 static void onsave_action_toggle_callback(GtkWidget *widget,
@@ -307,14 +311,13 @@ void gui_cleanup(dt_imageio_module_storage_t *self)
 void gui_reset(dt_imageio_module_storage_t *self)
 {
   disk_t *d = self->gui_data;
-  gtk_entry_set_text(d->entry,
-                     dt_confgen_get("plugins/imageio/storage/disk/file_directory",
+  gtk_editable_set_text(GTK_EDITABLE(d->entry), dt_confgen_get("plugins/imageio/storage/disk/file_directory",
                                     DT_DEFAULT));
   dt_bauhaus_combobox_set(d->onsave_action,
                           dt_confgen_get_int("plugins/imageio/storage/disk/overwrite",
                                              DT_DEFAULT));
   dt_conf_set_string("plugins/imageio/storage/disk/file_directory",
-                     gtk_entry_get_text(d->entry));
+                     gtk_editable_get_text(GTK_EDITABLE(d->entry)));
   dt_conf_set_int("plugins/imageio/storage/disk/overwrite",
                   dt_bauhaus_combobox_get(d->onsave_action));
 }
@@ -596,7 +599,7 @@ int set_params(dt_imageio_module_storage_t *self,
 
   if(size != self->params_size(self)) return 1;
 
-  gtk_entry_set_text(GTK_ENTRY(g->entry), d->filename);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(g->entry)), d->filename);
   gtk_editable_set_position(GTK_EDITABLE(g->entry), strlen(d->filename));
   dt_bauhaus_combobox_set(g->onsave_action, d->onsave_action);
   return 0;

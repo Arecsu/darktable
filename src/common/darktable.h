@@ -112,6 +112,9 @@ static inline void dt_gui_widget_destroy(GtkWidget *widget)
  * the values clear of every real GdkEventType.  TODO P4: pass n_press. */
 #define GDK_2BUTTON_PRESS (GDK_BUTTON_PRESS + 100)
 #define GDK_3BUTTON_PRESS (GDK_BUTTON_PRESS + 101)
+/* GTK3.6 aliases for the above (Gtk3's GdkEventType has both spellings) */
+#define GDK_DOUBLE_BUTTON_PRESS GDK_2BUTTON_PRESS
+#define GDK_TRIPLE_BUTTON_PRESS GDK_3BUTTON_PRESS
 
 /* GdkModifierType renames/removals: MOD1 is ALT, MOD2 was the macOS
  * Command bit (GTK4 maps Command to META), MOD5 (AltGr/level-3) has no

@@ -248,7 +248,7 @@ static void _osd_button_clicked(GtkWidget *widget, gpointer user_data)
 static void _property_choice_callback(GtkMenuItem *item, gpointer user_data)
 {
   dt_lib_camera_t *lib = (dt_lib_camera_t *)user_data;
-  gtk_entry_set_text(GTK_ENTRY(lib->gui.pname), gtk_menu_item_get_label(item));
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(lib->gui.pname)), gtk_menu_item_get_label(item));
 }
 
 
@@ -263,8 +263,9 @@ static void _show_property_popupmenu_clicked(GtkWidget *widget, gpointer user_da
 static void _lib_property_add_to_gui(dt_lib_camera_property_t *prop, dt_lib_camera_t *lib)
 {
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, DT_PIXEL_APPLY_DPI(5));
-  gtk_box_pack_start(GTK_BOX(hbox), GTK_WIDGET(prop->values), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), GTK_WIDGET(prop->osd), FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(hbox), GTK_WIDGET(prop->values));
+  gtk_widget_set_hexpand(GTK_WIDGET(prop->values), TRUE);
+  gtk_box_append(GTK_BOX(hbox), GTK_WIDGET(prop->osd));
   gtk_grid_insert_row(lib->gui.main_grid, lib->gui.prop_end); // make space for the new row
   gtk_grid_attach(lib->gui.main_grid, GTK_WIDGET(hbox), 0, lib->gui.prop_end, 2, 1);
   g_signal_connect(G_OBJECT(prop->osd), "clicked", G_CALLBACK(_osd_button_clicked), prop);
@@ -276,8 +277,8 @@ static void _lib_property_add_to_gui(dt_lib_camera_property_t *prop, dt_lib_came
 static void _add_property_button_clicked(GtkWidget *widget, gpointer user_data)
 {
   dt_lib_camera_t *lib = (dt_lib_camera_t *)user_data;
-  const gchar *label = gtk_entry_get_text(GTK_ENTRY(lib->gui.plabel));
-  const gchar *property = gtk_entry_get_text(GTK_ENTRY(lib->gui.pname));
+  const gchar *label = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(lib->gui.plabel)));
+  const gchar *property = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(lib->gui.pname)));
 
   // Let's try to add property
   if(label && property)
@@ -297,8 +298,8 @@ static void _add_property_button_clicked(GtkWidget *widget, gpointer user_data)
       dt_conf_set_string(key, property);
 
       // Clear entries
-      gtk_entry_set_text(GTK_ENTRY(lib->gui.plabel), "");
-      gtk_entry_set_text(GTK_ENTRY(lib->gui.pname), "");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(lib->gui.plabel)), "");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(lib->gui.pname)), "");
     }
   }
 }
@@ -468,9 +469,12 @@ void gui_init(dt_lib_module_t *self)
   lib->gui.toggle_bracket = DTGTK_TOGGLEBUTTON(dtgtk_togglebutton_new(dtgtk_cairo_paint_bracket, 0, NULL));
 
   hbox = GTK_BOX(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0));
-  gtk_box_pack_start(hbox, GTK_WIDGET(lib->gui.toggle_timer), TRUE, TRUE, 0);
-  gtk_box_pack_start(hbox, GTK_WIDGET(lib->gui.toggle_sequence), TRUE, TRUE, 0);
-  gtk_box_pack_start(hbox, GTK_WIDGET(lib->gui.toggle_bracket), TRUE, TRUE, 0);
+  gtk_box_append(hbox, GTK_WIDGET(lib->gui.toggle_timer));
+  gtk_widget_set_hexpand(GTK_WIDGET(lib->gui.toggle_timer), TRUE);
+  gtk_box_append(hbox, GTK_WIDGET(lib->gui.toggle_sequence));
+  gtk_widget_set_hexpand(GTK_WIDGET(lib->gui.toggle_sequence), TRUE);
+  gtk_box_append(hbox, GTK_WIDGET(lib->gui.toggle_bracket));
+  gtk_widget_set_hexpand(GTK_WIDGET(lib->gui.toggle_bracket), TRUE);
   gtk_grid_attach_next_to(GTK_GRID(self->widget), GTK_WIDGET(hbox), GTK_WIDGET(modes_label), GTK_POS_RIGHT, 1, 1);
 
   lib->gui.timer = gtk_spin_button_new_with_range(1, 60, 1);
@@ -535,8 +539,9 @@ void gui_init(dt_lib_module_t *self)
   g_signal_connect(G_OBJECT(widget), "clicked", G_CALLBACK(_show_property_popupmenu_clicked), lib);
 #endif
   lib->gui.pname = dt_ui_entry_new(0);
-  gtk_box_pack_start(hbox, GTK_WIDGET(lib->gui.pname), TRUE, TRUE, 0);
-  gtk_box_pack_start(hbox, GTK_WIDGET(widget), FALSE, FALSE, 0);
+  gtk_box_append(hbox, GTK_WIDGET(lib->gui.pname));
+  gtk_widget_set_hexpand(GTK_WIDGET(lib->gui.pname), TRUE);
+  gtk_box_append(hbox, GTK_WIDGET(widget));
   gtk_grid_attach(GTK_GRID(self->widget), GTK_WIDGET(label), 0, lib->gui.rows++, 1, 1);
   gtk_grid_attach_next_to(GTK_GRID(self->widget), GTK_WIDGET(hbox), GTK_WIDGET(label), GTK_POS_RIGHT, 1, 1);
 

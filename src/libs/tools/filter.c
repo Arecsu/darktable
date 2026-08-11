@@ -105,23 +105,25 @@ void gui_init(dt_lib_module_t *self)
         .clicked_cb = G_CALLBACK(_pref_show),
         .clicked_data = self,
       });
-  gtk_box_pack_start(GTK_BOX(self->widget), bt, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), bt);
 
   d->filter_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_name(d->filter_box, "header-rule-box");
-  gtk_box_pack_start(GTK_BOX(self->widget), d->filter_box, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(self->widget), d->filter_box);
 
   /* sort combobox */
   d->sort_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_name(d->sort_box, "header-sort-box");
-  gtk_box_pack_start(GTK_BOX(self->widget), d->sort_box, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(self->widget), d->sort_box);
   GtkWidget *label = gtk_label_new(_("sort by"));
-  gtk_box_pack_start(GTK_BOX(d->sort_box), label, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(d->sort_box), label);
+  gtk_widget_set_hexpand(label, TRUE);
 
   /* label to display selected count */
   d->count = gtk_label_new("");
   gtk_label_set_ellipsize(GTK_LABEL(d->count), PANGO_ELLIPSIZE_MIDDLE);
-  gtk_box_pack_start(GTK_BOX(self->widget), d->count, TRUE, FALSE, 0);
+  gtk_box_append(GTK_BOX(self->widget), d->count);
+  gtk_widget_set_hexpand(d->count, TRUE);
 
   /* initialize proxy */
   darktable.view_manager->proxy.filter.module = self;

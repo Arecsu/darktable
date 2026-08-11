@@ -252,7 +252,7 @@ static void _workspace_template_radios_set_visible(dt_workspace_t *session,
 static void _workspace_entry_changed(GtkWidget *entry,
                                      dt_workspace_t *session)
 {
-  const gchar *label = gtk_entry_get_text(GTK_ENTRY(entry));
+  const gchar *label = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry)));
 
   gtk_widget_set_sensitive(session->create, strlen(label) != 0);
   gtk_widget_set_sensitive(session->copy_template_check, strlen(label) != 0);
@@ -394,7 +394,7 @@ static void _workspace_new_db(GtkWidget *button,
 {
   (void)button;
 
-  gchar *const label = g_strdup(gtk_entry_get_text(GTK_ENTRY(session->entry)));
+  gchar *const label = g_strdup(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(session->entry))));
   g_strstrip(label);
 
   if(!*label)
@@ -467,10 +467,10 @@ static GtkWidget *_insert_button(dt_workspace_t *session,
   if(with_radio)
   {
 #if GTK_CHECK_VERSION(4, 0, 0)
-    radio = gtk_radio_button_new();
+    radio = gtk_check_button_new();
     if(session->template_radio_leader)
-      gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(radio),
-                                  GTK_TOGGLE_BUTTON(session->template_radio_leader));
+      gtk_check_button_set_group(GTK_CHECK_BUTTON(radio),
+                                 GTK_CHECK_BUTTON(session->template_radio_leader));
     else
       session->template_radio_leader = radio;
 #else
@@ -574,7 +574,6 @@ gboolean dt_workspace_create(const char *datadir)
                                 GTK_RESPONSE_NONE,
                                 NULL);
 
-  gtk_window_set_position(GTK_WINDOW(session->db_screen), GTK_WIN_POS_CENTER);
 
   GList *dbs = dt_read_file_pattern(datadir, "library-*.db");
   if(dbs)

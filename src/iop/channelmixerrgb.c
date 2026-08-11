@@ -2590,8 +2590,7 @@ int mouse_moved(dt_iop_module_t *self,
     // fall back to default cursor
     GdkCursor *const cursor =
       gdk_cursor_new_from_name("default", NULL);
-    gdk_window_set_cursor(gtk_widget_get_window(dt_ui_main_window(darktable.gui->ui)),
-                          cursor);
+    gtk_widget_set_cursor(dt_ui_main_window(darktable.gui->ui), cursor);
     g_object_unref(cursor);
   }
 

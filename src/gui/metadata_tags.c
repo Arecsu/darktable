@@ -59,7 +59,7 @@ static gboolean _set_matching_tag_visibility(GtkTreeModel *model, GtkTreePath *p
 // set the metadata tag visibility aligned with filter
 static void _tag_name_changed(GtkEntry *entry, gpointer user_data)
 {
-  sel_entry_text = gtk_entry_get_text(GTK_ENTRY(sel_entry));
+  sel_entry_text = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(sel_entry)));
   GtkTreeModel *model = gtk_tree_view_get_model(sel_view);
   GtkTreeModel *store = gtk_tree_model_filter_get_model(GTK_TREE_MODEL_FILTER(model));
   gtk_tree_model_foreach(store, (GtkTreeModelForeachFunc)_set_matching_tag_visibility, NULL);
@@ -95,13 +95,12 @@ GtkWidget *dt_metadata_tags_dialog(GtkWidget *parent,
                                                   _("_done"), GTK_RESPONSE_NONE, NULL);
   gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_NONE);
   gtk_window_set_default_size(GTK_WINDOW(dialog), DT_PIXEL_APPLY_DPI(500), DT_PIXEL_APPLY_DPI(300));
-  gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
 
   // keep a reference to the "add" button to toggle its sensitivity
   add_button = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
 
   sel_entry = gtk_entry_new();
-  gtk_entry_set_text(GTK_ENTRY(sel_entry), "");
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(sel_entry)), "");
   gtk_widget_set_tooltip_text(sel_entry, _("list filter"));
   gtk_entry_set_activates_default(GTK_ENTRY(sel_entry), TRUE);
   g_signal_connect(G_OBJECT(sel_entry), "changed", G_CALLBACK(_tag_name_changed), NULL);

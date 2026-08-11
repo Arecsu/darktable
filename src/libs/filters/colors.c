@@ -53,16 +53,8 @@ static void _set_mask(dt_lib_filtering_rule_t *rule , const int mask, const gboo
 }
 
 // kept for direct callers from accelerators
-static gboolean _colors_clicked_old(GtkWidget *w, GdkEventButton *e, _widgets_colors_t *colors)
+static gboolean _colors_clicked_old(GtkWidget *w, GdkModifierType state, _widgets_colors_t *colors)
 {
-  // double click reset the widget
-  if(e->button == GDK_BUTTON_PRIMARY && e->type == GDK_2BUTTON_PRESS)
-  {
-    _set_mask(colors->rule, CL_AND_MASK, TRUE);
-    _colors_update(colors->rule);
-    return TRUE;
-  }
-
   dt_lib_filtering_rule_t *rule = colors->rule;
   const int mask = _get_mask(rule->raw_text);
   const int k = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(w), "colors_index"));
@@ -72,9 +64,9 @@ static gboolean _colors_clicked_old(GtkWidget *w, GdkEventButton *e, _widgets_co
   {
     if(mask & mask_k)
       new_mask = 0;
-    else if(dt_modifier_is(e->state, GDK_CONTROL_MASK))
+    else if(dt_modifier_is(state, GDK_CONTROL_MASK))
       new_mask = CL_ALL_EXCLUDED | CL_GREY_EXCLUDED;
-    else if(dt_modifier_is(e->state, 0))
+    else if(dt_modifier_is(state, 0))
       new_mask = CL_ALL_INCLUDED | CL_GREY_INCLUDED;
     new_mask |= (mask & CL_AND_MASK);
   }
@@ -82,9 +74,9 @@ static gboolean _colors_clicked_old(GtkWidget *w, GdkEventButton *e, _widgets_co
   {
     if(mask & mask_k)
       new_mask = 0;
-    else if(dt_modifier_is(e->state, GDK_CONTROL_MASK))
+    else if(dt_modifier_is(state, GDK_CONTROL_MASK))
       new_mask = 1 << (k + 12);
-    else if(dt_modifier_is(e->state, 0))
+    else if(dt_modifier_is(state, 0))
       new_mask = 1 << k;
     new_mask |= (mask & ~mask_k);
   }
@@ -284,13 +276,13 @@ static float _action_process_colors(gpointer target, dt_action_element_t element
 
   if(DT_PERFORM_ACTION(move_size))
   {
-    GdkEventButton e = { .state = effect == DT_ACTION_EFFECT_TOGGLE_CTRL ? GDK_CONTROL_MASK : 0 };
+    const GdkModifierType state = effect == DT_ACTION_EFFECT_TOGGLE_CTRL ? GDK_CONTROL_MASK : 0;
 
     if((!mask || (effect != DT_ACTION_EFFECT_ON && effect != DT_ACTION_EFFECT_ON_CTRL))
        && (mask || effect != DT_ACTION_EFFECT_OFF))
     {
       if(element)
-        _colors_clicked_old(w, &e, colors);
+        _colors_clicked_old(w, state, colors);
       else
         _colors_operator_clicked(w, colors);
     }
@@ -354,7 +346,7 @@ static void _colors_widget_init(dt_lib_filtering_rule_t *rule, const dt_collecti
     dt_gui_add_class(colors->colors[k], "dt_no_hover");
     dt_gui_add_class(colors->colors[k], "dt_dimmed");
     g_object_set_data(G_OBJECT(colors->colors[k]), "colors_self", colors);
-    gtk_box_pack_start(GTK_BOX(hbox), colors->colors[k], FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(hbox), colors->colors[k]);
     dt_gui_connect_click(colors->colors[k], _colors_clicked_gesture, NULL, colors);
     dt_gui_connect_motion(colors->colors[k], NULL, _colors_enter_cb, NULL, GINT_TO_POINTER(k));
   }
@@ -370,7 +362,7 @@ static void _colors_widget_init(dt_lib_filtering_rule_t *rule, const dt_collecti
         .clicked_cb = G_CALLBACK(_colors_operator_clicked),
         .clicked_data = colors,
       });
-  gtk_box_pack_start(GTK_BOX(hbox), colors->operator, FALSE, FALSE, 2);
+  gtk_box_append(GTK_BOX(hbox), colors->operator);
   dt_gui_connect_motion(colors->operator, NULL, _colors_enter_cb, NULL, GINT_TO_POINTER(-1));
   dt_action_t *ac = dt_action_widget(colors->operator);
 
@@ -386,9 +378,15 @@ static void _colors_widget_init(dt_lib_filtering_rule_t *rule, const dt_collecti
   }
 
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), hbox, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), hbox);
+    gtk_widget_set_vexpand(hbox, TRUE);
+  }
   else
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), hbox, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box), hbox);
+    gtk_widget_set_vexpand(hbox, TRUE);
+  }
 }
 
 // clang-format off

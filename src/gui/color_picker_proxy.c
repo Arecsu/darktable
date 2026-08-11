@@ -521,7 +521,7 @@ static GtkWidget *_color_picker_new(dt_iop_module_t *module,
     // cannot reach this CAPTURE-phase gesture (the widget class handler only
     // dispatches BUBBLE-phase controllers and synthetic events carry no
     // device).
-    GtkGesture *gesture = gtk_gesture_multi_press_new(button);
+    GtkGesture *gesture = gtk_gesture_click_new();
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
                                                GTK_PHASE_CAPTURE);
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
@@ -531,7 +531,11 @@ static GtkWidget *_color_picker_new(dt_iop_module_t *module,
                           color_picker, (GClosureNotify)_color_picker_destroy, 0);
     g_signal_connect(gesture, "begin", G_CALLBACK(dt_gui_gesture_claim), NULL);
     g_object_set_data(G_OBJECT(button), DT_COLOR_PICKER_INSTANCE_KEY, color_picker);
-    if(w) gtk_box_pack_start(GTK_BOX(w), button, FALSE, FALSE, 0);
+    if(w)
+    {
+      gtk_widget_set_halign(button, GTK_ALIGN_START);
+      gtk_box_append(GTK_BOX(w), button);
+    }
 
     return button;
   }

@@ -403,7 +403,7 @@ static float _action_process_entry(gpointer target,
     if(buffer)
       gtk_text_buffer_set_text(buffer, _entry_set_element, -1);
     else
-      gtk_entry_set_text(target, _entry_set_element);
+      gtk_editable_set_text(GTK_EDITABLE(target), _entry_set_element);
   }
 
   return DT_ACTION_NOT_VALID;
@@ -1019,7 +1019,11 @@ void _shortcut_copy_lua(GtkWidget *widget, dt_shortcut_t *shortcut, gchar *prese
 {
   gchar *lua_command = _shortcut_lua_command(widget, shortcut);
   if(!lua_command) return;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gdk_clipboard_set_text(gdk_display_get_clipboard(gdk_display_get_default()), lua_command);
+#else
   gtk_clipboard_set_text(gtk_clipboard_get_default(gdk_display_get_default()), lua_command, -1);
+#endif
   dt_control_log(_("Lua script command copied to clipboard:\n\n<tt>%s</tt>"), lua_command);
   g_free(lua_command);
 }
@@ -1055,6 +1059,14 @@ static void _tooltip_reposition(GtkWidget *widget,
                                 GdkRectangle *allocation,
                                 gpointer user_data)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4 tooltips are popovers anchored by the compositor, which already
+  // keeps them within the monitor's work area; there is no GdkWindow to
+  // move (GdkWindow is removed).
+  (void)widget;
+  (void)allocation;
+  (void)user_data;
+#else
   GdkWindow *window = gtk_widget_get_window(gtk_widget_get_toplevel(widget));
   if(!window) return;
 
@@ -1070,6 +1082,7 @@ static void _tooltip_reposition(GtkWidget *widget,
 
   if(nx != wx)
     gdk_window_move(window, nx, wy);
+#endif
 }
 
 gboolean dt_shortcut_tooltip_callback(GtkWidget *widget,
@@ -1079,9 +1092,11 @@ gboolean dt_shortcut_tooltip_callback(GtkWidget *widget,
                                       GtkTooltip *tooltip,
                                       GtkWidget *vbox)
 {
-  GtkWindow *top = GTK_WINDOW(gtk_widget_get_toplevel(widget));
-  if(!gtk_window_is_active(top)
-     && gtk_window_get_window_type(top) != GTK_WINDOW_POPUP)
+  GtkWidget *top = gtk_widget_get_toplevel(widget);
+  // GTK3: allow tooltips in popup windows even when not active (GTK4's
+  // bauhaus popups are plain toplevels that can be active; popovers carry
+  // their own tooltip handling)
+  if(!gtk_window_is_active(GTK_WINDOW(top)) && !GTK_IS_POPOVER(top))
     return FALSE;
 
   if(dt_key_modifier_state() & (GDK_BUTTON1_MASK|GDK_BUTTON2_MASK|GDK_BUTTON3_MASK
@@ -1109,7 +1124,7 @@ gboolean dt_shortcut_tooltip_callback(GtkWidget *widget,
     GtkTreePath *path = NULL;
     GtkTreeModel *model;
     GtkTreeIter iter;
-    if(!gtk_tree_view_get_tooltip_context(GTK_TREE_VIEW(widget), &x, &y,
+    if(!gtk_tree_view_get_tooltip_context(GTK_TREE_VIEW(widget), x, y,
                                           keyboard_mode, &model, &path, &iter))
       return FALSE;
 
@@ -1263,7 +1278,7 @@ gboolean dt_shortcut_tooltip_callback(GtkWidget *widget,
 
     GtkWidget *label = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label), markup_text);
-    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+    gtk_label_set_wrap(GTK_LABEL(label), TRUE);
     // Set a preferred width for tooltips that have no manual line breaks,
     // or that contain markup tags (which tend to produce long runs of text).
     if(original_markup && (!strchr(original_markup, '\n') || strchr(original_markup, '<')))
@@ -2775,15 +2790,17 @@ static void _export_clicked(GtkButton *button, gpointer user_data)
         _("select file to export"), GTK_WINDOW(win), GTK_FILE_CHOOSER_ACTION_SAVE,
         _("_export"), _("_cancel"));
 
-  gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(chooser), TRUE);
+  // GTK4: confirm-overwrite is always on, gtk_file_chooser_set_do_overwrite_confirmation is removed
   dt_conf_get_folder_to_file_chooser("ui_last/export_path", GTK_FILE_CHOOSER(chooser));
   gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(chooser), "shortcutsrc");
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(chooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(chooser)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(chooser));
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(chooser));
+    gchar *filename = file ? g_file_get_path(file) : NULL;
 
     _shortcuts_save(filename, id);
     g_free(filename);
+    g_object_unref(file);
     dt_conf_set_folder_from_file_chooser("ui_last/export_path", GTK_FILE_CHOOSER(chooser));
   }
   g_object_unref(chooser);
@@ -2863,9 +2880,10 @@ static void _import_clicked(GtkButton *button, gpointer user_data)
   gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(chooser), FALSE);
 
   dt_conf_get_folder_to_file_chooser("ui_last/import_path", GTK_FILE_CHOOSER(chooser));
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(chooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(chooser)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(chooser));
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(chooser));
+    gchar *filename = file ? g_file_get_path(file) : NULL;
 
     if(wipe && from_id != DT_ALL_DEVICES)
     {
@@ -2898,6 +2916,7 @@ static void _import_clicked(GtkButton *button, gpointer user_data)
     _shortcuts_load(filename, from_id, to_id, wipe && from_id == DT_ALL_DEVICES);
 
     g_free(filename);
+    g_object_unref(file);
     dt_conf_set_folder_from_file_chooser("ui_last/import_path", GTK_FILE_CHOOSER(chooser));
   }
   g_object_unref(chooser);
@@ -3036,8 +3055,11 @@ static void _shortcuts_view_realized(GtkWidget *widget, gpointer user_data)
   GtkEventController *controller = gtk_event_controller_key_new();
   gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
   dt_gui_add_controller(toplevel, controller);
-  g_signal_connect(controller, "key-pressed",
-                   G_CALLBACK(_shortcuts_dialog_key_pressed), widget);
+  // key controllers return gboolean from "key-pressed", which the
+  // g_signal_connect assert (gtk.h) cannot express for a non-*-event signal
+  g_signal_connect_data(controller, "key-pressed",
+                        G_CALLBACK(_shortcuts_dialog_key_pressed), widget,
+                        NULL, (GConnectFlags)0);
 #else
   g_signal_connect(G_OBJECT(toplevel), "key-press-event",
                    G_CALLBACK(_shortcuts_dialog_key_pressed), widget);
@@ -3087,7 +3109,7 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
                    G_CALLBACK(dt_gui_search_stop), shortcuts_view);
   g_signal_connect(G_OBJECT(search_shortcuts), "stop-search",
                    G_CALLBACK(dt_gui_search_stop), shortcuts_view);
-  gtk_tree_view_set_search_entry(shortcuts_view, GTK_ENTRY(search_shortcuts));
+  gtk_tree_view_set_search_entry(shortcuts_view, GTK_EDITABLE(search_shortcuts));
   // intercept the delete keys at the toplevel, see _shortcuts_dialog_key_pressed
   g_signal_connect(G_OBJECT(shortcuts_view), "realize",
                    G_CALLBACK(_shortcuts_view_realized), NULL);
@@ -3147,7 +3169,9 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
   // Adding the shortcuts treeview to its containers
   GtkWidget *scroll = dt_gui_scroll_wrap(GTK_WIDGET(shortcuts_view));
   gtk_widget_set_size_request(scroll, -1, 100);
-  gtk_paned_pack2(GTK_PANED(container), scroll, TRUE, FALSE);
+  gtk_paned_set_end_child(GTK_PANED(container), scroll);
+  gtk_paned_set_resize_end_child(GTK_PANED(container), TRUE);
+  gtk_paned_set_shrink_end_child(GTK_PANED(container), FALSE);
 
   // Creating the action selection treeview
   g_set_weak_pointer(&_actions_store, gtk_tree_store_new(2, G_TYPE_POINTER, G_TYPE_STRING)); // static
@@ -3190,7 +3214,7 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
                    G_CALLBACK(dt_gui_search_stop), actions_view);
   g_signal_connect(G_OBJECT(search_actions), "stop-search",
                    G_CALLBACK(dt_gui_search_stop), actions_view);
-  gtk_tree_view_set_search_entry(actions_view, GTK_ENTRY(search_actions));
+  gtk_tree_view_set_search_entry(actions_view, GTK_EDITABLE(search_actions));
 
   g_object_set(actions_view, "has-tooltip", TRUE, NULL);
   gtk_widget_set_name(GTK_WIDGET(actions_view), "actions_view");
@@ -3201,7 +3225,7 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
     // the internal treeview gesture would fight our click handling;
     // claim the sequence in CAPTURE phase to suppress it, replicating
     // the event consumption of the pre-migration handler
-    GtkGesture *gesture = gtk_gesture_multi_press_new(GTK_WIDGET(actions_view));
+    GtkGesture *gesture = gtk_gesture_click_new();
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
                                                GTK_PHASE_CAPTURE);
     dt_gui_add_controller(GTK_WIDGET(actions_view), gesture);
@@ -3236,7 +3260,9 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
   // Adding the action treeview to its containers
   scroll = dt_gui_scroll_wrap(GTK_WIDGET(actions_view));
   gtk_widget_set_size_request(scroll, -1, 100);
-  gtk_paned_pack1(GTK_PANED(container), scroll, TRUE, FALSE);
+  gtk_paned_set_start_child(GTK_PANED(container), scroll);
+  gtk_paned_set_resize_start_child(GTK_PANED(container), TRUE);
+  gtk_paned_set_shrink_start_child(GTK_PANED(container), FALSE);
 
   if(found_iter.user_data)
   {
@@ -3302,9 +3328,9 @@ GtkWidget *dt_shortcuts_prefs(GtkWidget *widget)
         "change their <i>element</i> or <i>effect</i> by adding mouse clicks.\n\n"
         "<i>click <b> three times </b> to dismiss this notice permanently</i>"));
     gtk_widget_set_hexpand(button, TRUE);
-    GtkLabel *label = GTK_LABEL(gtk_bin_get_child(GTK_BIN(button)));
+    GtkLabel *label = GTK_LABEL(gtk_button_get_child(GTK_BUTTON(button)));
     gtk_label_set_use_markup(label, TRUE);
-    gtk_label_set_line_wrap(label, TRUE);
+    gtk_label_set_wrap(label, TRUE);
     gtk_label_set_xalign(label, 0);
     g_signal_connect(button, "clicked", G_CALLBACK(_notice_clicked), NULL);
     dt_gui_box_add(top_level, button);
@@ -4226,7 +4252,11 @@ static float _process_shortcut(float move_size)
   // no proxy means nothing holds the grab.
   if(DT_PERFORM_ACTION(move_size)
      && darktable.control->progress_system.proxy.module
-     && gtk_widget_has_grab(darktable.control->progress_system.proxy.module->widget))
+#if !GTK_CHECK_VERSION(4, 0, 0)
+     // GTK4 has no implicit grabs (gtk_widget_has_grab is gone)
+     && gtk_widget_has_grab(darktable.control->progress_system.proxy.module->widget)
+#endif
+    )
   {
     if(_sc.key_device == DT_SHORTCUT_DEVICE_KEYBOARD_MOUSE && _sc.key == GDK_KEY_Escape)
       dt_print(DT_DEBUG_ALWAYS, "this should cancel the running blocking job"); // TODO
@@ -4391,9 +4421,19 @@ static inline void _interrupt_delayed_release(gboolean trigger)
 
 static guint _key_modifiers_clean(guint mods)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GdkKeymap is gone in GTK4; the primary accelerator is Ctrl everywhere
+  // except macOS where it is Cmd (GDK_META_MASK).
+  GdkModifierType primary = GDK_CONTROL_MASK;
+#ifdef __APPLE__
+  primary = GDK_META_MASK;
+#endif
+  mods &= GDK_SHIFT_MASK | GDK_CONTROL_MASK | GDK_MOD1_MASK | GDK_MOD5_MASK | primary;
+#else
   GdkKeymap *keymap = gdk_keymap_get_for_display(gdk_display_get_default());
   mods &= GDK_SHIFT_MASK | GDK_CONTROL_MASK | GDK_MOD1_MASK | GDK_MOD5_MASK |
           gdk_keymap_get_modifier_mask(keymap, GDK_MODIFIER_INTENT_PRIMARY_ACCELERATOR);
+#endif
   return mods | dt_modifier_shortcuts;
 }
 
@@ -4913,11 +4953,17 @@ gboolean dt_shortcut_key_active(dt_input_device_t id, guint key)
 
 static guint _fix_keyval(GdkEvent *event)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GdkKeymap is gone in GTK4: the event's keyval is already the base
+  // keyval (no modifiers), same as the GTK3 translate-with-zero-state.
+  return dt_gdk_event_get_keyval(event);
+#else
   guint keyval = 0;
   GdkKeymap *keymap = gdk_keymap_get_for_display(gdk_display_get_default());
   gdk_keymap_translate_keyboard_state(keymap, dt_gdk_event_get_keycode(event), 0, 0,
                                       &keyval, NULL, NULL, NULL);
   return keyval;
+#endif
 }
 
 gboolean dt_shortcut_dispatcher(GtkWidget *w,
@@ -4973,6 +5019,7 @@ gboolean dt_shortcut_dispatcher(GtkWidget *w,
        dt_gdk_event_get_type(event) != GDK_FOCUS_CHANGE)
       return FALSE;
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
     if(GTK_IS_WINDOW(w) &&
        (dt_gdk_event_get_type(event) == GDK_KEY_PRESS || dt_gdk_event_get_type(event) == GDK_KEY_RELEASE))
     {
@@ -4989,12 +5036,17 @@ gboolean dt_shortcut_dispatcher(GtkWidget *w,
           return FALSE;
       }
     }
+#endif
   }
 
-  switch(dt_gdk_event_get_type(event))
+  switch((int)dt_gdk_event_get_type(event))
   {
   case GDK_KEY_PRESS:
+#if GTK_CHECK_VERSION(4, 0, 0)
+    if(gdk_key_event_is_modifier(event)
+#else
     if(event->key.is_modifier
+#endif
     // || dt_gdk_event_get_keyval(event) >= GDK_KEY_ModeLock (all hardware event "keys", including extra "media" keys)
        || dt_gdk_event_get_keyval(event) == GDK_KEY_VoidSymbol
        || dt_gdk_event_get_keyval(event) == GDK_KEY_Meta_L
@@ -5019,7 +5071,11 @@ gboolean dt_shortcut_dispatcher(GtkWidget *w,
     dt_shortcut_key_press(DT_SHORTCUT_DEVICE_KEYBOARD_MOUSE, dt_gdk_event_get_time(event), ko.key + 1);
     break;
   case GDK_KEY_RELEASE:
+#if GTK_CHECK_VERSION(4, 0, 0)
+    if(gdk_key_event_is_modifier(event) || dt_gdk_event_get_keyval(event) == GDK_KEY_ISO_Level3_Shift)
+#else
     if(event->key.is_modifier || dt_gdk_event_get_keyval(event) == GDK_KEY_ISO_Level3_Shift)
+#endif
     {
       // are we defining shortcuts for fallbacks? just modifiers can be used.
       if(_sc.action && _sc.action->type == DT_ACTION_TYPE_FALLBACK)
@@ -5032,6 +5088,7 @@ gboolean dt_shortcut_dispatcher(GtkWidget *w,
 
     dt_shortcut_key_release(DT_SHORTCUT_DEVICE_KEYBOARD_MOUSE, dt_gdk_event_get_time(event), _fix_keyval(event));
     break;
+#if !GTK_CHECK_VERSION(4, 0, 0)
   case GDK_GRAB_BROKEN:
     if(!event->grab_broken.implicit)
       _ungrab_at_focus_loss();
@@ -5040,8 +5097,13 @@ gboolean dt_shortcut_dispatcher(GtkWidget *w,
     if(!(event->window_state.new_window_state & GDK_WINDOW_STATE_FOCUSED))
       _ungrab_at_focus_loss();
     return FALSE;
+#endif
   case GDK_FOCUS_CHANGE: // dialog boxes and switch to other app release grab
+#if GTK_CHECK_VERSION(4, 0, 0)
+    if(gdk_focus_event_get_in(event))
+#else
     if(event->focus_change.in)
+#endif
       g_set_weak_pointer(&_grab_window, w);
     else
       _ungrab_at_focus_loss();
@@ -5361,12 +5423,25 @@ static GdkModifierType _mods_fix_primary(GdkModifierType mods)
 {
   // FIXME move to darktable.h (?) and use there too in dt_modifier_is
   // and dt_modifiers_include use global variable?
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GdkKeymap is gone in GTK4; the primary accelerator is Ctrl everywhere
+  // except macOS where it is Cmd (GDK_META_MASK).
+  GdkModifierType primary = GDK_CONTROL_MASK;
+#ifdef __APPLE__
+  primary = GDK_META_MASK;
+#endif
+  if(mods & GDK_CONTROL_MASK)
+    return (mods & ~GDK_CONTROL_MASK) | primary;
+  else
+    return mods;
+#else
   GdkKeymap *keymap = gdk_keymap_get_for_display(gdk_display_get_default());
   if(mods & GDK_CONTROL_MASK)
     return (mods & ~GDK_CONTROL_MASK)
            | gdk_keymap_get_modifier_mask(keymap, GDK_MODIFIER_INTENT_PRIMARY_ACCELERATOR);
   else
     return mods;
+#endif
 }
 
 void dt_action_define_fallback(dt_action_type_t type, const dt_action_def_t *action_def)
@@ -5409,6 +5484,25 @@ void dt_shortcut_register(dt_action_t *owner,
 {
   if(accel_key != 0 && !darktable.control->accel_initialised)
   {
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // GdkKeymap is gone in GTK4: the keyval-based shortcut matching cannot
+    // derive the base keyval/level of a shifted key, so register the keyval
+    // as-is (the GTK4 dispatcher compares keyvals directly).  TODO P5:
+    // revisit with GtkShortcut when the whole shortcuts system is reworked.
+    mods = _mods_fix_primary(mods);
+
+    dt_shortcut_t s = { .key_device = DT_SHORTCUT_DEVICE_KEYBOARD_MOUSE,
+                        .key = accel_key,
+                        .mods = mods,
+                        .is_default = TRUE,
+                        .speed = 1.0,
+                        .action = owner,
+                        .element = element,
+                        .effect = effect };
+
+    _insert_shortcut(&s, FALSE, FALSE);
+  }
+#else
     GdkKeymap *keymap = gdk_keymap_get_for_display(gdk_display_get_default());
 
     GdkKeymapKey *keys;
@@ -5448,6 +5542,7 @@ void dt_shortcut_register(dt_action_t *owner,
 
     g_free(keys);
   }
+#endif
 }
 
 void dt_action_define_preset(dt_action_t *action,
@@ -5651,7 +5746,7 @@ GtkWidget *dt_action_button_new(dt_lib_module_t *self,
 {
   GtkWidget *button = gtk_button_new_with_label(Q_(label));
   gtk_widget_set_hexpand(button, TRUE);
-  gtk_label_set_ellipsize(GTK_LABEL(gtk_bin_get_child(GTK_BIN(button))),
+  gtk_label_set_ellipsize(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(button))),
                           PANGO_ELLIPSIZE_END);
   if(tooltip) gtk_widget_set_tooltip_text(button, tooltip);
   g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(callback), data);
@@ -5677,7 +5772,7 @@ GtkWidget *dt_action_entry_new(dt_action_t *ac,
   GtkWidget *entry = dt_ui_entry_new(5);
   gtk_widget_set_hexpand(entry, TRUE);
   if(text)
-    gtk_entry_set_text (GTK_ENTRY(entry), text);
+    gtk_editable_set_text(GTK_EDITABLE(entry), text);
   if(tooltip)
     gtk_widget_set_tooltip_text(entry, tooltip);
   g_signal_connect(G_OBJECT(entry), "changed", G_CALLBACK(callback), data);

@@ -331,23 +331,9 @@ static void _overlays_show_popup(GtkWidget *button, dt_lib_module_t *self)
 
   if(show)
   {
-    GdkDevice *pointer = gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default()));
-
-    int x, y;
-    GdkWindow *pointer_window = gdk_device_get_window_at_position(pointer, &x, &y);
-    gpointer   pointer_widget = NULL;
-    if(pointer_window)
-      gdk_window_get_user_data(pointer_window, &pointer_widget);
-
-    GdkRectangle rect = { gtk_widget_get_allocated_width(button) / 2,
-                          gtk_widget_get_allocated_height(button), 1, 1 };
-
-    if(pointer_widget && button != pointer_widget)
-      gtk_widget_translate_coordinates(pointer_widget, button, x, y, &rect.x, &rect.y);
-
-    gtk_popover_set_pointing_to(GTK_POPOVER(d->over_popup), &rect);
-
-    gtk_widget_show(d->over_popup);
+    // GTK4: gtk_popover_popup() pops the popover up at the current pointer
+    // position (the popover is anchored to the overlays button)
+    gtk_popover_popup(GTK_POPOVER(d->over_popup));
   }
   else
     dt_control_log(_("overlays not available here..."));
@@ -408,7 +394,8 @@ void gui_init(dt_lib_module_t *self)
         .clicked_cb = G_CALLBACK(_overlays_show_popup),
         .clicked_data = self,
       });
-  d->over_popup = gtk_popover_new(d->overlays_button);
+  d->over_popup = gtk_popover_new();
+  gtk_widget_set_parent(d->over_popup, d->overlays_button);
   gtk_widget_set_size_request(d->over_popup, 350, -1);
   g_object_set(G_OBJECT(d->over_popup), "transitions-enabled", FALSE, NULL);
   // we register size of overlay icon to keep in sync thumbtable overlays
@@ -416,13 +403,19 @@ void gui_init(dt_lib_module_t *self)
 
   GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
-  gtk_container_add(GTK_CONTAINER(d->over_popup), vbox);
+  gtk_popover_set_child(GTK_POPOVER(d->over_popup), vbox);
 
 #define NEW_RADIO(widget, box, callback, label)                                               \
-  rb = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(rb), _(label)); \
-  dt_action_define(ac, NULL, label, rb, &dt_action_def_button);                     \
-  g_signal_connect(G_OBJECT(rb), "clicked", G_CALLBACK(callback), self);            \
-  gtk_box_pack_start(GTK_BOX(box), rb, TRUE, TRUE, 0);                              \
+  rb = gtk_check_button_new_with_label(_(label));                             \
+  if(rb_leader)                                                                 \
+    gtk_check_button_set_group(GTK_CHECK_BUTTON(rb), GTK_CHECK_BUTTON(rb_leader)); \
+  else                                                                          \
+    rb_leader = rb;                                                             \
+  dt_action_define(ac, NULL, label, rb, &dt_action_def_button);                 \
+  g_signal_connect(G_OBJECT(rb), "clicked", G_CALLBACK(callback), self);        \
+  gtk_box_append(GTK_BOX(box), rb);                                             \
+  gtk_widget_set_hexpand(rb, TRUE);                                             \
+  gtk_widget_set_vexpand(rb, TRUE);                                             \
   widget = rb;
 
   // thumbnails overlays
@@ -430,10 +423,12 @@ void gui_init(dt_lib_module_t *self)
 
   d->over_label = gtk_label_new(_("overlay mode for size"));
   dt_gui_add_class(d->over_label, "dt_section_label");
-  gtk_box_pack_start(GTK_BOX(d->thumbnails_box), d->over_label, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(d->thumbnails_box), d->over_label);
+  gtk_widget_set_vexpand(d->over_label, TRUE);
 
   dt_action_t *ac = dt_action_section(&darktable.control->actions_global, N_("thumbnail overlays"));
   GtkWidget *rb = NULL;
+  GtkWidget *rb_leader = NULL;
   NEW_RADIO(d->over_r0, d->thumbnails_box, _overlays_toggle_button, N_("no overlays"));
   NEW_RADIO(d->over_r1, d->thumbnails_box, _overlays_toggle_button, N_("overlays on mouse hover"));
   NEW_RADIO(d->over_r2, d->thumbnails_box, _overlays_toggle_button, N_("extended overlays on mouse hover"));
@@ -442,43 +437,53 @@ void gui_init(dt_lib_module_t *self)
   NEW_RADIO(d->over_r5, d->thumbnails_box, _overlays_toggle_button, N_("permanent overlays extended on mouse hover"));
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   NEW_RADIO(d->over_r6, hbox, _overlays_toggle_button, N_("overlays block on mouse hover"));
-  gtk_box_pack_start(GTK_BOX(hbox), gtk_label_new(_("during (s)")), FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(hbox), gtk_label_new(_("during (s)")));
   d->over_timeout = gtk_spin_button_new_with_range(-1, 99, 1);
   g_signal_connect(G_OBJECT(d->over_timeout), "value-changed", G_CALLBACK(_overlays_timeout_changed), self);
-  gtk_box_pack_start(GTK_BOX(hbox), d->over_timeout, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(d->thumbnails_box), hbox, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), d->over_timeout);
+  gtk_widget_set_hexpand(d->over_timeout, TRUE);
+  gtk_box_append(GTK_BOX(d->thumbnails_box), hbox);
+  gtk_widget_set_vexpand(hbox, TRUE);
   d->over_tt = gtk_check_button_new_with_label(_("show tooltip"));
   g_signal_connect(G_OBJECT(d->over_tt), "toggled", G_CALLBACK(_overlays_toggle_button), self);
   gtk_widget_set_name(d->over_tt, "show-tooltip");
-  gtk_box_pack_start(GTK_BOX(d->thumbnails_box), d->over_tt, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(d->thumbnails_box), d->over_tt);
+  gtk_widget_set_vexpand(d->over_tt, TRUE);
 
-  gtk_box_pack_start(GTK_BOX(vbox), d->thumbnails_box, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(vbox), d->thumbnails_box);
+  gtk_widget_set_vexpand(d->thumbnails_box, TRUE);
 
   // culling/preview overlays
   d->culling_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
   d->over_culling_label = gtk_label_new(_("overlay mode for size"));
   dt_gui_add_class(d->over_culling_label, "dt_section_label");
-  gtk_box_pack_start(GTK_BOX(d->culling_box), d->over_culling_label, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(d->culling_box), d->over_culling_label);
+  gtk_widget_set_vexpand(d->over_culling_label, TRUE);
 
   ac = dt_action_section(&darktable.control->actions_global, N_("culling overlays"));
   rb = NULL;
+  rb_leader = NULL;
   NEW_RADIO(d->over_culling_r0, d->culling_box, _overlays_toggle_culling_button, N_("no overlays"));
   NEW_RADIO(d->over_culling_r3, d->culling_box, _overlays_toggle_culling_button, N_("permanent overlays"));
   NEW_RADIO(d->over_culling_r4, d->culling_box, _overlays_toggle_culling_button, N_("permanent extended overlays"));
   hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   NEW_RADIO(d->over_culling_r6, hbox, _overlays_toggle_culling_button, N_("overlays block on mouse hover"));
-  gtk_box_pack_start(GTK_BOX(hbox), gtk_label_new(_("during (s)")), FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(hbox), gtk_label_new(_("during (s)")));
   d->over_culling_timeout = gtk_spin_button_new_with_range(-1, 99, 1);
   g_signal_connect(G_OBJECT(d->over_culling_timeout), "value-changed", G_CALLBACK(_overlays_timeout_changed), self);
-  gtk_box_pack_start(GTK_BOX(hbox), d->over_culling_timeout, TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(d->culling_box), hbox, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), d->over_culling_timeout);
+  gtk_widget_set_hexpand(d->over_culling_timeout, TRUE);
+  gtk_box_append(GTK_BOX(d->culling_box), hbox);
+  gtk_widget_set_vexpand(hbox, TRUE);
   d->over_culling_tt = gtk_check_button_new_with_label(_("show tooltip"));
   g_signal_connect(G_OBJECT(d->over_culling_tt), "toggled", G_CALLBACK(_overlays_toggle_culling_button), self);
   gtk_widget_set_name(d->over_culling_tt, "show-tooltip");
-  gtk_box_pack_start(GTK_BOX(d->culling_box), d->over_culling_tt, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(d->culling_box), d->over_culling_tt);
+  gtk_widget_set_vexpand(d->over_culling_tt, TRUE);
 
-  gtk_box_pack_start(GTK_BOX(vbox), d->culling_box, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(vbox), d->culling_box);
+  gtk_widget_set_vexpand(d->culling_box, TRUE);
 #undef NEW_RADIO
 
   gtk_widget_show_all(vbox);
@@ -636,6 +641,7 @@ static void _main_do_event_help(GdkEvent *event, gpointer data)
 }
 #endif
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 // Don't save across sessions (window managers role)
 static struct { gint x, y, w, h; } _shortcuts_dialog_posize = {};
 
@@ -649,7 +655,9 @@ static gboolean _resize_shortcuts_dialog(GtkWidget *widget, GdkEvent *event, gpo
 
   return FALSE;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _set_mapping_mode_cursor(GtkWidget *widget)
 {
   GdkDisplay *display = gdk_display_get_default();
@@ -680,6 +688,7 @@ static void _set_mapping_mode_cursor(GtkWidget *widget)
   gdk_window_set_cursor(window, cursor);
   g_object_unref(cursor);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static gboolean _shortcuts_dialog_open = FALSE;
 

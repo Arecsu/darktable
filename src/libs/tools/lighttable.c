@@ -100,6 +100,14 @@ static void _lib_lighttable_update_btn(dt_lib_module_t *self)
   else if(d->layout == DT_LIGHTTABLE_LAYOUT_ZOOMABLE)
     active = d->layout_zoomable;
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+  for(GtkWidget *w = gtk_widget_get_first_child(d->layout_box); w;
+      w = gtk_widget_get_next_sibling(w))
+  {
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), (w == active));
+    gtk_widget_queue_draw(w); // force redraw even if state not changed
+  }
+#else
   GList *children = gtk_container_get_children(GTK_CONTAINER(d->layout_box));
   for(GList *l = children; l; l = g_list_delete_link(l, l))
   {
@@ -107,6 +115,7 @@ static void _lib_lighttable_update_btn(dt_lib_module_t *self)
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), (w == active));
     gtk_widget_queue_draw(w); // force redraw even if state not changed
   }
+#endif
 
   // and now we set the tooltips
   if(fullpreview)

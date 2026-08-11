@@ -155,9 +155,15 @@ static void _history_widget_init(dt_lib_filtering_rule_t *rule, const dt_collect
   dt_bauhaus_widget_hide_label(history->combo);
 
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), history->combo, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), history->combo);
+    gtk_widget_set_hexpand(history->combo, TRUE);
+  }
   else
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), history->combo, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box), history->combo);
+    gtk_widget_set_hexpand(history->combo, TRUE);
+  }
 
   if(top)
   {

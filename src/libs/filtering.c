@@ -738,12 +738,12 @@ static void _range_widget_add_to_rule(dt_lib_filtering_rule_t *rule, _widgets_ra
     g_free(DTGTK_RANGE_SELECT(special->range_select)->cur_help);
   DTGTK_RANGE_SELECT(special->range_select)->cur_help = txt;
 
-  gtk_box_pack_start(GTK_BOX((top) ? rule->w_special_box_top : rule->w_special_box), special->range_select, TRUE,
-                     TRUE, 0);
+  gtk_box_append(GTK_BOX((top) ? rule->w_special_box_top : rule->w_special_box), special->range_select);
+  gtk_widget_set_hexpand(special->range_select, TRUE);
   g_signal_connect(G_OBJECT(special->range_select), "value-changed", G_CALLBACK(_range_changed), special);
   if(top)
   {
-    dt_gui_add_class(gtk_bin_get_child(GTK_BIN(special->range_select)), "dt_quick_filter");
+    dt_gui_add_class(gtk_widget_get_first_child(special->range_select), "dt_quick_filter");
   }
 
   if(top)
@@ -775,7 +775,10 @@ static gboolean _widget_init_special(dt_lib_filtering_rule_t *rule, const gchar 
     rule->w_special_box_top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   GtkWidget *special_box = (top) ? rule->w_special_box_top : rule->w_special_box;
   if(!top)
-    gtk_box_pack_start(GTK_BOX(rule->w_widget_box), rule->w_special_box, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_widget_box), rule->w_special_box);
+    gtk_widget_set_hexpand(rule->w_special_box, TRUE);
+  }
   else
     g_object_ref(G_OBJECT(rule->w_special_box_top));
 
@@ -1085,7 +1088,7 @@ static void _topbar_update(dt_lib_module_t *self)
       // we add the filter label if it's the first filter
       if(nb == 0)
       {
-        GtkWidget *evtb = gtk_event_box_new();
+        GtkWidget *evtb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
         GtkWidget *label = gtk_label_new(C_("quickfilter", "filter"));
         gtk_container_add(GTK_CONTAINER(evtb), label);
         dt_gui_connect_click_all(evtb, _topbar_label_press_cb, NULL, self);

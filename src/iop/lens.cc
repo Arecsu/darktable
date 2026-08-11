@@ -3670,6 +3670,7 @@ static int _precision(double x, double adj)
 
 /* -- UFRaw ptr array functions -- */
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static int _ptr_array_insert_sorted(GPtrArray *array,
                                     const void *item,
                                     GCompareFunc compare)
@@ -3708,7 +3709,10 @@ done:
   root[m] = item;
   return m;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static int _ptr_array_find_sorted(const GPtrArray *array,
                                   const void *item,
                                   GCompareFunc compare)
@@ -3741,7 +3745,10 @@ static int _ptr_array_find_sorted(const GPtrArray *array,
 
   return -1;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _ptr_array_insert_index(GPtrArray *array,
                                     const void *item,
                                     const int index)
@@ -3753,6 +3760,8 @@ static void _ptr_array_insert_index(GPtrArray *array,
   memmove(root + index + 1, root + index, sizeof(void *) * (length - index));
   root[index] = item;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
+
 
 /* -- end of UFRaw ptr array functions -- */
 
@@ -3781,7 +3790,7 @@ static void _camera_set(dt_iop_module_t *self, const lfCamera *cam)
     else
       fm = g_strdup(p->camera);
 
-    gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(g->camera_model))),
+    gtk_label_set_text(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(g->camera_model))),
                        fm);
     gtk_widget_set_tooltip_text
       (GTK_WIDGET(g->camera_model),
@@ -3807,7 +3816,7 @@ static void _camera_set(dt_iop_module_t *self, const lfCamera *cam)
       fm = g_strdup_printf("%s, %s", maker, model);
     else
       fm = g_strdup_printf("%s", model);
-    gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(g->camera_model))),
+    gtk_label_set_text(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(g->camera_model))),
                        fm);
     g_free(fm);
   }
@@ -3826,6 +3835,9 @@ static void _camera_set(dt_iop_module_t *self, const lfCamera *cam)
   g_free(fm);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
+// TODO P2: GtkMenu->GtkPopoverMenu migration; the camera picker menus are
+// GTK3-only until then.
 static void _camera_menu_select(GtkMenuItem *menuitem, dt_iop_module_t *self)
 {
   _camera_set(self, (lfCamera *)g_object_get_data(G_OBJECT(menuitem),
@@ -3890,6 +3902,7 @@ static GtkMenu *camera_menu_fill(dt_iop_module_t *self,
   g_ptr_array_free(makers, TRUE);
   return camera_menu;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _parse_model(const char *txt,
                          char *model,
@@ -3903,6 +3916,7 @@ static void _parse_model(const char *txt,
   model[len] = 0;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _camera_menusearch_clicked(GtkWidget *button, dt_iop_module_t *self)
 {
   dt_iop_lens_global_data_t *gd = (dt_iop_lens_global_data_t *)self->global_data;
@@ -3951,6 +3965,21 @@ static void _camera_autosearch_clicked(GtkWidget *button, dt_iop_module_t *self)
   // dt_gui_menu_popup unrefs the menu
   dt_gui_menu_popup(menu, button, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
 }
+#else
+// TODO P2: GtkMenu->GtkPopoverMenu migration; the camera picker popups are
+// no-ops on GTK4 until then.
+static void _camera_menusearch_clicked(GtkWidget *button, dt_iop_module_t *self)
+{
+  (void)button;
+  (void)self;
+}
+
+static void _camera_autosearch_clicked(GtkWidget *button, dt_iop_module_t *self)
+{
+  (void)button;
+  (void)self;
+}
+#endif
 
 /* -- end camera -- */
 
@@ -4010,7 +4039,7 @@ static void _lens_set(dt_iop_module_t *self,
     const dt_image_t *img = &self->dev->image_storage;
     const char *name = p->lens[0] ? p->lens : img->exif_lens;
 
-    gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(g->lens_model))),
+    gtk_label_set_text(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(g->lens_model))),
                        name);
     gtk_widget_set_tooltip_text
       (GTK_WIDGET(g->lens_model),
@@ -4037,7 +4066,7 @@ static void _lens_set(dt_iop_module_t *self,
       fm = g_strdup_printf("%s, %s", maker, model);
     else
       fm = g_strdup_printf("%s", model);
-    gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(g->lens_model))), fm);
+    gtk_label_set_text(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(g->lens_model))), fm);
     g_free(fm);
   }
 
@@ -4175,6 +4204,9 @@ static void _lens_set(dt_iop_module_t *self,
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
+// TODO P2: GtkMenu->GtkPopoverMenu migration; the lens picker menus are
+// GTK3-only until then.
 static void _lens_menu_select(GtkMenuItem *menuitem,
                               dt_iop_module_t *self)
 {
@@ -4282,6 +4314,21 @@ static void _lens_autosearch_clicked(GtkWidget *button, dt_iop_module_t *self)
   // dt_gui_menu_popup unrefs the menu
   dt_gui_menu_popup(menu, button, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
 }
+#else
+// TODO P2: GtkMenu->GtkPopoverMenu migration; the lens picker popups are
+// no-ops on GTK4 until then.
+static void _lens_menusearch_clicked(GtkWidget *button, dt_iop_module_t *self)
+{
+  (void)button;
+  (void)self;
+}
+
+static void _lens_autosearch_clicked(GtkWidget *button, dt_iop_module_t *self)
+{
+  (void)button;
+  (void)self;
+}
+#endif
 
 /* -- end lens -- */
 
@@ -4645,7 +4692,7 @@ void gui_init(dt_iop_module_t *self)
   g->hbox1 = GTK_BOX(dt_gui_hbox(label, g->message));
 
   g->methods = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(g->methods), FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(g->methods), FALSE);
   dt_gui_box_add(self->widget, g->hbox1, g->methods);
 
   gtk_stack_add_named(GTK_STACK(g->methods), box_lf, "lensfun");
@@ -4727,9 +4774,9 @@ void gui_update(dt_iop_module_t *self)
 
   // these are the wrong (untranslated) strings in general but that's
   // ok, they will be overwritten further down
-  gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(g->camera_model))),
+  gtk_label_set_text(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(g->camera_model))),
                      p->camera);
-  gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(g->lens_model))),
+  gtk_label_set_text(GTK_LABEL(gtk_button_get_child(GTK_BUTTON(g->lens_model))),
                      p->lens);
   gtk_widget_set_tooltip_text(g->camera_model, "");
   gtk_widget_set_tooltip_text(g->lens_model, "");

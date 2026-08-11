@@ -342,7 +342,7 @@ static void _drawable_drag_update(GtkGestureDrag* gesture,
   dt_scopes_mode_t *const cur_mode = s->cur_mode;
   const GdkEvent *event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), NULL);
   if(!event) return;
-  if(gdk_event_get_event_type(event) == GDK_MOTION_NOTIFY)
+  if(gdk_event_get_event_type((GdkEvent *)event) == GDK_MOTION_NOTIFY)
   {
     // at any time user may user a modifier key to adjust speed
     // multiplier, so calculate delta since last move, rather than
@@ -518,18 +518,21 @@ static void _eventbox_scroll_callback(GtkEventControllerScroll* self,
     }
     else
     {
-      int ebx, eby;
 #if GTK_CHECK_VERSION(4, 0, 0)
+      double ebx = 0.0, eby = 0.0;
       gdouble gdk_x = 0.0, gdk_y = 0.0;
       gdk_event_get_position(event, &gdk_x, &gdk_y);
       gtk_widget_translate_coordinates(dt_gui_get_widget(GTK_EVENT_CONTROLLER(self)), s->scope_draw,
-                                       (int)gdk_x, (int)gdk_y, &ebx, &eby);
+                                       gdk_x, gdk_y, &ebx, &eby);
+      dt_scopes_call_if_exists(s->cur_mode, eventbox_scroll, (int)ebx, (int)eby,
+                               dx, dy, dt_gdk_event_get_state(event));
 #else
+      int ebx, eby;
       gtk_widget_translate_coordinates(gtk_get_event_widget(event), s->scope_draw,
                                        (int)dt_gdk_event_get_x(event), (int)dt_gdk_event_get_y(event), &ebx, &eby);
-#endif
       dt_scopes_call_if_exists(s->cur_mode, eventbox_scroll, ebx, eby,
                                dx, dy, dt_gdk_event_get_state(event));
+#endif
     }
   }
 #if !GTK_CHECK_VERSION(4, 0, 0)
@@ -546,8 +549,16 @@ static gboolean _pointer_over_widget(GtkWidget *from,
 {
   if(!w || !gtk_widget_is_visible(w)) return FALSE;
   gint tx, ty;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  double txd = 0.0, tyd = 0.0;
+  if(!gtk_widget_translate_coordinates(from, w, x, y, &txd, &tyd))
+    return FALSE;
+  tx = (gint)txd;
+  ty = (gint)tyd;
+#else
   if(!gtk_widget_translate_coordinates(from, w, (gint)x, (gint)y, &tx, &ty))
     return FALSE;
+#endif
   GtkAllocation alloc;
   gtk_widget_get_allocation(w, &alloc);
   return tx >= 0 && tx < alloc.width && ty >= 0 && ty < alloc.height;
@@ -571,13 +582,13 @@ static void _eventbox_motion_notify_callback(GtkEventControllerMotion *controlle
   // For the split option we test the inner button_box_split, not the full-width
   // outer_box_split, so dragging still works across the rest of the top.
   GtkWidget *eb = dt_gui_get_widget(controller);
-  gtk_overlay_set_overlay_pass_through
-    (GTK_OVERLAY(s->overlay), s->button_box_left,
-     !_pointer_over_widget(eb, s->button_box_left, x, y));
+  gtk_widget_set_can_target
+    (s->button_box_left,
+     _pointer_over_widget(eb, s->button_box_left, x, y));
   if(s->outer_box_split)
-    gtk_overlay_set_overlay_pass_through
-      (GTK_OVERLAY(s->overlay), s->outer_box_split,
-       !_pointer_over_widget(eb, s->button_box_split, x, y));
+    gtk_widget_set_can_target
+      (s->outer_box_split,
+       _pointer_over_widget(eb, s->button_box_split, x, y));
 }
 
 static void _eventbox_enter_notify_callback(GtkEventControllerMotion *controller,
@@ -630,9 +641,9 @@ static void _eventbox_leave_notify_callback(GtkEventControllerMotion *controller
   gtk_widget_hide(s->button_box_split);
   // a fast exit can skip the motion event that would restore pass-through,
   // make sure dragging is re-enabled when the pointer leaves
-  gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(s->overlay), s->button_box_left, TRUE);
+  gtk_widget_set_can_target(s->button_box_left, FALSE);
   if(s->outer_box_split)
-    gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(s->overlay), s->outer_box_split, TRUE);
+    gtk_widget_set_can_target(s->outer_box_split, FALSE);
 }
 
 static void _lib_histogram_collapse_callback(dt_action_t *action)
@@ -701,7 +712,7 @@ static gboolean _overlay_get_child_position(GtkOverlay *overlay,
   if(child != match) return FALSE;
   GtkAllocation main_alloc;
   GtkRequisition req;
-  GtkWidget *main = gtk_bin_get_child(GTK_BIN(overlay));
+  GtkWidget *main = gtk_overlay_get_child(GTK_OVERLAY(overlay));
   gtk_widget_get_allocation(main, &main_alloc);
   gtk_widget_get_preferred_size(child, NULL, &req);
   alloc->width = req.width;
@@ -807,15 +818,15 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_hexpand(s->button_box_right, TRUE);
 
   s->overlay = gtk_overlay_new();
-  gtk_container_add(GTK_CONTAINER(s->overlay), s->scope_draw);
+  gtk_overlay_set_child(GTK_OVERLAY(s->overlay), s->scope_draw);
   gtk_overlay_add_overlay(GTK_OVERLAY(s->overlay), s->button_box_left);
   gtk_overlay_add_overlay(GTK_OVERLAY(s->overlay), s->button_box_right);
   gtk_overlay_add_overlay(GTK_OVERLAY(s->overlay), outer_box_split);
   s->outer_box_split = outer_box_split;
   // Pass-through by default to allow exposure-dragging reach the scope.
   // Set to FALSE on hover to allow tooltips, see _eventbox_motion_notify_callback()
-  gtk_overlay_set_overlay_pass_through (GTK_OVERLAY(s->overlay), s->button_box_left, TRUE);
-  gtk_overlay_set_overlay_pass_through (GTK_OVERLAY(s->overlay), outer_box_split, TRUE);
+  gtk_widget_set_can_target (s->button_box_left, FALSE);
+  gtk_widget_set_can_target (outer_box_split, FALSE);
 
   // FIXME: the button transitions when they appear on mouseover
   // (mouse enters scope widget) or change (mouse click) cause redraws
@@ -915,8 +926,8 @@ void gui_init(dt_lib_module_t *self)
   // drawable is below the buttons, and hence won't catch motion
   // events for the buttons, and gets a leave event when the cursor
   // moves over the buttons.
-  GtkWidget *eventbox = gtk_event_box_new();
-  gtk_container_add(GTK_CONTAINER(eventbox), s->overlay);
+  GtkWidget *eventbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_box_append(GTK_BOX(eventbox), s->overlay);
   self->widget = eventbox;
   gtk_widget_set_name(self->widget, "main-histogram");
 

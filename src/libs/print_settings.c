@@ -1203,6 +1203,7 @@ static void _update_style_label(dt_lib_print_settings_t *ps, const char *name)
   dt_conf_set_string(PRINT_CONFIG_PREFIX "style", is_style_set ? name : "");
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _update_style(const dt_stylemenu_data_t *menu_data)
 {
   _update_style_label(menu_data->user_data, menu_data->name);
@@ -1228,9 +1229,11 @@ static void _apply_style_button_callback(GtkGestureSingle *gesture,
     //??? dt_shortcut_copy_lua(NULL, name);
   }
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _style_popupmenu_callback(GtkWidget *w, gpointer user_data)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   /* if we got any styles, lets popup menu for selection */
   GtkMenuShell *menu = dtgtk_build_style_menu_hierarchy(TRUE,
                                                         _apply_style_activate_callback,
@@ -1242,6 +1245,10 @@ static void _style_popupmenu_callback(GtkWidget *w, gpointer user_data)
   }
   else
     dt_control_log(_("no styles have been created yet"));
+#else
+  // TODO P2: GtkMenu->GtkPopoverMenu migration
+  dt_control_log(_("no styles have been created yet"));
+#endif
 }
 
 static void
@@ -2487,11 +2494,13 @@ void gui_init(dt_lib_module_t *self)
   d->papers = dt_bauhaus_combobox_new_action(DT_ACTION(self));
 
   label = dt_ui_section_label_new(C_("section", "printer"));
-  gtk_box_pack_start(GTK_BOX(self->widget), label, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), label);
+  gtk_widget_set_vexpand(label, TRUE);
   dt_gui_add_help_link(self->widget, "print_settings_printer");
   d->printers = dt_bauhaus_combobox_new_action(DT_ACTION(self));
 
-  gtk_box_pack_start(GTK_BOX(self->widget), d->printers, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), d->printers);
+  gtk_widget_set_vexpand(d->printers, TRUE);
   g_signal_connect(G_OBJECT(d->printers), "value-changed",
                    G_CALLBACK(_printer_changed), self);
 
@@ -2503,7 +2512,8 @@ void gui_init(dt_lib_module_t *self)
 
   g_signal_connect(G_OBJECT(d->media), "value-changed",
                    G_CALLBACK(_media_changed), self);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->media), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->media));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->media), TRUE);
 
   //  Add printer profile combo
 
@@ -2512,7 +2522,8 @@ void gui_init(dt_lib_module_t *self)
 
   int combo_idx, n;
 
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->pprofile), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->pprofile));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->pprofile), TRUE);
   int printer_profile_type =
     dt_conf_get_int("plugins/print/printer/icctype");
   const char *printer_profile =
@@ -2569,14 +2580,15 @@ void gui_init(dt_lib_module_t *self)
                                N_("relative colorimetric"),
                                NC_("rendering intent", "saturation"),
                                N_("absolute colorimetric"));
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->pintent), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->pintent));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->pintent), TRUE);
 
   d->prt.printer.intent = d->v_pintent;
 
   d->black_point_compensation =
     gtk_check_button_new_with_label(_("black point compensation"));
-  gtk_box_pack_start(GTK_BOX(self->widget),
-                     GTK_WIDGET(d->black_point_compensation), TRUE, FALSE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->black_point_compensation));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->black_point_compensation), TRUE);
   g_signal_connect(d->black_point_compensation, "toggled",
                    G_CALLBACK(_printer_bpc_callback), (gpointer)self);
 
@@ -2595,7 +2607,8 @@ void gui_init(dt_lib_module_t *self)
   ////////////////////////// PAGE SETTINGS
 
   label = dt_ui_section_label_new(C_("section", "page"));
-  gtk_box_pack_start(GTK_BOX(self->widget), label, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), label);
+  gtk_widget_set_vexpand(label, TRUE);
   dt_gui_add_help_link(self->widget, "print_settings_page");
 
   //// papers
@@ -2603,14 +2616,16 @@ void gui_init(dt_lib_module_t *self)
   dt_bauhaus_widget_set_label(d->papers, NULL, N_("paper size"));
 
   g_signal_connect(G_OBJECT(d->papers), "value-changed", G_CALLBACK(_paper_changed), self);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->papers), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->papers));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->papers), TRUE);
 
   //// portrait / landscape
 
   DT_BAUHAUS_COMBOBOX_NEW_FULL(d->orientation, self, NULL, N_("orientation"), NULL,
                                d->prt.page.landscape?1:0, _orientation_changed, self,
                                N_("portrait"), N_("landscape"));
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->orientation), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->orientation));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->orientation), TRUE);
 
   // NOTE: units has no label, which makes for cleaner UI but means
   // that no action can be assigned
@@ -2619,29 +2634,38 @@ void gui_init(dt_lib_module_t *self)
                                  _("measurement units"),
                                  d->unit, (GtkCallback)_unit_changed, self,
                                  _unit_names);
-  gtk_box_pack_start(GTK_BOX(self->widget), ucomb, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), ucomb);
+  gtk_widget_set_vexpand(ucomb, TRUE);
 
   //// image dimensions, create them now as we need them
 
   GtkWidget *hboxdim = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
   label = gtk_label_new(_("image width/height"));
-  gtk_box_pack_start(GTK_BOX(hboxdim), GTK_WIDGET(label), TRUE, TRUE,
-                     DT_PIXEL_APPLY_DPI(3));
+  gtk_box_append(GTK_BOX(hboxdim), GTK_WIDGET(label));
+  gtk_widget_set_hexpand(GTK_WIDGET(label), TRUE);
+  gtk_widget_set_margin_start(GTK_WIDGET(label), DT_PIXEL_APPLY_DPI(3));
+  gtk_widget_set_margin_end(GTK_WIDGET(label), DT_PIXEL_APPLY_DPI(3));
   d->width = gtk_label_new(_("width"));
-  gtk_box_pack_start(GTK_BOX(hboxdim), GTK_WIDGET(d->width), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hboxdim), GTK_WIDGET(d->width));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->width), TRUE);
   label = gtk_label_new(_(" x "));
-  gtk_box_pack_start(GTK_BOX(hboxdim), GTK_WIDGET(label), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hboxdim), GTK_WIDGET(label));
+  gtk_widget_set_hexpand(GTK_WIDGET(label), TRUE);
   d->height = gtk_label_new(_("height"));
-  gtk_box_pack_start(GTK_BOX(hboxdim), GTK_WIDGET(d->height), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hboxdim), GTK_WIDGET(d->height));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->height), TRUE);
 
   //// image information (downscale/upscale)
 
   GtkWidget *hboxinfo = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
   label = gtk_label_new(_("scale factor"));
-  gtk_box_pack_start(GTK_BOX(hboxinfo), GTK_WIDGET(label), TRUE, TRUE,
-                     DT_PIXEL_APPLY_DPI(3));
+  gtk_box_append(GTK_BOX(hboxinfo), GTK_WIDGET(label));
+  gtk_widget_set_hexpand(GTK_WIDGET(label), TRUE);
+  gtk_widget_set_margin_start(GTK_WIDGET(label), DT_PIXEL_APPLY_DPI(3));
+  gtk_widget_set_margin_end(GTK_WIDGET(label), DT_PIXEL_APPLY_DPI(3));
   d->info = gtk_label_new("1.0");
-  gtk_box_pack_start(GTK_BOX(hboxinfo), GTK_WIDGET(d->info), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hboxinfo), GTK_WIDGET(d->info));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->info), TRUE);
   gtk_widget_set_tooltip_text(hboxinfo,
                _("image scale factor from native printer DPI:\n"
                  " < 1 means that it is downscaled (best quality)\n"
@@ -2678,7 +2702,8 @@ void gui_init(dt_lib_module_t *self)
   gtk_grid_attach(bds, GTK_WIDGET(d->b_bottom), 1, 2, 1, 1);
 
   gtk_widget_set_halign(GTK_WIDGET(bds), GTK_ALIGN_CENTER);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(bds), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(bds));
+  gtk_widget_set_vexpand(GTK_WIDGET(bds), TRUE);
 
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(d->b_top), top_b);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(d->b_bottom), bottom_b);
@@ -2709,19 +2734,24 @@ void gui_init(dt_lib_module_t *self)
 
     d->grid = gtk_check_button_new_with_label(_("display grid"));
     // d->grid_size = gtk_spin_button_new_with_range(0, 100, 0.1);
-    gtk_box_pack_start(GTK_BOX(hbox), GTK_WIDGET(d->grid), TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(hbox), GTK_WIDGET(d->grid_size), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(hbox), GTK_WIDGET(d->grid));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->grid), TRUE);
+    gtk_box_append(GTK_BOX(hbox), GTK_WIDGET(d->grid_size));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->grid_size), TRUE);
 
     gtk_spin_button_set_value
       (GTK_SPIN_BUTTON(d->grid_size),
        dt_conf_get_float(PRINT_CONFIG_PREFIX "grid_size") * units[d->unit]);
 
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(hbox), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(hbox));
+  gtk_widget_set_vexpand(GTK_WIDGET(hbox), TRUE);
 
     d->snap_grid = gtk_check_button_new_with_label(_("snap to grid"));
-    gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(d->snap_grid), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(d->snap_grid));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->snap_grid), TRUE);
 
-    gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(vbox), TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(vbox));
+  gtk_widget_set_vexpand(GTK_WIDGET(vbox), TRUE);
 
     g_signal_connect(G_OBJECT(d->grid_size), "value-changed",
                      G_CALLBACK(_grid_size_changed), self);
@@ -2732,7 +2762,8 @@ void gui_init(dt_lib_module_t *self)
   }
 
   d->borderless = gtk_check_button_new_with_label(_("borderless mode required"));
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->borderless), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->borderless));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->borderless), TRUE);
   gtk_widget_set_tooltip_text(d->borderless,
                               _("indicates that the borderless mode should be activated\n"
                                 "in the printer driver because the selected margins are\n"
@@ -2742,11 +2773,14 @@ void gui_init(dt_lib_module_t *self)
   // pack image dimension hbox here
 
   label = dt_ui_section_label_new(C_("section", "image layout"));
-  gtk_box_pack_start(GTK_BOX(self->widget), label, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), label);
+  gtk_widget_set_vexpand(label, TRUE);
   dt_gui_add_help_link(self->widget, "print_image_layout");
 
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(hboxdim), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(hboxinfo), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(hboxdim));
+  gtk_widget_set_vexpand(GTK_WIDGET(hboxdim), TRUE);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(hboxinfo));
+  gtk_widget_set_vexpand(GTK_WIDGET(hboxinfo), TRUE);
 
   //// alignments
 
@@ -2766,9 +2800,12 @@ void gui_init(dt_lib_module_t *self)
 
   GtkWidget *hbox22 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
   GtkWidget *label4 = gtk_label_new(_("alignment"));
-  gtk_box_pack_start(GTK_BOX(hbox22),GTK_WIDGET(label4),TRUE,TRUE,0);
-  gtk_box_pack_start(GTK_BOX(hbox22), GTK_WIDGET(bat), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(hbox22), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox22), GTK_WIDGET(label4));
+  gtk_widget_set_hexpand(GTK_WIDGET(label4), TRUE);
+  gtk_box_append(GTK_BOX(hbox22), GTK_WIDGET(bat));
+  gtk_widget_set_hexpand(GTK_WIDGET(bat), TRUE);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(hbox22));
+  gtk_widget_set_vexpand(GTK_WIDGET(hbox22), TRUE);
 
   // Manual fit
   GtkWidget *hfitbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -2802,8 +2839,10 @@ void gui_init(dt_lib_module_t *self)
   gtk_grid_attach(fitbut, GTK_WIDGET(d->del), 0, 1, 1, 1);
   gtk_grid_attach(fitbut, GTK_WIDGET(bclear), 1, 1, 1, 1);
 
-  gtk_box_pack_start(GTK_BOX(mfitbox), GTK_WIDGET(fitbut), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(hfitbox), GTK_WIDGET(mfitbox), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(mfitbox), GTK_WIDGET(fitbut));
+  gtk_widget_set_hexpand(GTK_WIDGET(fitbut), TRUE);
+  gtk_box_append(GTK_BOX(hfitbox), GTK_WIDGET(mfitbox));
+  gtk_widget_set_vexpand(GTK_WIDGET(mfitbox), TRUE);
 
   // X x Y
   GtkWidget *box;
@@ -2813,33 +2852,40 @@ void gui_init(dt_lib_module_t *self)
   box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
   // d->b_x = gtk_spin_button_new_with_range(0, 1000, 1);
   gtk_widget_set_tooltip_text(d->b_x, _("image area x origin (in current unit)"));
-  gtk_entry_set_width_chars(GTK_ENTRY(d->b_x), 5);
+  gtk_editable_set_width_chars(GTK_EDITABLE(d->b_x), 5);
 
   // d->b_y = gtk_spin_button_new_with_range(0, 1000, 1);
   gtk_widget_set_tooltip_text(d->b_y, _("image area y origin (in current unit)"));
-  gtk_entry_set_width_chars(GTK_ENTRY(d->b_y), 5);
+  gtk_editable_set_width_chars(GTK_EDITABLE(d->b_y), 5);
 
-  gtk_box_pack_start(GTK_BOX(box), GTK_WIDGET(d->b_x), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(box), GTK_WIDGET(d->b_y), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(box), GTK_WIDGET(d->b_x));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->b_x), TRUE);
+  gtk_box_append(GTK_BOX(box), GTK_WIDGET(d->b_y));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->b_y), TRUE);
 
-  gtk_box_pack_start(GTK_BOX(hfitbox), GTK_WIDGET(box), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hfitbox), GTK_WIDGET(box));
+  gtk_widget_set_vexpand(GTK_WIDGET(box), TRUE);
 
   // width x height
   box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
   // d->b_width = gtk_spin_button_new_with_range(0, 1000, 1);
   gtk_widget_set_tooltip_text(d->b_width, _("image area width (in current unit)"));
-  gtk_entry_set_width_chars(GTK_ENTRY(d->b_width), 5);
+  gtk_editable_set_width_chars(GTK_EDITABLE(d->b_width), 5);
 
   // d->b_height = gtk_spin_button_new_with_range(0, 1000, 1);
   gtk_widget_set_tooltip_text(d->b_height, _("image area height (in current unit)"));
-  gtk_entry_set_width_chars(GTK_ENTRY(d->b_height), 5);
+  gtk_editable_set_width_chars(GTK_EDITABLE(d->b_height), 5);
 
-  gtk_box_pack_start(GTK_BOX(box), GTK_WIDGET(d->b_width), TRUE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(box), GTK_WIDGET(d->b_height), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(box), GTK_WIDGET(d->b_width));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->b_width), TRUE);
+  gtk_box_append(GTK_BOX(box), GTK_WIDGET(d->b_height));
+  gtk_widget_set_hexpand(GTK_WIDGET(d->b_height), TRUE);
 
-  gtk_box_pack_start(GTK_BOX(hfitbox), GTK_WIDGET(box), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hfitbox), GTK_WIDGET(box));
+  gtk_widget_set_vexpand(GTK_WIDGET(box), TRUE);
 
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(hfitbox), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(hfitbox));
+  gtk_widget_set_vexpand(GTK_WIDGET(hfitbox), TRUE);
 
   gtk_widget_add_events(d->b_x, GDK_BUTTON_PRESS_MASK);
   gtk_widget_add_events(d->b_y, GDK_BUTTON_PRESS_MASK);
@@ -2858,7 +2904,8 @@ void gui_init(dt_lib_module_t *self)
   ////////////////////////// PRINT SETTINGS
 
   label = dt_ui_section_label_new(C_("section", "print settings"));
-  gtk_box_pack_start(GTK_BOX(self->widget), label, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), label);
+  gtk_widget_set_vexpand(label, TRUE);
   dt_gui_add_help_link(self->widget, "print_settings");
 
   //  Add export profile combo
@@ -2866,7 +2913,8 @@ void gui_init(dt_lib_module_t *self)
   d->profile = dt_bauhaus_combobox_new_action(DT_ACTION(self));
   dt_bauhaus_widget_set_label(d->profile, NULL, N_("profile"));
 
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->profile), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->profile));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->profile), TRUE);
   dt_bauhaus_combobox_add(d->profile, _("image settings"));
 
   const int icctype = dt_conf_get_int(PRINT_CONFIG_PREFIX "icctype");
@@ -2918,7 +2966,8 @@ void gui_init(dt_lib_module_t *self)
                                N_("relative colorimetric"),
                                NC_("rendering intent", "saturation"),
                                N_("absolute colorimetric"));
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->intent), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->intent));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->intent), TRUE);
 
   //  Add export style combo
 
@@ -2934,16 +2983,17 @@ void gui_init(dt_lib_module_t *self)
   GtkBox *style_box = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
   gtk_widget_set_tooltip_text(GTK_WIDGET(style_box), _("temporary style to use while printing"));
   GtkWidget *styles_label = gtk_label_new(_("style"));
-  gtk_box_pack_start(style_box, styles_label, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(style_box), styles_label);
   GtkWidget *current_style = gtk_label_new("");
   gtk_widget_set_halign(current_style,GTK_ALIGN_END);
   gtk_label_set_justify(GTK_LABEL(current_style), GTK_JUSTIFY_RIGHT);
   gtk_label_set_ellipsize(GTK_LABEL(current_style), PANGO_ELLIPSIZE_MIDDLE);
-  gtk_box_pack_start(style_box, current_style, TRUE, TRUE, 0);
-  gtk_box_pack_start(style_box, styles_button, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(style_box), current_style);
+  gtk_widget_set_hexpand(current_style, TRUE);
+  gtk_box_append(GTK_BOX(style_box), styles_button);
 
   d->style = GTK_WIDGET(current_style);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(style_box), FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(style_box));
 
   //  Whether to add/replace style items
 
@@ -2956,7 +3006,8 @@ void gui_init(dt_lib_module_t *self)
   gtk_widget_set_no_show_all(d->style_mode, TRUE);
   const gboolean is_style_set = _is_style_set(current_style_name);
   gtk_widget_set_visible(GTK_WIDGET(d->style_mode), is_style_set);
-  gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(d->style_mode), TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), GTK_WIDGET(d->style_mode));
+  gtk_widget_set_vexpand(GTK_WIDGET(d->style_mode), TRUE);
 
   _update_style_label(d, is_style_set ? current_style_name : "");
 
@@ -2967,7 +3018,8 @@ void gui_init(dt_lib_module_t *self)
                                            _("print with current settings"),
                                            GDK_KEY_p, GDK_CONTROL_MASK);
   d->print_button = GTK_BUTTON(button);
-  gtk_box_pack_start(GTK_BOX(self->widget), button, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), button);
+  gtk_widget_set_vexpand(button, TRUE);
   dt_gui_add_help_link(button, "print_settings_button");
 
   // Let's start the printer discovery now

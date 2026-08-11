@@ -27,6 +27,7 @@ typedef struct _widgets_filename_t
   GtkWidget *name;
   GtkWidget *ext;
   GtkWidget *pop;
+  GtkWidget *opener; // GTK4: the entry the popover is anchored to
   GtkWidget *name_tree;
   GtkWidget *ext_tree;
   gboolean tree_ok;
@@ -44,10 +45,10 @@ static void _filename_synchronise(_widgets_filename_t *source)
   if(dest)
   {
     source->rule->manual_widget_set++;
-    const gchar *txt1 = gtk_entry_get_text(GTK_ENTRY(source->name));
-    gtk_entry_set_text(GTK_ENTRY(dest->name), txt1);
-    const gchar *txt2 = gtk_entry_get_text(GTK_ENTRY(source->ext));
-    gtk_entry_set_text(GTK_ENTRY(dest->ext), txt2);
+    const gchar *txt1 = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(source->name)));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(dest->name)), txt1);
+    const gchar *txt2 = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(source->ext)));
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(dest->ext)), txt2);
     source->rule->manual_widget_set--;
   }
 }
@@ -73,20 +74,20 @@ static void _filename_changed(GtkWidget *widget, gpointer user_data)
   if(filename->rule->manual_widget_set) return;
 
   // we recreate the right raw text and put it in the raw entry
-  gchar *value = g_strdup_printf("%s/%s", gtk_entry_get_text(GTK_ENTRY(filename->name)),
-                                 gtk_entry_get_text(GTK_ENTRY(filename->ext)));
+  gchar *value = g_strdup_printf("%s/%s", gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(filename->name))),
+                                 gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(filename->ext))));
 
   _rule_set_raw_text(filename->rule, value, TRUE);
   _filename_synchronise(filename);
   g_free(value);
 }
 
-static gboolean _filename_focus_out(GtkWidget *entry, GdkEventFocus *event, gpointer user_data)
+static void _filename_focus_out(GtkEventControllerFocus *controller,
+                                gpointer user_data)
 {
   _widgets_filename_t *filename = (_widgets_filename_t *)user_data;
-  if(filename->rule->cleaning) return FALSE;
-  _filename_changed(entry, user_data);
-  return FALSE;
+  if(filename->rule->cleaning) return;
+  _filename_changed(dt_gui_get_widget(controller), user_data);
 }
 
 void _filename_tree_update(_widgets_filename_t *filename)
@@ -215,8 +216,12 @@ static gboolean _filename_select_func(GtkTreeModel *model, GtkTreePath *path, Gt
 static void _filename_update_selection(_widgets_filename_t *filename)
 {
   // get the current text
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *entry = filename->opener;
+#else
   GtkWidget *entry = gtk_popover_get_default_widget(GTK_POPOVER(filename->pop));
-  const gchar *txt = gtk_entry_get_text(GTK_ENTRY(entry));
+#endif
+  const gchar *txt = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry)));
 
   // get the current treeview
   GtkWidget *tree = (entry == filename->name) ? filename->name_tree : filename->ext_tree;
@@ -242,8 +247,15 @@ static void _filename_press(GtkGestureSingle *gesture, gint n_press, gdouble x, 
   if(gtk_gesture_single_get_current_button(gesture) == GDK_BUTTON_SECONDARY)
   {
     _filename_tree_update_visibility(w, filename);
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // GTK4: popovers anchor to their parent; reparent to the opener
+    filename->opener = w;
+    gtk_widget_unparent(filename->pop);
+    gtk_widget_set_parent(filename->pop, w);
+#else
     gtk_popover_set_default_widget(GTK_POPOVER(filename->pop), w);
     gtk_popover_set_relative_to(GTK_POPOVER(filename->pop), w);
+#endif
 
     // update the selection
     _filename_update_selection(filename);
@@ -253,7 +265,7 @@ static void _filename_press(GtkGestureSingle *gesture, gint n_press, gdouble x, 
   else if(gtk_gesture_single_get_current_button(gesture) == GDK_BUTTON_PRIMARY
           && n_press >= 2)
   {
-    gtk_entry_set_text(GTK_ENTRY(w), "");
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(w)), "");
     _filename_changed(w, filename);
   }
 }
@@ -268,14 +280,14 @@ static gboolean _filename_update(dt_lib_filtering_rule_t *rule)
   rule->manual_widget_set++;
   _widgets_filename_t *filename = (_widgets_filename_t *)rule->w_specific;
   filename->tree_ok = FALSE;
-  if(name) gtk_entry_set_text(GTK_ENTRY(filename->name), name);
-  if(ext) gtk_entry_set_text(GTK_ENTRY(filename->ext), ext);
+  if(name) gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(filename->name)), name);
+  if(ext) gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(filename->ext)), ext);
   if(rule->topbar && rule->w_specific_top)
   {
     filename = (_widgets_filename_t *)rule->w_specific_top;
     filename->tree_ok = FALSE;
-    if(name) gtk_entry_set_text(GTK_ENTRY(filename->name), name);
-    if(ext) gtk_entry_set_text(GTK_ENTRY(filename->ext), ext);
+    if(name) gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(filename->name)), name);
+    if(ext) gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(filename->ext)), ext);
   }
   _filename_synchronise(filename);
   rule->manual_widget_set--;
@@ -288,7 +300,11 @@ static gboolean _filename_update(dt_lib_filtering_rule_t *rule)
 static void _filename_popup_closed(GtkWidget *w, _widgets_filename_t *filename)
 {
   // we validate the corresponding entry
+#if GTK_CHECK_VERSION(4, 0, 0)
+  gtk_widget_activate(filename->opener);
+#else
   gtk_widget_activate(gtk_popover_get_default_widget(GTK_POPOVER(w)));
+#endif
 }
 
 static void _filename_tree_row_activated(GtkTreeView *self, GtkTreePath *path, GtkTreeViewColumn *column,
@@ -319,8 +335,12 @@ static void _filename_tree_selection_change(GtkTreeSelection *sel, _widgets_file
   g_list_free_full(list, (GDestroyNotify)gtk_tree_path_free);
 
   // we set the entry with this value
+#if GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *entry = filename->opener;
+#else
   GtkWidget *entry = gtk_popover_get_default_widget(GTK_POPOVER(filename->pop));
-  gtk_entry_set_text(GTK_ENTRY(entry), (txt == NULL) ? "" : txt);
+#endif
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(entry)), (txt == NULL) ? "" : txt);
   g_free(txt);
 }
 
@@ -360,32 +380,44 @@ static void _filename_widget_init(dt_lib_filtering_rule_t *rule, const dt_collec
 
   GtkWidget *hb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   if(top)
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box_top), hb, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box_top), hb);
+    gtk_widget_set_hexpand(hb, TRUE);
+  }
   else
-    gtk_box_pack_start(GTK_BOX(rule->w_special_box), hb, TRUE, TRUE, 0);
+  {
+    gtk_box_append(GTK_BOX(rule->w_special_box), hb);
+    gtk_widget_set_hexpand(hb, TRUE);
+  }
   filename->name = dt_ui_entry_new(top ? 10 : 0);
-  gtk_widget_set_can_default(filename->name, TRUE);
+  // gtk_widget_set_can_default is removed in GTK4; the entry is not a dialog default target
   gtk_entry_set_placeholder_text(GTK_ENTRY(filename->name), _("filename"));
   gtk_widget_set_tooltip_text(filename->name, _("enter filename to search.\n"
                                                 "multiple values can be separated by ','\n"
                                                 "\nright-click to get existing filenames"));
-  gtk_box_pack_start(GTK_BOX(hb), filename->name, TRUE, TRUE, 0);
+  gtk_widget_set_hexpand(filename->name, TRUE);
+  gtk_box_append(GTK_BOX(hb), filename->name);
   g_signal_connect(G_OBJECT(filename->name), "activate", G_CALLBACK(_filename_changed), filename);
-  g_signal_connect(G_OBJECT(filename->name), "focus-out-event", G_CALLBACK(_filename_focus_out), filename);
+  GtkEventController *focus = gtk_event_controller_focus_new();
+  g_signal_connect(focus, "leave", G_CALLBACK(_filename_focus_out), filename);
+  gtk_widget_add_controller(filename->name, focus);
   GtkGestureSingle *g_name = dt_gui_connect_click(filename->name, _filename_press, NULL, filename);
   gtk_gesture_single_set_button(g_name, GDK_BUTTON_SECONDARY);
   gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(g_name), GTK_PHASE_TARGET);
 
   filename->ext = dt_ui_entry_new(top ? 5 : 0);
-  gtk_widget_set_can_default(filename->ext, TRUE);
+  // gtk_widget_set_can_default is removed in GTK4; the entries are not dialog default targets
   gtk_entry_set_placeholder_text(GTK_ENTRY(filename->ext), _("extension"));
   gtk_widget_set_tooltip_text(filename->ext, _("enter extension to search with starting dot\n"
                                                "multiple values can be separated by ','\n"
                                                "handled keywords: 'RAW', 'NOT RAW', 'LDR', 'HDR'\n"
                                                "\nright-click to get existing extensions"));
-  gtk_box_pack_start(GTK_BOX(hb), filename->ext, TRUE, TRUE, 0);
+  gtk_widget_set_hexpand(filename->ext, TRUE);
+  gtk_box_append(GTK_BOX(hb), filename->ext);
   g_signal_connect(G_OBJECT(filename->ext), "activate", G_CALLBACK(_filename_changed), filename);
-  g_signal_connect(G_OBJECT(filename->ext), "focus-out-event", G_CALLBACK(_filename_focus_out), filename);
+  GtkEventController *focus2 = gtk_event_controller_focus_new();
+  g_signal_connect(focus2, "leave", G_CALLBACK(_filename_focus_out), filename);
+  gtk_widget_add_controller(filename->ext, focus2);
   GtkGestureSingle *g_ext = dt_gui_connect_click(filename->ext, _filename_press, NULL, filename);
   gtk_gesture_single_set_button(g_ext, GDK_BUTTON_SECONDARY);
   gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(g_ext), GTK_PHASE_TARGET);
@@ -395,11 +427,17 @@ static void _filename_widget_init(dt_lib_filtering_rule_t *rule, const dt_collec
   }
 
   // the popup
+#if GTK_CHECK_VERSION(4, 0, 0)
+  filename->pop = gtk_popover_new();
+  filename->opener = filename->name;
+  gtk_widget_set_parent(filename->pop, filename->name);
+#else
   filename->pop = gtk_popover_new(filename->name);
+#endif
   gtk_widget_set_size_request(filename->pop, 250, 400);
   g_signal_connect(G_OBJECT(filename->pop), "closed", G_CALLBACK(_filename_popup_closed), filename);
   hb = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  gtk_container_add(GTK_CONTAINER(filename->pop), hb);
+  gtk_popover_set_child(GTK_POPOVER(filename->pop), hb);
 
   // the name tree
   GtkTreeModel *model
@@ -425,7 +463,8 @@ static void _filename_widget_init(dt_lib_filtering_rule_t *rule, const dt_collec
 
   GtkWidget *sw = dt_gui_scroll_wrap(filename->name_tree);
   gtk_widget_set_no_show_all(sw, TRUE);
-  gtk_box_pack_start(GTK_BOX(hb), sw, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), sw);
+  gtk_widget_set_vexpand(sw, TRUE);
 
   // the extension tree
   model
@@ -451,11 +490,12 @@ static void _filename_widget_init(dt_lib_filtering_rule_t *rule, const dt_collec
 
   sw = dt_gui_scroll_wrap(filename->ext_tree);
   gtk_widget_set_no_show_all(sw, TRUE);
-  gtk_box_pack_start(GTK_BOX(hb), sw, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), sw);
+  gtk_widget_set_vexpand(sw, TRUE);
 
   // the button to close the popup
   GtkWidget *btn = gtk_button_new_with_label(_("ok"));
-  gtk_box_pack_start(GTK_BOX(hb), btn, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hb), btn);
   g_signal_connect(G_OBJECT(btn), "clicked", G_CALLBACK(_filename_ok_clicked), filename);
 
   if(top)

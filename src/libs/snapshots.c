@@ -133,9 +133,11 @@ enum _lib_snapshot_button_items
 static GtkWidget *_lib_snapshot_button_get_item(GtkWidget *button,
                                                 const int num)
 {
-  GtkWidget *cont = gtk_bin_get_child(GTK_BIN(button));
-  GList *items = gtk_container_get_children(GTK_CONTAINER(cont));
-  return (GtkWidget *)g_list_nth_data(items, num);
+  GtkWidget *cont = gtk_button_get_child(GTK_BUTTON(button));
+  GtkWidget *item = gtk_widget_get_first_child(cont);
+  for(int i = 0; item && i < num; i++)
+    item = gtk_widget_get_next_sibling(item);
+  return item;
 }
 
 // draw snapshot sign
@@ -550,7 +552,7 @@ static void _entry_activated_callback(GtkEntry *entry, dt_lib_module_t *self)
 
   const int index = _look_for_widget(self, (GtkWidget *)entry, TRUE);
 
-  const char *txt = gtk_entry_get_text(GTK_ENTRY(d->snapshot[index].entry));
+  const char *txt = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(d->snapshot[index].entry)));
 
   char *label = dt_history_get_name_label(d->snapshot[index].module, txt, TRUE, TRUE);
   gtk_label_set_markup(GTK_LABEL(d->snapshot[index].name), label);
@@ -841,25 +843,31 @@ void gui_init(dt_lib_module_t *self)
 
     // 4 items inside box, num, status, name, label
 
-    gtk_box_pack_start(GTK_BOX(box), s->num, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(box), s->status, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(box), s->name, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(box), s->entry, TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(box), s->num);
+    gtk_box_append(GTK_BOX(box), s->status);
+    gtk_box_append(GTK_BOX(box), s->name);
+    gtk_widget_set_hexpand(s->name, TRUE);
+    gtk_box_append(GTK_BOX(box), s->entry);
+    gtk_widget_set_hexpand(s->entry, TRUE);
 
     gtk_widget_show_all(box);
 
     // hide entry, will be used only when editing
     gtk_widget_hide(s->entry);
 
-    gtk_container_add(GTK_CONTAINER(s->button), box);
+    gtk_button_set_child(GTK_BUTTON(s->button), box);
 
     // add snap button and restore button
     s->bbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    gtk_box_pack_start(GTK_BOX(s->bbox), s->button, TRUE, TRUE, 0);
-    gtk_box_pack_end(GTK_BOX(s->bbox), s->restore_button, FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(s->bbox), s->button);
+    gtk_widget_set_hexpand(s->button, TRUE);
+    gtk_box_append(GTK_BOX(s->bbox), s->restore_button);
+    gtk_widget_set_halign(s->restore_button, GTK_ALIGN_START);
 
-    /* add button to snapshot box */
-    gtk_box_pack_end(GTK_BOX(d->snapshots_box), s->bbox, FALSE, FALSE, 0);
+    /* add button to snapshot box.
+     * GTK3 pack_end laid the rows out with the first pack_end child at the
+     * bottom (newest snapshot on top); prepend reproduces that order. */
+    gtk_box_prepend(GTK_BOX(d->snapshots_box), s->bbox);
 
     /* prevent widget to show on external show all */
     gtk_widget_set_no_show_all(s->button, TRUE);
@@ -867,13 +875,14 @@ void gui_init(dt_lib_module_t *self)
   }
 
   /* add snapshot box and take snapshot button to widget ui*/
-  gtk_box_pack_start(GTK_BOX(self->widget),
-                     dt_ui_resize_wrap(d->snapshots_box, 1,
-                                       "plugins/darkroom/snapshots/windowheight"),
-                     TRUE, TRUE, 0);
+  GtkWidget *resize_wrap = dt_ui_resize_wrap(d->snapshots_box, 1,
+                                       "plugins/darkroom/snapshots/windowheight");
+  gtk_box_append(GTK_BOX(self->widget), resize_wrap);
+  gtk_widget_set_vexpand(resize_wrap, TRUE);
 
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-  gtk_box_pack_start(GTK_BOX(hbox), d->take_button, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), d->take_button);
+  gtk_widget_set_hexpand(d->take_button, TRUE);
   d->sidebyside_button = dtgtk_togglebutton_new_full(dtgtk_cairo_paint_lt_mode_culling_dynamic, 0, NULL,
       &(dtgtk_button_config_t){
         .tooltip = _("place the snapshot side-by-side / above-below the current image instead of overlaying"),
@@ -883,9 +892,10 @@ void gui_init(dt_lib_module_t *self)
         .clicked_cb = G_CALLBACK(_sidebyside_button_clicked),
         .clicked_data = self,
       });
-  gtk_box_pack_start(GTK_BOX(hbox), d->sidebyside_button, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), d->sidebyside_button);
 
-  gtk_box_pack_start(GTK_BOX(self->widget), hbox, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(self->widget), hbox);
+  gtk_widget_set_vexpand(hbox, TRUE);
 
   dt_action_register(DT_ACTION(self), N_("toggle last snapshot"),
                      _lib_snapshots_toggle_last, 0, 0);
@@ -965,7 +975,7 @@ static void _lib_snapshots_add_button_clicked_callback(GtkWidget *widget,
   char *txt = dt_history_get_name_label(s->module, s->label, TRUE, TRUE);
   gtk_label_set_markup(lname, txt);
 
-  gtk_entry_set_text(lentry, s->label ? s->label : "");
+  gtk_editable_set_text(GTK_EDITABLE(lentry), s->label ? s->label : "");
 
   gtk_widget_grab_focus(s->button);
 
@@ -1274,7 +1284,7 @@ static int lua_select(lua_State *L)
     return luaL_error(L, "Accessing a non-existent snapshot");
   }
   dt_lib_snapshot_t *self = &d->snapshot[index];
-  gtk_button_clicked(GTK_BUTTON(self->button));
+  gtk_widget_activate(GTK_WIDGET(self->button));
   return 0;
 }
 

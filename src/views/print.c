@@ -77,6 +77,7 @@ static void _view_print_settings(const dt_view_t *view,
   dt_control_queue_redraw();
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _drag_and_drop_received(GtkWidget *widget,
                                     GdkDragContext *context,
                                     gint x,
@@ -132,6 +133,7 @@ static gboolean _drag_motion_received(GtkWidget *widget,
 
   return TRUE;
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void init(dt_view_t *self)
 {
@@ -359,12 +361,14 @@ void enter(dt_view_t *self)
 
   gtk_widget_grab_focus(dt_ui_center(darktable.gui->ui));
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *widget = dt_ui_center(darktable.gui->ui);
 
   gtk_drag_dest_set(widget, GTK_DEST_DEFAULT_ALL,
                     target_list_all, n_targets_all, GDK_ACTION_MOVE);
   g_signal_connect(widget, "drag-data-received", G_CALLBACK(_drag_and_drop_received), self);
   g_signal_connect(widget, "drag-motion", G_CALLBACK(_drag_motion_received), self);
+#endif
 
   dt_control_set_mouse_over_id(prt->imgs->imgid_to_load);
 }
@@ -372,15 +376,17 @@ void enter(dt_view_t *self)
 void leave(dt_view_t *self)
 {
   dt_print_t *prt = (dt_print_t*)self->data;
-  GtkWidget *widget = dt_ui_center(darktable.gui->ui);
 
   /* disconnect from mipmap updated signal */
   DT_CONTROL_SIGNAL_DISCONNECT_ALL(self, "print");
 
   dt_printing_clear_boxes(prt->imgs);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
+  GtkWidget *widget = dt_ui_center(darktable.gui->ui);
   g_signal_handlers_disconnect_by_func(widget, G_CALLBACK(_drag_and_drop_received), self);
   g_signal_handlers_disconnect_by_func(widget, G_CALLBACK(_drag_motion_received), self);
+#endif
 }
 
 // clang-format off

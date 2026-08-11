@@ -92,10 +92,6 @@ GtkWidget *dtgtk_button_new_full(DTGTKCairoPaintIconFunc paint,
                                  const dtgtk_button_config_t *config);
 /** set the paint function for a button */
 void dtgtk_button_set_paint(GtkDarktableButton *button, DTGTKCairoPaintIconFunc paint, gint paintflags, void *paintdata);
-/** clear the stale hover/pressed state GTK3 leaves on buttons after a grab
- * (menu, popover, modal dialog) that shadowed them has ended; connect on any
- * button that pops up menus or opens dialogs */
-void dtgtk_button_connect_stale_hover_cleanup(GtkWidget *widget);
 /** set the active state of the button icon */
 void dtgtk_button_set_active(GtkDarktableButton *button, gboolean active);
 

@@ -348,7 +348,7 @@ static void init_tab_general(GtkWidget *dialog,
   gtk_widget_set_valign(grid, GTK_ALIGN_START);
   int line = 0;
 
-  gtk_box_pack_start(GTK_BOX(container), grid, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(container), grid);
 
   gtk_stack_add_titled(GTK_STACK(stack), container, _("general"), _("general"));
 
@@ -356,9 +356,9 @@ static void init_tab_general(GtkWidget *dialog,
 
   GtkWidget *label = gtk_label_new(_("interface language"));
   gtk_widget_set_halign(label, GTK_ALIGN_START);
-  GtkWidget *labelev = gtk_event_box_new();
+  GtkWidget *labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
+  gtk_box_append(GTK_BOX(labelev), label);
   GtkWidget *widget = dt_bauhaus_combobox_new(NULL);
   dt_bauhaus_combobox_set_selected_text_align(widget, DT_BAUHAUS_COMBOBOX_ALIGN_LEFT);
 
@@ -375,7 +375,6 @@ static void init_tab_general(GtkWidget *dialog,
   g_signal_connect(G_OBJECT(widget), "value-changed",
                    G_CALLBACK(language_callback), 0);
   gtk_widget_set_tooltip_text(labelev,  _("double-click to reset to the system language"));
-  gtk_event_box_set_visible_window(GTK_EVENT_BOX(labelev), FALSE);
   gtk_widget_set_tooltip_text(widget,
                               _("set the language of the user interface."
                                 " the system default is marked with an * \n"
@@ -393,9 +392,9 @@ static void init_tab_general(GtkWidget *dialog,
   widget = dt_bauhaus_combobox_new(NULL);
   dt_bauhaus_combobox_set_selected_text_align(widget, DT_BAUHAUS_COMBOBOX_ALIGN_LEFT);
 
-  labelev = gtk_event_box_new();
+  labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
+  gtk_box_append(GTK_BOX(labelev), label);
   gtk_grid_attach(GTK_GRID(grid), labelev, 0, line++, 1, 1);
   gtk_grid_attach_next_to(GTK_GRID(grid), widget, labelev, GTK_POS_RIGHT, 1, 1);
 
@@ -436,9 +435,9 @@ static void init_tab_general(GtkWidget *dialog,
 
   label = gtk_label_new(_("use system font size"));
   gtk_widget_set_halign(label, GTK_ALIGN_START);
-  labelev = gtk_event_box_new();
+  labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
+  gtk_box_append(GTK_BOX(labelev), label);
   gtk_grid_attach(GTK_GRID(grid), labelev, i, i?2:line++, 1, 1);
   gtk_grid_attach_next_to(GTK_GRID(grid), usesysfont, labelev, GTK_POS_RIGHT, 1, 1);
   gtk_widget_set_tooltip_text(usesysfont, _("use system font size"));
@@ -458,9 +457,9 @@ static void init_tab_general(GtkWidget *dialog,
 
   label = gtk_label_new(_("font size in points"));
   gtk_widget_set_halign(label, GTK_ALIGN_START);
-  labelev = gtk_event_box_new();
+  labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
+  gtk_box_append(GTK_BOX(labelev), label);
   gtk_grid_attach(GTK_GRID(grid), labelev, i, i?0:line++, 1, 1);
   gtk_grid_attach_next_to(GTK_GRID(grid), fontsize, labelev, GTK_POS_RIGHT, 1, 1);
   gtk_widget_set_tooltip_text(fontsize, _("font size in points"));
@@ -471,9 +470,9 @@ static void init_tab_general(GtkWidget *dialog,
   GtkWidget *screen_dpi_overwrite = gtk_spin_button_new_with_range(-1.0f, 360, 1.f);
   label = gtk_label_new(_("GUI controls and text DPI"));
   gtk_widget_set_halign(label, GTK_ALIGN_START);
-  labelev = gtk_event_box_new();
+  labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
+  gtk_box_append(GTK_BOX(labelev), label);
   gtk_grid_attach(GTK_GRID(grid), labelev, i, i?1:line++, 1, 1);
   gtk_grid_attach_next_to(GTK_GRID(grid), screen_dpi_overwrite, labelev,
                           GTK_POS_RIGHT, 1, 1);
@@ -502,9 +501,9 @@ static void init_tab_general(GtkWidget *dialog,
   gtk_widget_set_halign(label, GTK_ALIGN_START);
   tw->apply_toggle = gtk_check_button_new();
   gtk_widget_set_name(tw->apply_toggle, "themes/usercss");
-  labelev = gtk_event_box_new();
+  labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), label);
+  gtk_box_append(GTK_BOX(labelev), label);
   gtk_grid_attach(GTK_GRID(grid), labelev, 0, line++, 1, 1);
   gtk_grid_attach_next_to(GTK_GRID(grid), tw->apply_toggle, labelev, GTK_POS_RIGHT, 1, 1);
   gtk_widget_set_tooltip_text(tw->apply_toggle,
@@ -517,7 +516,8 @@ static void init_tab_general(GtkWidget *dialog,
 
   //scrollable textarea with save button to allow user to directly modify user.css file
   GtkWidget *usercssbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  gtk_box_pack_start(GTK_BOX(container), usercssbox, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(container), usercssbox);
+  gtk_widget_set_vexpand(usercssbox, TRUE);
   gtk_widget_set_name(usercssbox, "usercss-box");
 
   GtkTextBuffer *buffer = gtk_text_buffer_new(NULL);
@@ -528,7 +528,8 @@ static void init_tab_general(GtkWidget *dialog,
   gtk_widget_set_halign(tw->css_text_view, GTK_ALIGN_FILL);
 
   GtkWidget *scroll = dt_gui_scroll_wrap(tw->css_text_view);
-  gtk_box_pack_start(GTK_BOX(usercssbox), scroll, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(usercssbox), scroll);
+  gtk_widget_set_vexpand(scroll, TRUE);
 
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   tw->save_button = gtk_button_new_with_label(C_("usercss", "save CSS and apply"));
@@ -536,8 +537,9 @@ static void init_tab_general(GtkWidget *dialog,
                    G_CALLBACK(save_usercss_callback), tw);
   g_signal_connect(G_OBJECT(dialog), "response",
                    G_CALLBACK(usercss_dialog_callback), tw);
-  gtk_box_pack_end(GTK_BOX(hbox), tw->save_button, FALSE, TRUE, 0);
-  gtk_box_pack_start(GTK_BOX(usercssbox), hbox, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(hbox), tw->save_button);
+  gtk_box_append(GTK_BOX(usercssbox), hbox);
+  gtk_widget_set_valign(hbox, GTK_ALIGN_START);
   gtk_widget_set_tooltip_text(tw->save_button,
                               _("click to save and apply the CSS tweaks"
                                 " entered in this editor"));
@@ -546,7 +548,8 @@ static void init_tab_general(GtkWidget *dialog,
   dt_gui_add_help_link(button, "css_tweaks");
   g_signal_connect(button, "clicked",
                    G_CALLBACK(dt_gui_show_help), NULL);
-  gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(hbox), button);
+  gtk_widget_set_halign(button, GTK_ALIGN_START);
 
   //set textarea text from file or default
   char usercsspath[PATH_MAX] = { 0 }, configdir[PATH_MAX] = { 0 };
@@ -603,7 +606,6 @@ void dt_gui_preferences_show()
   // changing orientation of content area to horizontal causes wide (empty) action-box
   // so insert an hbox instead
   GtkWidget *box = dt_gui_hbox();
-  gtk_container_set_border_width(GTK_CONTAINER(box), 0);
   dt_gui_box_add(content, box);
 
   //create stack and sidebar and pack into the box
@@ -1029,7 +1031,7 @@ static void init_tab_presets(GtkWidget *stack)
   gtk_widget_set_name(hbox, "preset-controls");
 
   GtkWidget *search_presets = gtk_search_entry_new();
-  gtk_box_pack_start(GTK_BOX(hbox), search_presets, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), search_presets);
   gtk_entry_set_placeholder_text(GTK_ENTRY(search_presets), _("search presets list"));
   gtk_widget_set_tooltip_text
     (GTK_WIDGET(search_presets),
@@ -1042,26 +1044,27 @@ static void init_tab_presets(GtkWidget *stack)
 #if GTK_CHECK_VERSION(4, 0, 0)
   // GTK4: GtkSearchEntry captures keys from a designated widget natively
   // (gtk_search_entry_handle_event() is gone).
-  gtk_search_entry_set_key_capture_widget(GTK_SEARCH_ENTRY(search_presets), tree);
+  gtk_search_entry_set_key_capture_widget(GTK_SEARCH_ENTRY(search_presets), GTK_WIDGET(tree));
 #else
   dt_gui_connect_key(tree, _search_key_pressed, search_presets);
 #endif
-  gtk_tree_view_set_search_entry(tree, GTK_ENTRY(search_presets));
+  gtk_tree_view_set_search_entry(tree, GTK_EDITABLE(search_presets));
 
   GtkWidget *button = gtk_button_new_with_label(C_("preferences", "import..."));
-  gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), button);
   g_signal_connect(G_OBJECT(button), "clicked",
                    G_CALLBACK(import_preset), (gpointer)model);
 
   button = gtk_button_new_with_label(C_("preferences", "export..."));
-  gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, TRUE, 0);
+  gtk_box_append(GTK_BOX(hbox), button);
   g_signal_connect(G_OBJECT(button), "clicked",
                    G_CALLBACK(export_preset), (gpointer)model);
 
   button = gtk_button_new_with_label(_("?"));
   dt_gui_add_help_link(button, "presets");
   g_signal_connect(button, "clicked", G_CALLBACK(dt_gui_show_help), NULL);
-  gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(hbox), button);
+  gtk_widget_set_halign(button, GTK_ALIGN_START);
 
   // Attaching treeview signals
 
@@ -1270,9 +1273,19 @@ static void import_preset(GtkButton *button,
 
   gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(chooser), filter);
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(chooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(chooser)) == GTK_RESPONSE_ACCEPT)
   {
-    GSList *filenames = gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(chooser));
+    GListModel *files = gtk_file_chooser_get_files(GTK_FILE_CHOOSER(chooser));
+    GSList *filenames = NULL;
+    for(guint i = 0; i < g_list_model_get_n_items(files); i++)
+    {
+      GFile *file = g_list_model_get_item(files, i);
+      gchar *path = g_file_get_path(file);
+      if(path) filenames = g_slist_prepend(filenames, path);
+      g_object_unref(file);
+    }
+    g_object_unref(files);
+    filenames = g_slist_reverse(filenames);
     g_slist_foreach(filenames, (GFunc)_import_preset_from_file, NULL);
     g_slist_free_full(filenames, g_free);
 
@@ -1296,9 +1309,11 @@ static void export_preset(GtkButton *button,
 
   dt_conf_get_folder_to_file_chooser("ui_last/export_path", GTK_FILE_CHOOSER(filechooser));
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *filedir = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    gchar *filedir = file ? g_file_get_path(file) : NULL;
+    if(file) g_object_unref(file);
     sqlite3_stmt *stmt;
 
     // we have n+1 selects for saving presets, using single
@@ -1411,9 +1426,9 @@ GtkWidget *dt_gui_preferences_bool(GtkGrid *grid,
 {
   GtkWidget *w_label = dt_ui_label_new(_(dt_confgen_get_label(key)));
   gtk_widget_set_tooltip_markup(w_label, _(dt_confgen_get_tooltip(key)));
-  GtkWidget *labelev = gtk_event_box_new();
+  GtkWidget *labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), w_label);
+  gtk_box_append(GTK_BOX(labelev), w_label);
   GtkWidget *w = gtk_check_button_new();
   gtk_widget_set_name(w, key);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), dt_conf_get_bool(key));
@@ -1468,9 +1483,9 @@ GtkWidget *dt_gui_preferences_int(GtkGrid *grid,
 {
   GtkWidget *w_label = dt_ui_label_new(_(dt_confgen_get_label(key)));
   gtk_widget_set_tooltip_markup(w_label, _(dt_confgen_get_tooltip(key)));
-  GtkWidget *labelev = gtk_event_box_new();
+  GtkWidget *labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), w_label);
+  gtk_box_append(GTK_BOX(labelev), w_label);
   const gint min = MAX(G_MININT, dt_confgen_get_int(key, DT_MIN));
   const gint max = MIN(G_MAXINT, dt_confgen_get_int(key, DT_MAX));
   GtkWidget *w = gtk_spin_button_new_with_range(min, max, 1.0);
@@ -1540,7 +1555,7 @@ static void
 _gui_preferences_string_callback(GtkWidget *widget,
                                  gpointer data)
 {
-  const char *str = gtk_entry_get_text(GTK_ENTRY(widget));
+  const char *str = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(widget)));
   dt_conf_set_string((char *)data, str);
 }
 
@@ -1548,7 +1563,7 @@ void dt_gui_preferences_string_reset(GtkWidget *widget)
 {
   const char *key = gtk_widget_get_name(widget);
   const char *str = dt_confgen_get(key, DT_DEFAULT);
-  gtk_entry_set_text(GTK_ENTRY(widget), str);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(widget)), str);
 }
 
 static void
@@ -1568,7 +1583,7 @@ void dt_gui_preferences_string_update(GtkWidget *widget)
 {
   const char *key = gtk_widget_get_name(widget);
   const char *str = dt_conf_get_string_const(key);
-  gtk_entry_set_text(GTK_ENTRY(widget), str);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(widget)), str);
 }
 
 GtkWidget *dt_gui_preferences_string(GtkGrid *grid,
@@ -1578,13 +1593,13 @@ GtkWidget *dt_gui_preferences_string(GtkGrid *grid,
 {
   GtkWidget *w_label = dt_ui_label_new(_(dt_confgen_get_label(key)));
   gtk_widget_set_tooltip_markup(w_label, _(dt_confgen_get_tooltip(key)));
-  GtkWidget *labelev = gtk_event_box_new();
+  GtkWidget *labelev = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_events(labelev, GDK_BUTTON_PRESS_MASK);
-  gtk_container_add(GTK_CONTAINER(labelev), w_label);
+  gtk_box_append(GTK_BOX(labelev), w_label);
 
   GtkWidget *w = gtk_entry_new();
   const char *str = dt_conf_get_string_const(key);
-  gtk_entry_set_text(GTK_ENTRY(w), str);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(w)), str);
   gtk_widget_set_hexpand(w, TRUE);
   gtk_widget_set_name(w, key);
 

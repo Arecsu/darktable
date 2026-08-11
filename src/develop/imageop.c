@@ -775,16 +775,31 @@ dt_iop_module_t *dt_iop_gui_duplicate(dt_iop_module_t *base,
 
     /* add module to right panel */
     dt_iop_gui_set_expander(module);
-    GValue gv = { 0, { { 0 } } };
-    g_value_init(&gv, G_TYPE_INT);
-    gtk_container_child_get_property(
-        GTK_CONTAINER(dt_ui_get_container(darktable.gui->ui,
-                                          DT_UI_CONTAINER_PANEL_RIGHT_CENTER)),
-        base->expander, "position", &gv);
-    gtk_box_reorder_child(dt_ui_get_container(darktable.gui->ui,
-                                              DT_UI_CONTAINER_PANEL_RIGHT_CENTER),
-                          module->expander,
-                          g_value_get_int(&gv) + pos_base - pos_module + 1);
+    // GTK4: gtk_container_child_get_property / gtk_box_reorder_child are
+    // gone.  Reproduce the index-based reorder exactly (GTK3 semantics:
+    // remove child, insert before the widget at the target index, append
+    // when the index is out of range).
+    GtkBox *panel = dt_ui_get_container(darktable.gui->ui,
+                                        DT_UI_CONTAINER_PANEL_RIGHT_CENTER);
+    gint base_pos = 0;
+    for(GtkWidget *c = gtk_widget_get_first_child(GTK_WIDGET(panel));
+        c && c != base->expander; c = gtk_widget_get_next_sibling(c))
+      base_pos++;
+    const gint position = base_pos + pos_base - pos_module + 1;
+    GtkWidget *sibling = NULL; // the widget at index `position` after removing module->expander
+    gint idx = 0;
+    for(GtkWidget *c = gtk_widget_get_first_child(GTK_WIDGET(panel));
+        c; c = gtk_widget_get_next_sibling(c))
+    {
+      if(c == module->expander) continue;
+      if(idx == position) { sibling = c; break; }
+      idx++;
+    }
+    if(sibling)
+      dt_gui_box_reorder_child_before(panel, module->expander, sibling);
+    else
+      gtk_box_reorder_child_after(panel, module->expander,
+                                  gtk_widget_get_last_child(GTK_WIDGET(panel)));
     dt_iop_gui_set_expanded(module, TRUE, FALSE);
 
     dt_iop_reload_defaults(module); // some modules like profiled
@@ -866,62 +881,46 @@ static gboolean _rename_module_key_pressed(GtkEventControllerKey *controller,
                                            GdkModifierType state,
                                            dt_iop_module_t *module);
 
-static gboolean _rename_module_key_press(GtkWidget *entry,
-                                         GdkEventKey *event,
-                                         dt_iop_module_t *module)
+// focus-out of the rename entry commits the new name; the Return/Escape
+// keys are handled by the key controller (_rename_module_key_pressed).
+// The parent guard keeps the handler idempotent: when the key controller
+// destroys the entry, the focus controller's "leave" fires with no parent
+// left and must not commit again.
+static void _rename_module_focus_out(GtkEventControllerFocus *controller,
+                                     dt_iop_module_t *module)
 {
-  gboolean ended = FALSE;
+  GtkWidget *entry = dt_gui_get_widget(controller);
+  if(!gtk_widget_get_parent(entry)) return;
 
-  if(dt_gdk_event_get_type(event) == GDK_FOCUS_CHANGE
-     || dt_gdk_event_get_keyval(event) == GDK_KEY_Return
-     || dt_gdk_event_get_keyval(event) == GDK_KEY_KP_Enter)
+  if(gtk_entry_get_text_length(GTK_ENTRY(entry)) > 0)
   {
-    if(gtk_entry_get_text_length(GTK_ENTRY(entry)) > 0)
+    // name is not empty, set new multi_name only if changed
+    // ensure we keep the built-in as-is
+
+     const gchar *name = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry)));
+     gchar *current_name = dt_util_localize_segmented_name(module->multi_name, FALSE);
+
+    if(g_strcmp0(current_name, name) != 0)
     {
-      // name is not empty, set new multi_name only if changed
-      // ensure we keep the built-in as-is
-
-       const gchar *name = gtk_entry_get_text(GTK_ENTRY(entry));
-       gchar *current_name = dt_util_localize_segmented_name(module->multi_name, FALSE);
-
-      if(g_strcmp0(current_name, name) != 0)
-      {
-        dt_iop_update_multi_name(module, name, TRUE, TRUE, TRUE);
-      }
-      g_free(current_name);
+      dt_iop_update_multi_name(module, name, TRUE, TRUE, TRUE);
     }
-    else
-    {
-      dt_iop_update_multi_name(module, "", FALSE, FALSE, TRUE);
-    }
-
-    // make sure we write history & xmp to ensure that the new module name
-    // gets recorded into the XMP and won't be lost in case of crash.
-    dt_dev_write_history(darktable.develop);
-    dt_image_synch_xmp(darktable.develop->image_storage.id);
-
-    ended = TRUE;
+    g_free(current_name);
   }
-  else if(dt_gdk_event_get_keyval(event) == GDK_KEY_Escape)
+  else
   {
-    ended = TRUE;
+    dt_iop_update_multi_name(module, "", FALSE, FALSE, TRUE);
   }
 
-  if(ended)
-  {
-    gtk_widget_show(module->instance_name);
+  // make sure we write history & xmp to ensure that the new module name
+  // gets recorded into the XMP and won't be lost in case of crash.
+  dt_dev_write_history(darktable.develop);
+  dt_image_synch_xmp(darktable.develop->image_storage.id);
 
-    g_signal_handlers_disconnect_by_func(entry,
-                                         G_CALLBACK(_rename_module_key_press),
-                                         module);
-    gtk_widget_destroy(entry);
-    dt_iop_show_hide_header_buttons(module, TRUE, FALSE); // after removing entry
-    dt_iop_gui_update_header(module);
-    dt_masks_group_update_name(module);
-    return TRUE;
-  }
-
-  return FALSE; /* event not handled */
+  gtk_widget_show(module->instance_name);
+  gtk_widget_destroy(entry);
+  dt_iop_show_hide_header_buttons(module, TRUE, FALSE); // after removing entry
+  dt_iop_gui_update_header(module);
+  dt_masks_group_update_name(module);
 }
 
 static void _rename_module_resize(GtkWidget *entry,
@@ -930,7 +929,12 @@ static void _rename_module_resize(GtkWidget *entry,
   int width = 0;
   GtkBorder padding;
 
-  pango_layout_get_pixel_size(gtk_entry_get_layout(GTK_ENTRY(entry)), &width, NULL);
+  // GTK4 removed gtk_entry_get_layout; measure the text with a layout built
+  // from the entry's pango context
+  PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(entry));
+  pango_layout_set_text(layout, gtk_editable_get_text(GTK_EDITABLE(entry)), -1);
+  pango_layout_get_pixel_size(layout, &width, NULL);
+  g_object_unref(layout);
   gtk_style_context_get_padding(gtk_widget_get_style_context (entry),
                                 gtk_widget_get_state_flags (entry),
                                 &padding);
@@ -939,18 +943,17 @@ static void _rename_module_resize(GtkWidget *entry,
 
 void dt_iop_gui_rename_module(dt_iop_module_t *module)
 {
-  GtkWidget *focused = gtk_container_get_focus_child(GTK_CONTAINER(module->header));
+  GtkWidget *focused = gtk_widget_get_focus_child(module->header);
   if(focused && GTK_IS_ENTRY(focused)) return;
 
   GtkWidget *entry = gtk_entry_new();
 
   gtk_widget_set_name(entry, "iop-panel-label");
-  gtk_entry_set_width_chars(GTK_ENTRY(entry), 0);
+  gtk_editable_set_width_chars(GTK_EDITABLE(entry), 0);
   gtk_entry_set_max_length(GTK_ENTRY(entry), sizeof(module->multi_name) - 1);
 
   gchar *name = dt_util_localize_segmented_name(module->multi_name, FALSE);
-  gtk_entry_set_text(GTK_ENTRY(entry),
-                     strcmp(module->multi_name, "0")
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(entry)), strcmp(module->multi_name, "0")
                      || module->multi_priority > 0
                      || module->multi_name_hand_edited
                        ? name
@@ -962,8 +965,9 @@ void dt_iop_gui_rename_module(dt_iop_module_t *module)
 
   gtk_widget_add_events(entry, GDK_FOCUS_CHANGE_MASK);
   dt_gui_connect_key(entry, _rename_module_key_pressed, module);
-  g_signal_connect(entry, "focus-out-event",
-                   G_CALLBACK(_rename_module_key_press), module);
+  GtkEventController *focus = gtk_event_controller_focus_new();
+  g_signal_connect(focus, "leave", G_CALLBACK(_rename_module_focus_out), module);
+  gtk_widget_add_controller(entry, focus);
   g_signal_connect(entry, "style-updated",
                    G_CALLBACK(_rename_module_resize), module);
   g_signal_connect(entry, "changed",
@@ -972,7 +976,9 @@ void dt_iop_gui_rename_module(dt_iop_module_t *module)
                         GINT_TO_POINTER(DT_ACTION_ELEMENT_SHOW));
 
   dt_iop_show_hide_header_buttons(module, FALSE, TRUE); // before adding entry
-  gtk_box_pack_start(GTK_BOX(module->header), entry, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(module->header), entry);
+  gtk_widget_set_hexpand(entry, TRUE);
+  gtk_widget_set_vexpand(entry, TRUE);
   gtk_widget_show(entry);
   gtk_widget_grab_focus(entry);
 }
@@ -1024,6 +1030,12 @@ void _get_multi_show(dt_iop_module_t *module,
 static void _gui_multiinstance_callback(GtkButton *button,
                                         dt_iop_module_t *module)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // TODO P2: GtkMenu->GtkPopoverMenu migration; deferred (the individual
+  // new/duplicate/move/delete/rename effects remain reachable via shortcuts).
+  (void)button;
+  (void)module;
+#else
   dt_iop_gui_multi_show_t multi_show;
   _get_multi_show(module, &multi_show);
 
@@ -1077,6 +1089,7 @@ static void _gui_multiinstance_callback(GtkButton *button,
   // make sure the button is deactivated now that the menu is opened
   if(button)
     dtgtk_button_set_active(DTGTK_BUTTON(button), FALSE);
+#endif
 }
 
 static void _gui_off_button_clicked(GtkGestureSingle *gesture,
@@ -1132,7 +1145,7 @@ static gboolean _rename_module_key_pressed(GtkEventControllerKey *controller,
   {
     if(gtk_entry_get_text_length(GTK_ENTRY(entry)) > 0)
     {
-      const gchar *name = gtk_entry_get_text(GTK_ENTRY(entry));
+      const gchar *name = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry)));
       gchar *current_name = dt_util_localize_segmented_name(module->multi_name, FALSE);
       if(g_strcmp0(current_name, name) != 0)
       {
@@ -1157,9 +1170,6 @@ static gboolean _rename_module_key_pressed(GtkEventControllerKey *controller,
   if(ended)
   {
     gtk_widget_show(module->instance_name);
-    g_signal_handlers_disconnect_by_func(entry,
-                                         G_CALLBACK(_rename_module_key_press),
-                                         module);
     gtk_widget_destroy(entry);
     dt_iop_show_hide_header_buttons(module, TRUE, FALSE);
     dt_iop_gui_update_header(module);
@@ -2449,7 +2459,7 @@ void dt_iop_gui_reset(dt_iop_module_t *module)
 
 // kept for direct callers from accelerators
 static gboolean _gui_reset_callback(GtkButton *button,
-                                    GdkEventButton *event,
+                                    GdkModifierType state,
                                     dt_iop_module_t *module)
 {
   // never use the callback if module is always disabled
@@ -2458,8 +2468,7 @@ static gboolean _gui_reset_callback(GtkButton *button,
 
   // Ctrl is used to apply any auto-presets to the current module
   // If Ctrl was not pressed, or no auto-presets were applied, reset the module parameters
-  if(!(event
-       && dt_modifier_is(dt_gdk_event_get_state(event), GDK_CONTROL_MASK))
+  if(!dt_modifier_is(state, GDK_CONTROL_MASK)
      || !dt_gui_presets_autoapply_for_module(module, NULL))
   {
     // if a drawn mask is set, remove it from the list
@@ -2919,19 +2928,21 @@ static void _header_size_callback(GtkWidget *widget,
 {
   gchar *config = dt_conf_get_string("darkroom/ui/hide_header_buttons");
 
-  GList *children = gtk_container_get_children(GTK_CONTAINER(header));
-
   const gint panel_trigger_width = 250;
 
-  GList *button = children;
+  // children are walked right-to-left (GTK3 iterated the container's child
+  // list from the end); GtkBox keeps the append order, so the rightmost
+  // child is the last one in the widget hierarchy.  The size reference is
+  // the first (leftmost) child, matching GTK3's `children` head.
+  GtkWidget *button = gtk_widget_get_first_child(header);
   GtkRequisition button_size;
-  gtk_widget_show(GTK_WIDGET(button->data));
-  gtk_widget_get_preferred_size(GTK_WIDGET(button->data), &button_size, NULL);
+  gtk_widget_show(button);
+  gtk_widget_get_preferred_size(button, &button_size, NULL);
 
   int num_buttons = 0;
-  for(button = g_list_last(children);
-      button && GTK_IS_BUTTON(button->data);
-      button = g_list_previous(button)) num_buttons++;
+  for(button = gtk_widget_get_last_child(header);
+      button && GTK_IS_BUTTON(button);
+      button = gtk_widget_get_prev_sibling(button)) num_buttons++;
 
   gboolean hide_all = (allocation->width == 1);
   int num_to_unhide = (allocation->width - 2) / button_size.width;
@@ -2981,29 +2992,26 @@ static void _header_size_callback(GtkWidget *widget,
     }
   }
 
-  GList *prev_button = NULL;
+  GtkWidget *prev_button = NULL;
 
-  for(button = g_list_last(children);
-      button && GTK_IS_BUTTON(button->data);
-      button = g_list_previous(button))
+  for(button = gtk_widget_get_last_child(header);
+      button && GTK_IS_BUTTON(button);
+      button = gtk_widget_get_prev_sibling(button))
   {
-    GtkWidget *b = GTK_WIDGET(button->data);
-
-    if(!gtk_widget_get_visible(b))
+    if(!gtk_widget_get_visible(button))
     {
       if(num_to_unhide == 0) break;
       --num_to_unhide;
     }
 
-    gtk_widget_set_visible(b, !hide_all);
-    gtk_widget_set_opacity(b, opacity_others);
+    gtk_widget_set_visible(button, !hide_all);
+    gtk_widget_set_opacity(button, opacity_others);
 
     prev_button = button;
   }
   if(prev_button && num_to_unhide == 0)
-    gtk_widget_set_opacity(GTK_WIDGET(prev_button->data), opacity_leftmost);
+    gtk_widget_set_opacity(prev_button, opacity_leftmost);
 
-  g_list_free(children);
   g_free(config);
 
   dt_gui_widget_reallocate_now(header);
@@ -3015,7 +3023,7 @@ gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
 {
   // check if Entry widget for module name edit exists
   GtkWidget *header = module->header;
-  GtkWidget *focused = gtk_container_get_focus_child(GTK_CONTAINER(header));
+  GtkWidget *focused = gtk_widget_get_focus_child(header);
   if(focused && GTK_IS_ENTRY(focused)) return TRUE;
 
   const char *config = dt_conf_get_string_const("darkroom/ui/hide_header_buttons");
@@ -3038,38 +3046,36 @@ gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
 
   const gboolean disabled = !module->default_enabled && module->hide_enable_button;
 
-  GList *children = gtk_container_get_children(GTK_CONTAINER(header));
-
-  GList *button;
-  for(button = g_list_last(children);
-      button && GTK_IS_BUTTON(button->data);
-      button = g_list_previous(button))
+  GtkWidget *button;
+  for(button = gtk_widget_get_last_child(header);
+      button && GTK_IS_BUTTON(button);
+      button = gtk_widget_get_prev_sibling(button))
   {
-    gtk_widget_set_no_show_all(GTK_WIDGET(button->data), TRUE);
-    gtk_widget_set_visible(GTK_WIDGET(button->data), show_buttons && !always_hide && !disabled);
-    gtk_widget_set_opacity(GTK_WIDGET(button->data), opacity);
+    gtk_widget_set_no_show_all(button, TRUE);
+    gtk_widget_set_visible(button, show_buttons && !always_hide && !disabled);
+    gtk_widget_set_opacity(button, opacity);
   }
-  if(GTK_IS_DRAWING_AREA(button->data))
+  if(GTK_IS_DRAWING_AREA(button))
   {
     // temporarily or permanently (de)activate width trigger widget
     if(dynamic)
-      gtk_widget_set_visible(GTK_WIDGET(button->data), !show_buttons && !always_hide);
+      gtk_widget_set_visible(button, !show_buttons && !always_hide);
     else
-      gtk_widget_destroy(GTK_WIDGET(button->data));
+      gtk_widget_destroy(button);
   }
   else
   {
     if(dynamic)
     {
       GtkWidget *space = gtk_drawing_area_new();
-      gtk_box_pack_end(GTK_BOX(header), space, TRUE, TRUE, 0);
+      gtk_box_append(GTK_BOX(header), space);
+      gtk_widget_set_hexpand(space, TRUE);
+      gtk_widget_set_vexpand(space, TRUE);
       gtk_widget_show(space);
       g_signal_connect(G_OBJECT(space), "size-allocate",
                        G_CALLBACK(_header_size_callback), header);
     }
   }
-
-  g_list_free(children);
 
   if(dynamic && !show_buttons && !always_hide)
   {
@@ -3174,31 +3180,21 @@ void dt_iop_add_remove_mask_indicator(dt_iop_module_t *module, gboolean add)
                      G_CALLBACK(_mask_indicator_tooltip), module);
     gtk_widget_set_has_tooltip(module->mask_indicator, TRUE);
     gtk_widget_set_sensitive(module->mask_indicator, module->enabled);
-    gtk_box_pack_end(GTK_BOX(module->header), module->mask_indicator, FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(module->header), module->mask_indicator);
 
     // in dynamic modes, we need to put the mask indicator after the drawing area
-    GList *children = gtk_container_get_children(GTK_CONTAINER(module->header));
-    GList *child;
+    GtkWidget *child = gtk_widget_get_last_child(GTK_WIDGET(module->header));
+    for(; child && GTK_IS_BUTTON(child); child = gtk_widget_get_prev_sibling(child));
 
-    for(child = g_list_last(children);
-        child && GTK_IS_BUTTON(child->data);
-        child = g_list_previous(child));
-
-    if(GTK_IS_DRAWING_AREA(child->data))
-    {
-      GValue position = G_VALUE_INIT;
-      g_value_init (&position, G_TYPE_INT);
-      gtk_container_child_get_property(GTK_CONTAINER(module->header),
-                                       child->data ,"position", &position);
-      gtk_box_reorder_child(GTK_BOX(module->header), module->mask_indicator,
-                            g_value_get_int(&position));
-    }
-    g_list_free(children);
+    if(child && GTK_IS_DRAWING_AREA(child))
+      dt_gui_box_reorder_child_before(GTK_BOX(module->header),
+                                      module->mask_indicator, child);
 
     dt_iop_show_hide_header_buttons(module, FALSE, FALSE);
   }
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _iop_tooltip_reposition(GtkWidget *widget,
                                     GdkRectangle *allocation,
                                     gpointer user_data)
@@ -3212,6 +3208,7 @@ static void _iop_tooltip_reposition(GtkWidget *widget,
   gdk_window_move_to_rect(window, allocation, GDK_GRAVITY_SOUTH, GDK_GRAVITY_NORTH,
                           GDK_ANCHOR_FLIP_Y | GDK_ANCHOR_SLIDE_X, 0, 0);
 }
+#endif
 
 gboolean _iop_tooltip_callback(GtkWidget *widget,
                                const gint x,
@@ -3236,7 +3233,7 @@ gboolean _iop_tooltip_callback(GtkWidget *widget,
   gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
   // if there is no more description, do not add a separator
   if(des[1]) dt_gui_add_class(label, "dt_section_label");
-  gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(vbox), label);
 
   const char *icon_purpose = "⟳";
   const char *icon_input   = "⇥";
@@ -3268,10 +3265,12 @@ gboolean _iop_tooltip_callback(GtkWidget *widget,
     }
   }
 
-  gtk_box_pack_start(GTK_BOX(vbox), grid, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(vbox), grid);
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(vbox), "size-allocate",
                    G_CALLBACK(_iop_tooltip_reposition), module->header);
+#endif
 
   return dt_shortcut_tooltip_callback(widget, x, y, keyboard_mode, tooltip, vbox);
 }
@@ -3298,7 +3297,7 @@ GtkWidget *dt_iop_gui_header_button(dt_iop_module_t *module,
           .toggled_data = module,
         });
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), module->enabled);
-    gtk_box_pack_start(GTK_BOX(header), button, FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(header), button);
   }
   else
   {
@@ -3314,7 +3313,7 @@ GtkWidget *dt_iop_gui_header_button(dt_iop_module_t *module,
                                      | GTK_EVENT_CONTROLLER_SCROLL_DISCRETE,
                             _presets_scrolled, module);
     }
-    gtk_box_pack_end(GTK_BOX(header), button, FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(header), button);
   }
   dt_gui_connect_motion(button, NULL, _header_enter_notify_callback, NULL,
                         GINT_TO_POINTER(element));
@@ -3346,6 +3345,7 @@ GtkWidget *dt_iop_gui_header_button(dt_iop_module_t *module,
   return button;
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _on_drag_motion(GtkWidget *widget,
                                 GdkDragContext *dc,
                                 const gint x,
@@ -3430,6 +3430,7 @@ static gboolean _on_drag_drop(GtkWidget *widget,
 {
   return _on_drag_motion(widget, dc, DND_DROP, y, time, module);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void dt_iop_gui_set_expander(dt_iop_module_t *module)
 {
@@ -3446,12 +3447,14 @@ void dt_iop_gui_set_expander(dt_iop_module_t *module)
 
   dt_gui_add_class(pluginui_frame, "dt_plugin_ui");
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
   static const GtkTargetEntry target_list[] = { { "iop", GTK_TARGET_SAME_APP, DND_TARGET_IOP } };
 
   gtk_drag_source_set(header_evb, GDK_BUTTON1_MASK, target_list, 1, GDK_ACTION_COPY);
   gtk_drag_dest_set(expander, GTK_DEST_DEFAULT_DROP | GTK_DEST_DEFAULT_HIGHLIGHT, target_list, 1, GDK_ACTION_COPY);
   g_signal_connect(expander, "drag-motion", G_CALLBACK(_on_drag_motion), module);
   g_signal_connect(expander, "drag-drop", G_CALLBACK(_on_drag_drop), module);
+#endif
 
   module->header = header;
 
@@ -3485,14 +3488,14 @@ void dt_iop_gui_set_expander(dt_iop_module_t *module)
   gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
 
   /* add module label & instance name */
-  GtkWidget *lab = gtk_event_box_new();
+  GtkWidget *lab = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   module->label = gtk_label_new(module->name());
   gtk_widget_set_name(module->label, "iop-panel-label");
   gtk_label_set_ellipsize(GTK_LABEL(module->label), PANGO_ELLIPSIZE_END);
   gtk_widget_set_valign(module->label, GTK_ALIGN_BASELINE);
   g_object_set(G_OBJECT(module->label), "xalign", 0.0, (gchar *)0);
 
-  gtk_container_add(GTK_CONTAINER(lab), module->label);
+  gtk_box_append(GTK_BOX(lab), module->label);
   gtk_widget_set_valign(lab, GTK_ALIGN_BASELINE);
   gtk_widget_set_halign(lab, GTK_ALIGN_START);
 
@@ -3546,9 +3549,9 @@ void dt_iop_gui_set_expander(dt_iop_module_t *module)
   dt_iop_gui_set_enable_button_icon(module->off, module);
   gtk_widget_set_sensitive(module->off, !module->hide_enable_button);
 
-  gtk_box_pack_start(GTK_BOX(header), icon, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(header), lab, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(header), module->instance_name, FALSE, FALSE, 0);
+  gtk_box_append(GTK_BOX(header), icon);
+  gtk_box_append(GTK_BOX(header), lab);
+  gtk_box_append(GTK_BOX(header), module->instance_name);
 
   dt_gui_add_help_link(lab, module->op);
   dt_gui_add_help_link(expander, module->op);
@@ -3558,16 +3561,20 @@ void dt_iop_gui_set_expander(dt_iop_module_t *module)
   if(module->deprecated_msg())
   {
     GtkWidget *lb = gtk_label_new(module->deprecated_msg());
-    gtk_label_set_line_wrap(GTK_LABEL(lb), TRUE);
+    gtk_label_set_wrap(GTK_LABEL(lb), TRUE);
     gtk_label_set_max_width_chars(GTK_LABEL(lb), 0); // don't propagate natural width
     gtk_label_set_xalign(GTK_LABEL(lb), 0.0);
     dt_gui_add_class(lb, "dt_warning");
-    gtk_box_pack_start(GTK_BOX(iopw), lb, TRUE, TRUE, 0);
+    gtk_box_append(GTK_BOX(iopw), lb);
+    gtk_widget_set_hexpand(lb, TRUE);
+    gtk_widget_set_vexpand(lb, TRUE);
     gtk_widget_show(lb);
   }
 
   /* add the blending ui if supported */
-  gtk_box_pack_start(GTK_BOX(iopw), module->widget, TRUE, TRUE, 0);
+  gtk_box_append(GTK_BOX(iopw), module->widget);
+  gtk_widget_set_hexpand(module->widget, TRUE);
+  gtk_widget_set_vexpand(module->widget, TRUE);
   dt_guides_init_module_widget(iopw, module);
   dt_iop_gui_init_blending(iopw, module);
   dt_gui_add_class(module->widget, "dt_plugin_ui_main");
@@ -4354,10 +4361,10 @@ static float _action_process(gpointer target,
       break;
     case DT_ACTION_ELEMENT_RESET:
       {
-        GdkEventButton event = { .state = (effect == DT_ACTION_EFFECT_ACTIVATE_CTRL
-                                           ? GDK_CONTROL_MASK
-                                           : 0) };
-        _gui_reset_callback(NULL, &event, module);
+        _gui_reset_callback(NULL,
+                            effect == DT_ACTION_EFFECT_ACTIVATE_CTRL
+                              ? GDK_CONTROL_MASK : 0,
+                            module);
       }
       break;
     case DT_ACTION_ELEMENT_PRESETS:

@@ -123,7 +123,13 @@ static void load_button_clicked(GtkWidget *widget, dt_lib_module_t *self)
     {
       char pathname[PATH_MAX] = { 0 };
       dt_image_film_roll_directory(img, pathname, sizeof(pathname));
+#if GTK_CHECK_VERSION(4, 0, 0)
+      GFile *folder = g_file_new_for_path(pathname);
+      gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), folder, NULL);
+      g_object_unref(folder);
+#else
       gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(filechooser), pathname);
+#endif
     }
     else
     {
@@ -153,9 +159,11 @@ static void load_button_clicked(GtkWidget *widget, dt_lib_module_t *self)
   gtk_file_filter_set_name(filter, _("all files"));
   gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(filechooser), filter);
 
-  if(gtk_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
+  if(dt_gui_native_dialog_run(GTK_NATIVE_DIALOG(filechooser)) == GTK_RESPONSE_ACCEPT)
   {
-    gchar *dtfilename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(filechooser));
+    GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(filechooser));
+    gchar *dtfilename = file ? g_file_get_path(file) : NULL;
+    if(file) g_object_unref(file);
     if(dt_history_load_and_apply_on_list(dtfilename, imgs) != 0)
     {
       GtkWidget *dialog

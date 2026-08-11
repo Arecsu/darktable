@@ -177,7 +177,9 @@ static const char *_labels[] = {
 };
 
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static gboolean _dndactive = FALSE;
+#endif
 
 const char *name(dt_lib_module_t *self)
 {
@@ -1426,6 +1428,7 @@ static void _save_preferences(dt_lib_module_t *self)
   g_free(pref);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _select_toggled_callback(GtkCellRendererToggle *cell_renderer,
                                      gchar *path_str,
                                      gpointer user_data)
@@ -1442,7 +1445,9 @@ static void _select_toggled_callback(GtkCellRendererToggle *cell_renderer,
 
   gtk_tree_path_free(path);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _drag_data_inserted(GtkTreeModel *tree_model,
                                 GtkTreePath *path,
                                 GtkTreeIter *iter,
@@ -1450,7 +1455,9 @@ static void _drag_data_inserted(GtkTreeModel *tree_model,
 {
   _dndactive = TRUE;
 }
+#endif
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 void _menuitem_preferences(GtkMenuItem *menuitem,
                            dt_lib_module_t *self)
 {
@@ -1495,7 +1502,9 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
                 "\nuntick to hide metadata which are not of interest for you"
                 "\nif different settings are needed, use presets"));
   renderer = gtk_cell_renderer_toggle_new();
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(renderer, "toggled", G_CALLBACK(_select_toggled_callback), store);
+#endif
   column = gtk_tree_view_column_new_with_attributes(_("visible"), renderer,
                                                     "active",
                                                     DT_METADATA_PREF_COL_VISIBLE, NULL);
@@ -1506,7 +1515,9 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
 
   // drag & drop
   gtk_tree_view_set_reorderable(GTK_TREE_VIEW(view), TRUE);
+#if !GTK_CHECK_VERSION(4, 0, 0)
   g_signal_connect(G_OBJECT(model), "row-inserted", G_CALLBACK(_drag_data_inserted), NULL);
+#endif
   GtkWidget *w = dt_gui_scroll_wrap(view);
   gtk_widget_set_size_request(w, -1, DT_PIXEL_APPLY_DPI(600));
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(w),
@@ -1568,13 +1579,16 @@ void _menuitem_preferences(GtkMenuItem *menuitem,
   }
   gtk_widget_destroy(dialog);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void set_preferences(void *menu,
                      dt_lib_module_t *self)
 {
+#if !GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
   g_signal_connect(G_OBJECT(mi), "activate", G_CALLBACK(_menuitem_preferences), self);
   gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+#endif
 }
 
 void *get_params(dt_lib_module_t *self,

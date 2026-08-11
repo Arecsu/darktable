@@ -20,6 +20,12 @@
 #include "common/darktable.h"
 #include "gui/gtk.h"
 
+/* GtkCellRenderer is removed from GTK4's installed headers (GtkTreeView and
+ * friends went with it); the only consumer is preferences_ai.c's GtkTreeView,
+ * which needs the GtkTreeView->GtkColumnView migration (TODO P2).  Guarded
+ * GTK3-only like the GtkMenu subsystem. */
+#if !GTK_CHECK_VERSION(4, 0, 0)
+
 G_DEFINE_TYPE(GtkDarktablePaintCell, dtgtk_paint_cell, GTK_TYPE_CELL_RENDERER)
 
 // icon edge length, derived from the widget's line height
@@ -114,6 +120,8 @@ GtkCellRenderer *dtgtk_paint_cell_new(DTGTKCairoPaintIconFunc paint,
   cell->paint_data = paint_data;
   return GTK_CELL_RENDERER(cell);
 }
+
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

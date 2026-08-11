@@ -703,12 +703,12 @@ static void _settings_update_visibility(const _guides_settings_t *gw)
 
   if((guide && guide->widget))
   {
-    GtkWidget *w = gtk_bin_get_child(GTK_BIN(gw->g_widgets));
-    if(w) gtk_widget_destroy(w);
+    GtkWidget *w = gtk_widget_get_first_child(gw->g_widgets);
+    if(w) gtk_box_remove(GTK_BOX(gw->g_widgets), w);
 
     GtkWidget *extra = guide->widget(NULL, guide->user_data);
-    gtk_container_add(GTK_CONTAINER(gw->g_widgets), extra);
-    gtk_widget_show_all(extra);
+    gtk_box_append(GTK_BOX(gw->g_widgets), extra);
+    gtk_widget_set_visible(extra, TRUE);
   }
 }
 
@@ -814,7 +814,8 @@ static void _settings_contrast_changed(GtkWidget *slider,
 GtkWidget *dt_guides_popover(dt_view_t *self,
                              GtkWidget *button)
 {
-  GtkWidget *pop = gtk_popover_new(button);
+  GtkWidget *pop = gtk_popover_new();
+  gtk_widget_set_parent(pop, button);
 
   // create a new struct for all the widgets
   _guides_settings_t *gw = g_malloc0(sizeof(_guides_settings_t));
@@ -825,8 +826,7 @@ GtkWidget *dt_guides_popover(dt_view_t *self,
   dt_gui_add_class(lb, "dt_section_label");
 
   // global guides section
-  gw->g_widgets = gtk_event_box_new();
-  gtk_widget_set_no_show_all(gw->g_widgets, TRUE);
+  gw->g_widgets = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
   DT_BAUHAUS_COMBOBOX_NEW_FULL(gw->g_flip, self,
                                N_("guide lines"), N_("flip"), _("flip guides"),
@@ -835,7 +835,6 @@ GtkWidget *dt_guides_popover(dt_view_t *self,
                                N_("horizontally"),
                                N_("vertically"),
                                N_("both"));
-  gtk_widget_set_no_show_all(gw->g_flip, TRUE);
 
   darktable.view_manager->guides =
     dt_bauhaus_combobox_new_full(DT_ACTION(self), N_("guide lines"), N_("type"),
@@ -872,9 +871,9 @@ GtkWidget *dt_guides_popover(dt_view_t *self,
   GtkWidget *vbox = dt_gui_vbox(lb, gw->g_widgets, gw->g_flip, darktable.view_manager->guides,
                                 gtk_separator_new(GTK_ORIENTATION_HORIZONTAL),
                                 darktable.view_manager->guides_colors, contrast);
-  gtk_container_add(GTK_CONTAINER(pop), vbox);
+  gtk_popover_set_child(GTK_POPOVER(pop), vbox);
 
-  gtk_widget_show_all(vbox);
+  gtk_widget_set_visible(vbox, TRUE);
 
   return pop;
 }
@@ -964,6 +963,7 @@ void dt_guides_draw(cairo_t *cr,
   cairo_restore(cr);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _settings_autoshow_change(GtkWidget *mi,
                                       dt_iop_module_t *module)
 {
@@ -977,10 +977,16 @@ static void _settings_autoshow_change(GtkWidget *mi,
   g_free(key);
   dt_control_queue_redraw_center();
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 void dt_guides_add_module_menuitem(void *menu,
                                    dt_iop_module_t *module)
 {
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // TODO P2: GtkMenu->GtkPopoverMenu migration; deferred.
+  (void)menu;
+  (void)module;
+#else
   GtkWidget *mi = gtk_check_menu_item_new_with_label(_("show guides"));
   gchar *key = _conf_get_path(module->op, "autoshow", NULL);
   gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(mi), dt_conf_get_bool(key));
@@ -988,6 +994,7 @@ void dt_guides_add_module_menuitem(void *menu,
   g_signal_connect(G_OBJECT(mi), "activate",
                    G_CALLBACK(_settings_autoshow_change), module);
   gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+#endif
 }
 
 static void free_guide(void *data)
@@ -1016,7 +1023,15 @@ static void _settings_autoshow_menu(GtkWidget *button,
                                     dt_iop_module_t *module)
 {
   GtkWidget *popover = darktable.view_manager->guides_popover;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4 popovers are anchored to their parent widget (set_relative_to is
+  // gone); reparent the shared popover to the opener.  The extra ref from
+  // darkroom.c keeps it alive when a module header is destroyed.
+  gtk_widget_unparent(popover);
+  gtk_widget_set_parent(popover, button);
+#else
   gtk_popover_set_relative_to(GTK_POPOVER(popover), button);
+#endif
 
   // the icon is this widget's quad, so point at that rather than letting the
   // popup aim at the middle of the whole checkbox
@@ -1028,7 +1043,7 @@ static void _settings_autoshow_menu(GtkWidget *button,
 
   dt_guides_update_popover_values();
 
-  gtk_widget_show_all(popover);
+  gtk_widget_set_visible(popover, TRUE);
 }
 
 void dt_guides_init_module_widget(GtkWidget *iopw,
@@ -1064,7 +1079,6 @@ void dt_guides_init_module_widget(GtkWidget *iopw,
        "and will impact any module that shows guide overlays"));
 
   // we hide it if the preference is set to "off"
-  gtk_widget_set_no_show_all(cb, TRUE);
   gtk_widget_show(cb);
 
   dt_gui_box_add(iopw, cb);

@@ -593,7 +593,7 @@ void gui_init(dt_iop_module_t *self)
 
   // prepare the modes widgets stack
   g->mode_stack = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(g->mode_stack), FALSE);
+  gtk_stack_set_vhomogeneous(GTK_STACK(g->mode_stack), FALSE);
 
   /**** GAMMA MODE ***/
 

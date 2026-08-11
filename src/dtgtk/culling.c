@@ -46,7 +46,7 @@ static inline int _get_max_in_memory_images()
 static void _list_remove_thumb(gpointer user_data)
 {
   dt_thumbnail_t *thumb = (dt_thumbnail_t *)user_data;
-  gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(thumb->w_main)), thumb->w_main);
+  gtk_widget_unparent(thumb->w_main);
   dt_thumbnail_destroy(thumb);
 }
 
@@ -150,11 +150,17 @@ static void _thumbs_refocus(dt_culling_t *table)
   if(table->mouse_inside)
   {
     // the exact position of the mouse
+    // GTK4: pan_x/pan_y are surface-relative (dt_gui_get_event_coords);
+    // subtract the widget's origin in surface coords to get widget
+    // coordinates, mirroring the GTK3 window-origin math.
     int x = -1;
     int y = -1;
-    gdk_window_get_origin(gtk_widget_get_window(table->widget), &x, &y);
-    x = table->pan_x - x;
-    y = table->pan_y - y;
+    graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+    if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+    {
+      x = round(table->pan_x - origin.x);
+      y = round(table->pan_y - origin.y);
+    }
 
     // which thumb is under the mouse ?
     for(GList *l = table->list; l; l = g_list_next(l))
@@ -363,10 +369,10 @@ static gboolean _zoom_and_shift(dt_thumbnail_t *th,
   int posx = x_offset;
   int posy = y_offset;
 
-  const int iw = gtk_widget_get_allocated_width(th->w_image);
-  const int ih = gtk_widget_get_allocated_height(th->w_image);
-  const int box_w = gtk_widget_get_allocated_width(th->w_image_box);
-  const int box_h = gtk_widget_get_allocated_height(th->w_image_box);
+  const int iw = gtk_widget_get_width(th->w_image);
+  const int ih = gtk_widget_get_height(th->w_image);
+  const int box_w = gtk_widget_get_width(th->w_image_box);
+  const int box_h = gtk_widget_get_height(th->w_image_box);
 
   dt_print(DT_DEBUG_INPUT,
            "[culling _zoom_and_shift] offset=(%d,%d) iw=%d ih=%d box=(%d,%d)"
@@ -668,7 +674,7 @@ static void _event_scroll(GtkEventControllerScroll *controller,
 
   GdkDevice *device = dt_gdk_event_get_source_device(event);
   const GdkScrollDirection direction = dt_gdk_event_get_scroll_direction(event);
-  const gboolean is_stop = gdk_event_is_scroll_stop_event(event);
+  const gboolean is_stop = dt_gdk_event_is_scroll_stop(event);
   const GdkModifierType state = dt_gdk_event_get_state(event);
   const gdouble x_root = dt_gdk_event_get_root_x(event);
   const gdouble y_root = dt_gdk_event_get_root_y(event);
@@ -717,16 +723,17 @@ static void _event_scroll(GtkEventControllerScroll *controller,
        && (ddx != 0.0 || ddy != 0.0))
     {
       const float zoom_delta = dt_gui_scroll_zoom_delta(event, ddx, ddy);
-      // convert screen to culling coordinates
-      int ox = 0, oy = 0;
-      GdkWindow *win = gtk_widget_get_window(table->widget);
-      if(win)
-        gdk_window_get_origin(win, &ox, &oy);
-      const float x_culling = x_root - ox;
-      const float y_culling = y_root - oy;
-      dt_print(DT_DEBUG_INPUT,
-               "[culling scroll] ctrl+smooth zoom_delta=%.4f x_culling=%.1f y_culling=%.1f",
-               zoom_delta, x_culling, y_culling);
+      // convert surface to culling coordinates (GTK3 used the window origin)
+      float x_culling = x_root, y_culling = y_root;
+      graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+      if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+      {
+        x_culling = x_root - origin.x;
+        y_culling = y_root - origin.y;
+        dt_print(DT_DEBUG_INPUT,
+                 "[culling scroll] ctrl+smooth zoom_delta=%.4f x_culling=%.1f y_culling=%.1f",
+                 zoom_delta, x_culling, y_culling);
+      }
       if(fabsf(zoom_delta) > 0.001f)
         _thumbs_zoom_add(table, zoom_delta, x_culling, y_culling, state, TRUE);
     }
@@ -788,13 +795,14 @@ static void _event_scroll(GtkEventControllerScroll *controller,
     {
       // zooming: see dt_gui_scroll_zoom_delta() for the direction convention
       const float zoom_delta = dt_gui_scroll_zoom_delta(scroll_event, delta_x, delta_y);
-      // convert screen to culling coordinates
-      int ox = 0, oy = 0;
-      GdkWindow *win = gtk_widget_get_window(table->widget);
-      if(win)
-        gdk_window_get_origin(win, &ox, &oy);
-      const float x_culling = x_root - ox;
-      const float y_culling = y_root - oy;
+      // convert surface to culling coordinates (GTK3 used the window origin)
+      float x_culling = x_root, y_culling = y_root;
+      graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+      if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+      {
+        x_culling = x_root - origin.x;
+        y_culling = y_root - origin.y;
+      }
       dt_print(DT_DEBUG_INPUT,
                "[culling scroll] ctrl+scroll zoom_delta=%.2f x_culling=%.1f y_culling=%.1f",
                zoom_delta, x_culling, y_culling);
@@ -822,14 +830,14 @@ static gboolean _event_draw(GtkWidget *widget,
                             cairo_t *cr,
                             gpointer user_data)
 {
-  if(!GTK_IS_CONTAINER(gtk_widget_get_parent(widget))) return TRUE;
+  if(!gtk_widget_get_parent(widget)) return TRUE;
 
   // we render the background (can be visible if before first image /
   // after last image)
   GtkStyleContext *context = gtk_widget_get_style_context(widget);
   gtk_render_background(context, cr, 0, 0,
-                        gtk_widget_get_allocated_width(widget),
-                        gtk_widget_get_allocated_height(widget));
+                        gtk_widget_get_width(widget),
+                        gtk_widget_get_height(widget));
 
   // but we don't really want to draw something, this is just to know
   // when the widget is really ready
@@ -1268,7 +1276,7 @@ dt_culling_t *dt_culling_new(const dt_culling_mode_t mode)
   dt_culling_t *table = calloc(1, sizeof(dt_culling_t));
   table->mode = mode;
   table->zoom_ratio = IMG_TO_FIT;
-  table->widget = gtk_layout_new(NULL, NULL);
+  table->widget = gtk_fixed_new();
   table->selection = NO_IMGID;
   dt_gui_add_class(table->widget, "dt_fullview");
   dt_act_on_set_class(table->widget);
@@ -2227,13 +2235,13 @@ void dt_culling_full_redraw(dt_culling_t *table,
       gtk_widget_set_margin_top(thumb->w_image_box, old_margin_y);
       // and we resize the thumb
       dt_thumbnail_resize(thumb, thumb->width, thumb->height, FALSE, table->zoom_ratio);
-      gtk_layout_put(GTK_LAYOUT(table->widget), thumb->w_main, thumb->x, thumb->y);
+      gtk_fixed_put(GTK_FIXED(table->widget), thumb->w_main, thumb->x, thumb->y);
       thumb->zoomx = old_zx;
       thumb->zoomy = old_zy;
     }
     else
     {
-      gtk_layout_move(GTK_LAYOUT(table->widget), thumb->w_main, thumb->x, thumb->y);
+      gtk_fixed_move(GTK_FIXED(table->widget), thumb->w_main, thumb->x, thumb->y);
       // and we resize the thumb
       const float zoom_ratio = thumb->zoom_100 > 1
         ? thumb->zoom / thumb->zoom_100
@@ -2364,8 +2372,8 @@ void dt_culling_zoom_max(dt_culling_t *table)
   if(table->mode == DT_CULLING_MODE_PREVIEW && table->list)
   {
     const dt_thumbnail_t *th = table->list->data;
-    x = gtk_widget_get_allocated_width(th->w_image_box) / 2.0;
-    y = gtk_widget_get_allocated_height(th->w_image_box) / 2.0;
+    x = gtk_widget_get_width(th->w_image_box) / 2.0;
+    y = gtk_widget_get_height(th->w_image_box) / 2.0;
   }
   _thumbs_zoom_add(table, ZOOM_MAX, x, y, 0, FALSE);
 }
@@ -2387,12 +2395,15 @@ gboolean dt_culling_zoom_add(dt_culling_t *table,
 {
   if(!table) return FALSE;
   // Convert root (screen-absolute) coords to culling-widget-local, matching
-  // the same conversion done in the scroll handler for e->x_root / e->y_root.
-  int ox = 0, oy = 0;
-  GdkWindow *win = gtk_widget_get_window(table->widget);
-  if(win) gdk_window_get_origin(win, &ox, &oy);
-  const float x_culling = x_root - ox;
-  const float y_culling = y_root - oy;
+  // the same conversion done in the scroll handler for e->x_root / e->y_root
+  // (GTK4's "root" coords are surface-relative; GTK3 used the window origin).
+  float x_culling = x_root, y_culling = y_root;
+  graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+  if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+  {
+    x_culling = x_root - origin.x;
+    y_culling = y_root - origin.y;
+  }
   return _thumbs_zoom_add(table, zoom_delta, x_culling, y_culling, state, TRUE);
 }
 

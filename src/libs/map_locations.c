@@ -468,7 +468,7 @@ static void _name_editing_done(GtkCellEditable *editable, dt_lib_module_t *self)
   dt_lib_map_locations_t *d = self->data;
   gboolean canceled = TRUE;
   g_object_get(editable, "editing-canceled", &canceled, NULL);
-  const gchar *name = gtk_entry_get_text(GTK_ENTRY(editable));
+  const gchar *name = gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(editable)));
   const gboolean reset = name[0] ? FALSE : TRUE;
   GtkTreeIter iter;
   GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(d->view));
@@ -618,7 +618,7 @@ static void _name_start_editing(GtkCellRenderer *renderer, GtkCellEditable *edit
     {
       char *name = NULL;
       gtk_tree_model_get(model, &iter, DT_MAP_LOCATION_COL_TAG, &name, -1);
-      gtk_entry_set_text(GTK_ENTRY(editable), name);
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(editable)), name);
       g_free(name);
     }
     gtk_tree_path_free(new_path);

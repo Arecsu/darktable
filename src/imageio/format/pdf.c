@@ -515,12 +515,12 @@ static void _set_paper_size(dt_imageio_module_format_t *self, const char *text)
 
 static void title_changed_callback(GtkWidget *widget, gpointer user_data)
 {
-  dt_conf_set_string("plugins/imageio/format/pdf/title", gtk_entry_get_text(GTK_ENTRY(widget)));
+  dt_conf_set_string("plugins/imageio/format/pdf/title", gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(widget))));
 }
 
 static void border_changed_callback(GtkWidget *widget, gpointer user_data)
 {
-  dt_conf_set_string("plugins/imageio/format/pdf/border", gtk_entry_get_text(GTK_ENTRY(widget)));
+  dt_conf_set_string("plugins/imageio/format/pdf/border", gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(widget))));
 }
 
 static void size_toggle_callback(GtkWidget *widget, gpointer user_data)
@@ -804,8 +804,8 @@ int set_params(dt_imageio_module_format_t *self, const void *params, const int s
       dt_bauhaus_combobox_set(g->bpp, i);
   }
 
-  gtk_entry_set_text(g->title, d->params.title);
-  gtk_entry_set_text(g->border, d->params.border);
+  gtk_editable_set_text(GTK_EDITABLE(g->title), d->params.title);
+  gtk_editable_set_text(GTK_EDITABLE(g->border), d->params.border);
   dt_bauhaus_combobox_set(g->compression, d->params.compression);
   gtk_spin_button_set_value(g->dpi, d->params.dpi);
   dt_bauhaus_combobox_set(g->icc, d->params.icc);

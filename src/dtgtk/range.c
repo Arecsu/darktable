@@ -33,6 +33,7 @@ G_DEFINE_TYPE(GtkDarktableRangeSelect, dtgtk_range_select, GTK_TYPE_WIDGET);
 typedef struct _range_date_popup
 {
   GtkWidget *popup;
+  GtkWidget *opener; // the entry/band that opened the popup (GTK3's popover default-widget)
 
   GtkWidget *type;
 
@@ -521,7 +522,7 @@ static void _popup_date_update_widget_visibility(GtkDarktableRangeSelect *range)
   _range_date_popup *pop = range->date_popup;
   const int type = dt_bauhaus_combobox_get(pop->type);
   // first, we only allow fixed date for band right click
-  if(gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->band && type != 0)
+  if(pop->opener == range->band && type != 0)
   {
     dt_bauhaus_combobox_set(pop->type, 0);
     return;
@@ -530,7 +531,7 @@ static void _popup_date_update_widget_visibility(GtkDarktableRangeSelect *range)
   if(type == 1)
   {
     // set the label
-    if(gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->entry_min)
+    if(pop->opener == range->entry_min)
     {
       gtk_label_set_text(GTK_LABEL(pop->relative_label), _("date-time interval to subtract from the max value"));
     }
@@ -544,7 +545,7 @@ static void _popup_date_update_widget_visibility(GtkDarktableRangeSelect *range)
   gtk_widget_set_visible(pop->calendar, type == 0);
   gtk_widget_set_visible(pop->relative_label, type == 1);
   gtk_widget_set_visible(pop->relative_date_box, type == 1);
-  gtk_widget_set_visible(pop->now_btn, gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->entry_max);
+  gtk_widget_set_visible(pop->now_btn, pop->opener == range->entry_max);
 }
 
 static void _popup_date_update(GtkDarktableRangeSelect *range, GtkWidget *w)
@@ -552,7 +553,7 @@ static void _popup_date_update(GtkDarktableRangeSelect *range, GtkWidget *w)
   _range_date_popup *pop = range->date_popup;
   gchar *txt;
 
-  gtk_popover_set_default_widget(GTK_POPOVER(pop->popup), w);
+  pop->opener = w;
 
   pop->internal_change++;
 
@@ -579,48 +580,47 @@ static void _popup_date_update(GtkDarktableRangeSelect *range, GtkWidget *w)
   if(!dt) dt = g_date_time_new_now_utc();
 
   // update the calendar
-  gtk_calendar_select_month(GTK_CALENDAR(pop->calendar), g_date_time_get_month(dt) - 1, g_date_time_get_year(dt));
-  gtk_calendar_select_day(GTK_CALENDAR(pop->calendar), g_date_time_get_day_of_month(dt));
+  gtk_calendar_set_date(GTK_CALENDAR(pop->calendar), dt);
   gtk_calendar_clear_marks(GTK_CALENDAR(pop->calendar));
   gtk_calendar_mark_day(GTK_CALENDAR(pop->calendar), g_date_time_get_day_of_month(dt));
 
   // update the relative date fields
   char tx[32];
   snprintf(tx, sizeof(tx), "%d", range->select_relative_date_r.year);
-  gtk_entry_set_text(GTK_ENTRY(pop->years), tx);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->years)), tx);
   snprintf(tx, sizeof(tx), "%d", range->select_relative_date_r.month);
-  gtk_entry_set_text(GTK_ENTRY(pop->months), tx);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->months)), tx);
   snprintf(tx, sizeof(tx), "%d", range->select_relative_date_r.day);
-  gtk_entry_set_text(GTK_ENTRY(pop->days), tx);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->days)), tx);
 
   // and the time fields
   if(datetype == 0)
   {
     txt = g_date_time_format(dt, "%H");
-    gtk_entry_set_text(GTK_ENTRY(pop->hours), txt);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->hours)), txt);
     g_free(txt);
     txt = g_date_time_format(dt, "%M");
-    gtk_entry_set_text(GTK_ENTRY(pop->minutes), txt);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->minutes)), txt);
     g_free(txt);
     txt = g_date_time_format(dt, "%S");
-    gtk_entry_set_text(GTK_ENTRY(pop->seconds), txt);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->seconds)), txt);
     g_free(txt);
   }
   else
   {
     snprintf(tx, sizeof(tx), "%d", range->select_relative_date_r.hour);
-    gtk_entry_set_text(GTK_ENTRY(pop->hours), tx);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->hours)), tx);
     snprintf(tx, sizeof(tx), "%d", range->select_relative_date_r.minute);
-    gtk_entry_set_text(GTK_ENTRY(pop->minutes), tx);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->minutes)), tx);
     snprintf(tx, sizeof(tx), "%d", range->select_relative_date_r.second);
-    gtk_entry_set_text(GTK_ENTRY(pop->seconds), tx);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->seconds)), tx);
   }
 
   // and we finally populate the selection fields
   if(datetype == 0)
   {
     txt = g_date_time_format(dt, "%Y:%m:%d %H:%M:%S");
-    gtk_entry_set_text(GTK_ENTRY(pop->selection), txt);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->selection)), txt);
     g_free(txt);
   }
   else
@@ -629,7 +629,7 @@ static void _popup_date_update(GtkDarktableRangeSelect *range, GtkWidget *w)
              range->select_relative_date_r.year, range->select_relative_date_r.month,
              range->select_relative_date_r.day, range->select_relative_date_r.hour,
              range->select_relative_date_r.minute, range->select_relative_date_r.second);
-    gtk_entry_set_text(GTK_ENTRY(pop->selection), tx);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->selection)), tx);
   }
 
   // and we set its tooltip
@@ -668,9 +668,9 @@ static void _current_show_popup(GtkDarktableRangeSelect *range)
 {
   if(range->cur_window) return;
   darktable.gui->hide_tooltips++;
-  range->cur_window = gtk_popover_new(range->band);
+  range->cur_window = gtk_popover_new();
+  gtk_widget_set_parent(range->cur_window, range->band);
   gtk_widget_set_name(range->cur_window, "range-current");
-  gtk_popover_set_modal(GTK_POPOVER(range->cur_window), FALSE);
   gtk_popover_set_position(GTK_POPOVER(range->cur_window), GTK_POS_BOTTOM);
 
   // the label for the current value / selection
@@ -687,8 +687,8 @@ static void _current_show_popup(GtkDarktableRangeSelect *range)
   GtkWidget *lb = gtk_label_new("");
   gtk_label_set_xalign(GTK_LABEL(lb), 0.0);
   if(range->cur_help) gtk_label_set_markup(GTK_LABEL(lb), range->cur_help);
-  gtk_container_add(GTK_CONTAINER(range->cur_window), dt_gui_vbox(range->cur_label, lb));
-  gtk_widget_show_all(range->cur_window);
+  gtk_popover_set_child(GTK_POPOVER(range->cur_window), dt_gui_vbox(range->cur_label, lb));
+  gtk_widget_set_visible(range->cur_window, TRUE);
 }
 
 static void _bound_change(GtkDarktableRangeSelect *range, const gchar *val, const _range_bound bound)
@@ -783,12 +783,12 @@ static void _popup_date_ok_clicked(GtkWidget *w, GtkDarktableRangeSelect *range)
   _range_date_popup *pop = range->date_popup;
 
   _range_bound bound = BOUND_MIN;
-  if(gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->band)
+  if(pop->opener == range->band)
     bound = BOUND_MIDDLE;
-  else if(gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->entry_max)
+  else if(pop->opener == range->entry_max)
     bound = BOUND_MAX;
 
-  _bound_change(range, gtk_entry_get_text(GTK_ENTRY(pop->selection)), bound);
+  _bound_change(range, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(pop->selection))), bound);
 
   // and hide the popup
   gtk_widget_hide(pop->popup);
@@ -799,7 +799,7 @@ static void _popup_date_now_clicked(GtkWidget *w, GtkDarktableRangeSelect *range
   if(!range->date_popup || range->date_popup->internal_change) return;
   _range_date_popup *pop = range->date_popup;
 
-  if(gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) != range->entry_max) return;
+  if(pop->opener != range->entry_max) return;
 
   range->bounds &= ~DT_RANGE_BOUND_MAX;
   range->bounds &= ~DT_RANGE_BOUND_MAX_RELATIVE;
@@ -847,7 +847,7 @@ static void _popup_date_tree_selection_change(GtkTreeView *self, GtkDarktableRan
   else
   {
     // initialize value depending of the source widget
-    if(gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->entry_max)
+    if(pop->opener == range->entry_max)
     {
       m = 12;
       d = 31;
@@ -916,7 +916,7 @@ static void _popup_date_tree_selection_change(GtkTreeView *self, GtkDarktableRan
 
   // we set the final entry
   gchar *txt = g_strdup_printf("%04d:%02d:%02d %02d:%02d:%02d", y, m, d, h, min, s);
-  gtk_entry_set_text(GTK_ENTRY(pop->selection), txt);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->selection)), txt);
   g_free(txt);
 }
 
@@ -929,58 +929,62 @@ static void _popup_date_changed(GtkWidget *w, GtkDarktableRangeSelect *range)
   guint y, m, d;
   if(dt_bauhaus_combobox_get(pop->type) == 1)
   {
-    y = MAX(atoi(gtk_entry_get_text(GTK_ENTRY(pop->years))), 0);
-    m = MAX(atoi(gtk_entry_get_text(GTK_ENTRY(pop->months))), 0);
-    d = MAX(atoi(gtk_entry_get_text(GTK_ENTRY(pop->days))), 0);
+    y = MAX(atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(pop->years)))), 0);
+    m = MAX(atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(pop->months)))), 0);
+    d = MAX(atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(pop->days)))), 0);
   }
   else
   {
-    gtk_calendar_get_date(GTK_CALENDAR(pop->calendar), &y, &m, &d);
-    m++;
+    // GTK4's gtk_calendar_get_date returns a GDateTime (1-based month)
+    GDateTime *dt2 = gtk_calendar_get_date(GTK_CALENDAR(pop->calendar));
+    y = g_date_time_get_year(dt2);
+    m = g_date_time_get_month(dt2);
+    d = g_date_time_get_day_of_month(dt2);
+    g_date_time_unref(dt2);
   }
-  int h = CLAMP(atoi(gtk_entry_get_text(GTK_ENTRY(pop->hours))), 0, 23);
-  int min = CLAMP(atoi(gtk_entry_get_text(GTK_ENTRY(pop->minutes))), 0, 59);
-  int s = CLAMP(atoi(gtk_entry_get_text(GTK_ENTRY(pop->seconds))), 0, 59);
+  int h = CLAMP(atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(pop->hours)))), 0, 23);
+  int min = CLAMP(atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(pop->minutes)))), 0, 59);
+  int s = CLAMP(atoi(gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(pop->seconds)))), 0, 59);
 
   // if we select via calendar, we try to set time to what user expect
   if(w == pop->calendar)
   {
     // if we set the max value, and we have null time, we want to set time to the end of the day
-    if(gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->entry_max && h == 0 && min == 0 && s == 0)
+    if(pop->opener == range->entry_max && h == 0 && min == 0 && s == 0)
     {
       h = 23;
       min = 59;
       s = 59;
       pop->internal_change++;
-      gtk_entry_set_text(GTK_ENTRY(pop->hours), "23");
-      gtk_entry_set_text(GTK_ENTRY(pop->minutes), "59");
-      gtk_entry_set_text(GTK_ENTRY(pop->seconds), "59");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->hours)), "23");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->minutes)), "59");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->seconds)), "59");
       pop->internal_change--;
     }
     // same for min value (but less common)
-    else if(gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->entry_min && h == 23 && min == 59
+    else if(pop->opener == range->entry_min && h == 23 && min == 59
             && s == 59)
     {
       h = min = s = 0;
       pop->internal_change++;
-      gtk_entry_set_text(GTK_ENTRY(pop->hours), "00");
-      gtk_entry_set_text(GTK_ENTRY(pop->minutes), "00");
-      gtk_entry_set_text(GTK_ENTRY(pop->seconds), "00");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->hours)), "00");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->minutes)), "00");
+      gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->seconds)), "00");
       pop->internal_change--;
     }
   }
 
   gchar *txt = NULL;
   if(dt_bauhaus_combobox_get(pop->type) == 1
-     && gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->entry_min)
+     && pop->opener == range->entry_min)
     txt = g_strdup_printf("-%04u:%02u:%02u %02d:%02d:%02d", y, m, d, h, min, s);
   else if(dt_bauhaus_combobox_get(pop->type) == 1
-          && gtk_popover_get_default_widget(GTK_POPOVER(pop->popup)) == range->entry_max)
+          && pop->opener == range->entry_max)
     txt = g_strdup_printf("+%04u:%02u:%02u %02d:%02d:%02d", y, m, d, h, min, s);
   else
     txt = g_strdup_printf("%04u:%02u:%02u %02d:%02d:%02d", y, m, d, h, min, s);
 
-  gtk_entry_set_text(GTK_ENTRY(pop->selection), txt);
+  gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(pop->selection)), txt);
   g_free(txt);
 }
 
@@ -1002,7 +1006,8 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
 {
   _range_date_popup *pop = g_malloc0(sizeof(_range_date_popup));
   range->date_popup = pop;
-  pop->popup = gtk_popover_new(range->band);
+  pop->popup = gtk_popover_new();
+  gtk_widget_set_parent(pop->popup, range->band);
 
   // the type of date selection
   pop->type = dt_bauhaus_combobox_new(NULL);
@@ -1011,7 +1016,7 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
 
   // the label to explain the reference date for relative values
   pop->relative_label = gtk_label_new("");
-  gtk_label_set_line_wrap(GTK_LABEL(pop->relative_label), TRUE);
+  gtk_label_set_wrap(GTK_LABEL(pop->relative_label), TRUE);
   gtk_widget_set_no_show_all(pop->relative_label, TRUE);
 
   // the date section
@@ -1034,7 +1039,7 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
   gtk_label_set_xalign(GTK_LABEL(lb), 1.0);
   gtk_grid_attach(GTK_GRID(pop->relative_date_box), lb, 0, 0, 1, 1);
   pop->years = gtk_entry_new();
-  gtk_entry_set_width_chars(GTK_ENTRY(pop->years), 3);
+  gtk_editable_set_width_chars(GTK_EDITABLE(pop->years), 3);
   gtk_widget_set_halign(pop->years, GTK_ALIGN_START);
   g_signal_connect(G_OBJECT(pop->years), "changed", G_CALLBACK(_popup_date_changed), range);
   gtk_grid_attach(GTK_GRID(pop->relative_date_box), pop->years, 1, 0, 1, 1);
@@ -1042,7 +1047,7 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
   gtk_label_set_xalign(GTK_LABEL(lb), 1.0);
   gtk_grid_attach(GTK_GRID(pop->relative_date_box), lb, 0, 1, 1, 1);
   pop->months = gtk_entry_new();
-  gtk_entry_set_width_chars(GTK_ENTRY(pop->months), 3);
+  gtk_editable_set_width_chars(GTK_EDITABLE(pop->months), 3);
   gtk_widget_set_halign(pop->months, GTK_ALIGN_START);
   g_signal_connect(G_OBJECT(pop->months), "changed", G_CALLBACK(_popup_date_changed), range);
   gtk_grid_attach(GTK_GRID(pop->relative_date_box), pop->months, 1, 1, 1, 1);
@@ -1050,7 +1055,7 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
   gtk_label_set_xalign(GTK_LABEL(lb), 1.0);
   gtk_grid_attach(GTK_GRID(pop->relative_date_box), lb, 0, 2, 1, 1);
   pop->days = gtk_entry_new();
-  gtk_entry_set_width_chars(GTK_ENTRY(pop->days), 3);
+  gtk_editable_set_width_chars(GTK_EDITABLE(pop->days), 3);
   gtk_widget_set_halign(pop->days, GTK_ALIGN_START);
   g_signal_connect(G_OBJECT(pop->days), "changed", G_CALLBACK(_popup_date_changed), range);
   gtk_grid_attach(GTK_GRID(pop->relative_date_box), pop->days, 1, 2, 1, 1);
@@ -1062,13 +1067,13 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
   dt_gui_add_class(lb_time, "dt_section_label");
 
   pop->hours = gtk_entry_new();
-  gtk_entry_set_width_chars(GTK_ENTRY(pop->hours), 2);
+  gtk_editable_set_width_chars(GTK_EDITABLE(pop->hours), 2);
   g_signal_connect(G_OBJECT(pop->hours), "changed", G_CALLBACK(_popup_date_changed), range);
   pop->minutes = gtk_entry_new();
-  gtk_entry_set_width_chars(GTK_ENTRY(pop->minutes), 2);
+  gtk_editable_set_width_chars(GTK_EDITABLE(pop->minutes), 2);
   g_signal_connect(G_OBJECT(pop->minutes), "changed", G_CALLBACK(_popup_date_changed), range);
   pop->seconds = gtk_entry_new();
-  gtk_entry_set_width_chars(GTK_ENTRY(pop->seconds), 2);
+  gtk_editable_set_width_chars(GTK_EDITABLE(pop->seconds), 2);
   g_signal_connect(G_OBJECT(pop->seconds), "changed", G_CALLBACK(_popup_date_changed), range);
 
   // the treeview
@@ -1112,9 +1117,10 @@ static void _popup_date_init(GtkDarktableRangeSelect *range)
 
   gtk_widget_set_name(vbox, "dt-range-date-popup");
 
-  gtk_container_add(GTK_CONTAINER(pop->popup), vbox);
+  gtk_popover_set_child(GTK_POPOVER(pop->popup), vbox);
 }
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 static void _popup_item_activate(GtkWidget *w, gpointer user_data)
 {
   GtkDarktableRangeSelect *range = (GtkDarktableRangeSelect *)user_data;
@@ -1199,19 +1205,24 @@ static GtkWidget *_popup_get_numeric_menu(GtkDarktableRangeSelect *range, GtkWid
 
   return GTK_WIDGET(pop);
 }
+#endif // !GTK_CHECK_VERSION(4, 0, 0)
 
 static void _popup_show(GtkDarktableRangeSelect *range, GtkWidget *w)
 {
   if(range->type == DT_RANGE_TYPE_NUMERIC)
   {
+#if !GTK_CHECK_VERSION(4, 0, 0)
     GtkWidget *pop = _popup_get_numeric_menu(range, w);
     dt_gui_menu_popup(GTK_MENU(pop), NULL, GDK_GRAVITY_SOUTH, GDK_GRAVITY_NORTH);
+#endif
   }
   else if(range->type == DT_RANGE_TYPE_DATETIME)
   {
     _popup_date_update(range, w);
 
     // show the popup
+    GdkRectangle rect = { gtk_widget_get_width(w) / 2, gtk_widget_get_height(w), 1, 1 };
+#if !GTK_CHECK_VERSION(4, 0, 0)
     GdkDevice *pointer = gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default()));
 
     int x, y;
@@ -1219,14 +1230,12 @@ static void _popup_show(GtkDarktableRangeSelect *range, GtkWidget *w)
     gpointer pointer_widget = NULL;
     if(pointer_window) gdk_window_get_user_data(pointer_window, &pointer_widget);
 
-    GdkRectangle rect = { gtk_widget_get_allocated_width(w) / 2, gtk_widget_get_allocated_height(w), 1, 1 };
-
     if(pointer_widget && w != pointer_widget)
       gtk_widget_translate_coordinates(pointer_widget, w, x, y, &rect.x, &rect.y);
-
+#endif
     gtk_popover_set_pointing_to(GTK_POPOVER(range->date_popup->popup), &rect);
 
-    gtk_widget_show_all(range->date_popup->popup);
+    gtk_widget_set_visible(range->date_popup->popup, TRUE);
   }
 }
 
@@ -1245,13 +1254,14 @@ static void _event_entry_activated(GtkWidget *entry, gpointer user_data)
   _range_bound bound = BOUND_MIN;
   if(entry == range->entry_max) bound = BOUND_MAX;
 
-  _bound_change(range, gtk_entry_get_text(GTK_ENTRY(entry)), bound);
+  _bound_change(range, gtk_editable_get_text(GTK_EDITABLE(GTK_ENTRY(entry))), bound);
 }
 
-static gboolean _event_entry_focus_out(GtkWidget *entry, GdkEventFocus *event, gpointer user_data)
+static void _event_entry_focus_out(GtkEventControllerFocus *controller,
+                                   gpointer user_data)
 {
+  GtkWidget *entry = dt_gui_get_widget(controller);
   _event_entry_activated(entry, user_data);
-  return FALSE;
 }
 
 static double _graph_value_to_pos(GtkDarktableRangeSelect *range, const double value)
@@ -1570,9 +1580,9 @@ static void _event_band_motion_cb(GtkEventControllerMotion *controller, double x
     return;
   }
   _current_show_popup(range);
-  // point the popup to the current position
-  gint wx, wy;
-  gtk_widget_translate_coordinates(range->band, gtk_widget_get_toplevel(range->band), 0, 0, &wx, &wy);
+  // point the popup to the current position (the motion controller's x is
+  // surface-relative, which is what the popover wants; the GTK3 translate
+  // call below produced an unused result and is dropped on GTK4)
   GdkRectangle rect = { x, 0, 1, gtk_widget_get_allocated_height(range->band) };
   gtk_popover_set_pointing_to(GTK_POPOVER(range->cur_window), &rect);
 
@@ -1736,7 +1746,6 @@ GtkWidget *dtgtk_range_select_new(const gchar *property, const gboolean show_ent
   dt_gui_connect_click_all(range->band, _event_band_press_cb, _event_band_release_cb, range);
   dt_gui_connect_motion(range->band, _event_band_motion_cb, NULL, _event_band_leave_cb, range);
   gtk_widget_set_name(GTK_WIDGET(range->band), "dt-range-band");
-  gtk_widget_set_can_default(range->band, TRUE);
 
   // always hidden widgets used to retrieve drawing colors
   range->band_graph = gtk_drawing_area_new();
@@ -1763,20 +1772,22 @@ GtkWidget *dtgtk_range_select_new(const gchar *property, const gboolean show_ent
   {
     // the entries
     range->entry_min = dt_ui_entry_new(0);
-    gtk_widget_set_can_default(range->entry_min, TRUE);
     _entry_set_tooltip(range->entry_min, BOUND_MIN, range->type);
     g_signal_connect(G_OBJECT(range->entry_min), "activate", G_CALLBACK(_event_entry_activated), range);
-    g_signal_connect(G_OBJECT(range->entry_min), "focus-out-event", G_CALLBACK(_event_entry_focus_out), range);
+    GtkEventController *focus_min = gtk_event_controller_focus_new();
+    g_signal_connect(focus_min, "leave", G_CALLBACK(_event_entry_focus_out), range);
+    gtk_widget_add_controller(range->entry_min, focus_min);
     GtkGestureSingle *g_min = dt_gui_connect_click(range->entry_min, _event_entry_press_cb, NULL, range);
     gtk_gesture_single_set_button(g_min, GDK_BUTTON_SECONDARY);
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(g_min), GTK_PHASE_TARGET);
 
     range->entry_max = dt_ui_entry_new(0);
-    gtk_widget_set_can_default(range->entry_max, TRUE);
     gtk_entry_set_alignment(GTK_ENTRY(range->entry_max), 1.0);
     _entry_set_tooltip(range->entry_max, BOUND_MAX, range->type);
     g_signal_connect(G_OBJECT(range->entry_max), "activate", G_CALLBACK(_event_entry_activated), range);
-    g_signal_connect(G_OBJECT(range->entry_max), "focus-out-event", G_CALLBACK(_event_entry_focus_out), range);
+    GtkEventController *focus_max = gtk_event_controller_focus_new();
+    g_signal_connect(focus_max, "leave", G_CALLBACK(_event_entry_focus_out), range);
+    gtk_widget_add_controller(range->entry_max, focus_max);
     GtkGestureSingle *g_max = dt_gui_connect_click(range->entry_max, _event_entry_press_cb, NULL, range);
     gtk_gesture_single_set_button(g_max, GDK_BUTTON_SECONDARY);
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(g_max), GTK_PHASE_TARGET);
@@ -1784,7 +1795,7 @@ GtkWidget *dtgtk_range_select_new(const gchar *property, const gboolean show_ent
     dt_gui_box_add(vbox, dt_gui_hbox(dt_gui_expand(range->entry_min), dt_gui_expand(range->entry_max)));
   }
 
-  gtk_container_add(GTK_CONTAINER(range), vbox);
+  gtk_widget_set_parent(vbox, GTK_WIDGET(range));
   gtk_widget_set_name(vbox, "range-select");
 
   if(type == DT_RANGE_TYPE_DATETIME) _popup_date_init(range);
@@ -1862,7 +1873,7 @@ void dtgtk_range_select_set_selection(GtkDarktableRangeSelect *range, const dt_r
                             range->select_relative_date_r.second);
     else
       txt = range->print(range->select_min_r, FALSE);
-    gtk_entry_set_text(GTK_ENTRY(range->entry_min), txt);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(range->entry_min)), txt);
     g_free(txt);
 
     if(range->bounds & DT_RANGE_BOUND_MAX)
@@ -1876,7 +1887,7 @@ void dtgtk_range_select_set_selection(GtkDarktableRangeSelect *range, const dt_r
       txt = g_strdup(_("now"));
     else
       txt = range->print(range->select_max_r, FALSE);
-    gtk_entry_set_text(GTK_ENTRY(range->entry_max), txt);
+    gtk_editable_set_text(GTK_EDITABLE(GTK_ENTRY(range->entry_max)), txt);
     g_free(txt);
   }
 

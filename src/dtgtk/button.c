@@ -28,42 +28,14 @@ static void dtgtk_button_init(GtkDarktableButton *button)
 {
 }
 
-/* GTK3 synthesizes a fake enter crossing (GDK_CROSSING_GTK_UNGRAB) on every
- * widget a grab was shadowing when that grab ends -- menus, popovers, modal
- * dialogs, ... -- so the button's internal enter handler marks the pointer as
- * inside and the button keeps its hover state even after the pointer has
- * left.  The stale highlight then only clears on the next genuine crossing,
- * which users see as a "sticky" hover after closing a menu or dialog.
- * When a grab that shadowed the button ends, drop the stale hover/pressed
- * flags unless the pointer really is over the button; genuine crossings
- * re-add them as appropriate.
- * GTK4 migration: delete this handler together with the rest of this file
- * (GtkButton has no event window, gtk_container_add() is gone, ...); GTK4
- * removed grabs, so no synthetic crossings exist and the bug disappears. */
-static void _dtgtk_button_grab_notify(GtkWidget *widget,
-                                      gboolean was_grabbed,
-                                      gpointer user_data)
+static void _button_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
 {
-  if(!was_grabbed || !gtk_widget_get_realized(widget)) return;
+  g_return_if_fail(widget != NULL);
+  g_return_if_fail(DTGTK_IS_BUTTON(widget));
 
-  gint x, y;
-  gdk_window_get_device_position(gtk_widget_get_window(widget),
-                                 gdk_seat_get_pointer(
-                                   gdk_display_get_default_seat(gdk_display_get_default())),
-                                 &x, &y, NULL);
-
-  GtkAllocation allocation;
-  gtk_widget_get_allocation(widget, &allocation);
-  if(x < allocation.x || y < allocation.y
-     || x >= allocation.x + allocation.width
-     || y >= allocation.y + allocation.height)
-    gtk_widget_unset_state_flags(widget, GTK_STATE_FLAG_PRELIGHT | GTK_STATE_FLAG_ACTIVE);
-}
-
-static gboolean _button_draw(GtkWidget *widget, cairo_t *cr)
-{
-  g_return_val_if_fail(widget != NULL, FALSE);
-  g_return_val_if_fail(DTGTK_IS_BUTTON(widget), FALSE);
+  const int width = gtk_widget_get_width(widget);
+  const int height = gtk_widget_get_height(widget);
+  cairo_t *cr = gtk_snapshot_append_cairo(snapshot, &GRAPHENE_RECT_INIT(0, 0, width, height));
 
   GtkStateFlags state = gtk_widget_get_state_flags(widget);
 
@@ -81,11 +53,6 @@ static gboolean _button_draw(GtkWidget *widget, cairo_t *cr)
     flags &= ~CPF_PRELIGHT;
 
   /* begin cairo drawing */
-  /* get button total allocation */
-  GtkAllocation allocation;
-  gtk_widget_get_allocation(widget, &allocation);
-  const int width = allocation.width;
-  const int height = allocation.height;
 
   /* get the css geometry properties of the button */
   GtkBorder margin, border, padding;
@@ -133,14 +100,14 @@ static gboolean _button_draw(GtkWidget *widget, cairo_t *cr)
       DTGTK_BUTTON(widget)->icon(cr, startx, starty, cwidth, cheight, flags, icon_data);
   }
 
-  return FALSE;
+  cairo_destroy(cr);
 }
 
 static void dtgtk_button_class_init(GtkDarktableButtonClass *klass)
 {
   GtkWidgetClass *widget_class = (GtkWidgetClass *)klass;
 
-  widget_class->draw = _button_draw;
+  widget_class->snapshot = _button_snapshot;
 }
 
 // Public functions
@@ -154,10 +121,9 @@ GtkWidget *dtgtk_button_new(DTGTKCairoPaintIconFunc paint,
   button->icon_flags = paintflags;
   button->icon_data = paintdata;
   button->canvas = gtk_drawing_area_new();
-  gtk_container_add(GTK_CONTAINER(button), button->canvas);
+  gtk_button_set_child(GTK_BUTTON(button), button->canvas);
   dt_gui_add_class(GTK_WIDGET(button), "dt_module_btn");
   gtk_widget_set_name(GTK_WIDGET(button->canvas), "button-canvas");
-  dtgtk_button_connect_stale_hover_cleanup(GTK_WIDGET(button));
   return (GtkWidget *)button;
 }
 
@@ -182,12 +148,6 @@ GtkWidget *dtgtk_button_new_full(DTGTKCairoPaintIconFunc paint,
     g_signal_connect_data(G_OBJECT(button), "clicked", config->clicked_cb,
                           config->clicked_data, NULL, (GConnectFlags) 0);
   return button;
-}
-
-void dtgtk_button_connect_stale_hover_cleanup(GtkWidget *widget)
-{
-  g_signal_connect(G_OBJECT(widget), "grab-notify",
-                   G_CALLBACK(_dtgtk_button_grab_notify), NULL);
 }
 
 void dtgtk_button_set_paint(GtkDarktableButton *button,
