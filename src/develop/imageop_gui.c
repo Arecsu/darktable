@@ -242,16 +242,35 @@ GtkWidget *dt_bauhaus_toggle_from_params(dt_iop_module_t *self, const char *para
 }
 
 /* Claim the event sequence in CAPTURE phase so the togglebutton's
- * internal GtkGestureClick (GTK_PHASE_BUBBLE) does NOT process the
- * event.  This prevents GtkButton from emitting "clicked" and
- * toggling the button state behind our callback, which would conflict
- * with callbacks that implement radio-button behaviour by explicitly
- * managing all toggle states.
+ * internal GtkGestureClick does NOT process the release (which is what
+ * makes GtkButton emit "clicked" and toggle the button state behind our
+ * callback, conflicting with callbacks that implement radio-button
+ * behaviour by explicitly managing all toggle states).
+ *
+ * GTK4 reality (verified against /tmp/gtk4 sources, Session 13):
+ * GtkButton's internal gesture is CAPTURE-phase too (gtkbutton.c), and
+ * gtk_widget_add_controller() PREPENDS, so OUR gesture dispatches BEFORE
+ * it.  A claim can only reach gestures that already have the sequence's
+ * point (gtk_gesture_set_sequence_state() fails on point-less gestures,
+ * and the cancel/deny walk no-ops on them), so with the gesture on the
+ * button itself the claim does NOT suppress the internal gesture: it
+ * processes press+release with state NONE and GtkButton emits "clicked"
+ * and toggles behind our callback.
+ *
+ * TODO P3 (Session 13 finding): attach this gesture to the button's
+ * CHILD (the dtgtk canvas) instead, still CAPTURE phase: capture runs
+ * top-down, so the button's gesture processes the press first and HAS
+ * the point when our claim cancels it (gtk_gesture_set_sequence_state
+ * propagation -> _gtk_widget_cancel_or_deny_sequence, capture emitter
+ * => cancel) -> click_gesture_cancel_cb -> gtk_button_do_release(FALSE)
+ * -> no "clicked", button_down reset.  Same handler wiring, coordinates
+ * unchanged (the canvas fills the button).  Update test_gesture.c's
+ * togglebutton-capture-claim when done.
  *
  * The claim runs at "pressed" time (dt_gui_gesture_claim_pressed), not
- * in "begin": the press is still claimed before any bubble-phase
- * gesture sees it, but the sequence is not stolen from parent/child
- * controllers earlier than necessary (A2.10). */
+ * in "begin": a begin-time claim has the same point-ordering problem and
+ * would steal the sequence from parent/child controllers earlier than
+ * necessary (A2.10). */
 GtkWidget *dt_iop_togglebutton_new(dt_iop_module_t *self, const char *section, const gchar *label, const gchar *ctrl_label,
                                    GCallback callback, gboolean local, guint accel_key, GdkModifierType mods,
                                    DTGTKCairoPaintIconFunc paint, GtkWidget *box)

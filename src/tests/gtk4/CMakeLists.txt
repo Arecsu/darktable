@@ -15,6 +15,7 @@ add_executable(darktable-test-gtk4
   test_controller.c
   test_bauhaus.c
   test_iopheader.c
+  test_gesture.c
 )
 
 set_target_properties(darktable-test-gtk4 PROPERTIES LINKER_LANGUAGE C)

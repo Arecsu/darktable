@@ -512,12 +512,19 @@ static GtkWidget *_color_picker_new(dt_iop_module_t *module,
       color_picker->picker_cst = cst;
       color_picker->fixed_cst = TRUE;
     }
-    // The button is a GtkToggleButton, which owns its own
-    // GtkGestureMultiPress (bubble phase) that emits "clicked" and toggles
-    // the button on release.  Use a CAPTURE-phase gesture that claims the
-    // event sequence (same pattern as dt_iop_togglebutton_new) so that
-    // internal gesture never runs and the picker callback fully controls
+    // The button is a GtkToggleButton, which owns its own GtkGestureClick
+    // that would emit "clicked" and toggle the button on release.  Use a
+    // CAPTURE-phase gesture that claims the event sequence (same pattern
+    // as dt_iop_togglebutton_new) so the picker callback fully controls
     // the button state on real clicks.
+    //
+    // Session 13 finding: with the gesture on the BUTTON itself the claim
+    // does NOT reach the button's internal gesture (gtk_widget_add_
+    // controller prepends, so ours dispatches first and the claim can
+    // only touch gestures that already have the sequence's point).  Same
+    // TODO P3 fix as dt_iop_togglebutton_new: attach to the button's
+    // child instead, then the claim CANCELS the internal gesture (it has
+    // the point) and "clicked" never fires.
     //
     // Shortcuts (dt_action_def_color_picker, see above) and programmatic
     // activation (dt_iop_color_picker_toggle, e.g. temperature.c "spot"
