@@ -987,16 +987,16 @@ gboolean dt_lib_gui_get_expanded(dt_lib_module_t *module)
   return dtgtk_expander_get_expanded(DTGTK_EXPANDER(module->expander));
 }
 
-static void _lib_plugin_arrow_button_press_cb(GtkGestureSingle *gesture,
-                                                gint n_press,
-                                                gdouble x,
-                                                gdouble y,
-                                                dt_lib_module_t *module)
+/* plain-signature core (see the header comment in lib.h): synthetic
+ * signal emission -- the Layer B tests -- cannot populate the gesture's
+ * current button, so the toggle logic lives here and the gesture
+ * wrapper below only extracts (button, state) from the real event. */
+void dt_lib_plugin_arrow_button_press(const guint button,
+                                      const GdkModifierType state,
+                                      const gint n_press,
+                                      dt_lib_module_t *module)
 {
   if(n_press > 1) return;
-  const guint button = gtk_gesture_single_get_current_button(gesture);
-  const GdkModifierType state =
-    dt_gui_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
 
   if(button == GDK_BUTTON_PRIMARY)
   {
@@ -1052,6 +1052,20 @@ static void _lib_plugin_arrow_button_press_cb(GtkGestureSingle *gesture,
 
     return;
   }
+}
+
+static void _lib_plugin_arrow_button_press_cb(GtkGestureSingle *gesture,
+                                                gint n_press,
+                                                gdouble x,
+                                                gdouble y,
+                                                dt_lib_module_t *module)
+{
+  (void)x;
+  (void)y;
+  const guint button = gtk_gesture_single_get_current_button(gesture);
+  const GdkModifierType state =
+    dt_gui_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
+  dt_lib_plugin_arrow_button_press(button, state, n_press, module);
 }
 
 static void _lib_plugin_header_button_release_cb(GtkGestureSingle *gesture,

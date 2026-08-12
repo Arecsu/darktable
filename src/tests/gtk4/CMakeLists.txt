@@ -15,6 +15,7 @@ add_executable(darktable-test-gtk4
   test_controller.c
   test_bauhaus.c
   test_iopheader.c
+  test_libheader.c
   test_gesture.c
   test_panel.c
   test_view.c

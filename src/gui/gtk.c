@@ -5990,11 +5990,17 @@ static void _gesture_cancel(GtkGestureSingle *gesture,
                             GtkWidget *widget)
 {
   (void)widget;
-  /* do not re-emit the release at the widget's top-left corner: take the
-   * position of the gesture's last event, if any (A2.11) */
+  /* Re-emit the release with the same WIDGET-LOCAL coordinates the real
+   * "released" signal carries (GtkGestureClick::released uses
+   * gtk_gesture_get_point).  The raw event position (gdk_event_get_position)
+   * is in SURFACE space: the release handlers feed these coordinates to
+   * gtk_widget_pick() to exclude releases over child buttons, and surface
+   * coordinates made the pick miss the button entirely -- an arrow-click on
+   * a module header cancelled the parent header gesture, the re-emitted
+   * release landed "nowhere" (pick returned NULL), and the header toggled a
+   * second time (module opens and closes on one click). */
   gdouble x = 0.0, y = 0.0;
-  const GdkEvent *event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), sequence);
-  if(event) gdk_event_get_position((GdkEvent *)event, &x, &y);
+  gtk_gesture_get_point(GTK_GESTURE(gesture), sequence, &x, &y);
   g_signal_emit_by_name(gesture, "released", 1, x, y);
 }
 

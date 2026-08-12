@@ -147,6 +147,15 @@ void dt_lib_gui_set_expanded(dt_lib_module_t *module,
                              const gboolean expanded);
 /** get the expanded state of a plugin */
 gboolean dt_lib_gui_get_expanded(dt_lib_module_t *module);
+
+/* plain-signature core of the module-header arrow press, exported for the
+ * Layer B tests: synthetic gesture signal emission cannot populate the
+ * gesture's current button, so the toggle logic lives in this core and the
+ * gesture wrapper only extracts (button, state) from the real event. */
+void dt_lib_plugin_arrow_button_press(const guint button,
+                                      const GdkModifierType state,
+                                      const gint n_press,
+                                      dt_lib_module_t *module);
 /** queue plugin gui to be updated if visible */
 void dt_lib_gui_queue_update(dt_lib_module_t *module);
 void dt_lib_gui_update(dt_lib_module_t *module);

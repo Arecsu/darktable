@@ -29,6 +29,7 @@ void dt_test_container_register(void);
 void dt_test_controller_register(void);
 void dt_test_bauhaus_register(void);
 void dt_test_iopheader_register(void);
+void dt_test_libheader_register(void);
 void dt_test_gesture_register(void);
 void dt_test_panel_register(void);
 void dt_test_view_register(void);

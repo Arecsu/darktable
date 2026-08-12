@@ -39,6 +39,7 @@ int main(int argc, char **argv)
   dt_test_controller_register();
   dt_test_bauhaus_register();
   dt_test_iopheader_register();
+  dt_test_libheader_register();
   dt_test_gesture_register();
   dt_test_panel_register();
   dt_test_view_register();
