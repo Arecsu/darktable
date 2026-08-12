@@ -5163,6 +5163,9 @@ GtkWidget *dt_gui_container_nth_child(GtkWidget *container,
 {
   g_return_val_if_fail(GTK_IS_WIDGET(container), NULL);
 #if GTK_CHECK_VERSION(4, 0, 0)
+  /* GTK3's g_list_nth_data() returns NULL for negative indices; keep the
+   * same contract (a negative index is not a child position) */
+  if(which < 0) return NULL;
   GtkWidget *child = gtk_widget_get_first_child(container);
   for(int i = 0; child && i < which; i++)
     child = gtk_widget_get_next_sibling(child);
@@ -5275,8 +5278,13 @@ static GtkWidget *_dt_gui_menu_item_new_common(const gchar *label,
   if(check)
     item = gtk_check_button_new_with_label(label);
   else
+  {
     item = gtk_button_new_with_label(label);
-  gtk_button_set_has_frame(GTK_BUTTON(item), FALSE);
+    gtk_button_set_has_frame(GTK_BUTTON(item), FALSE);
+  }
+  /* GtkCheckButton is NOT a GtkButton in GTK4 (it is its own
+   * GtkWidget subclass, like GtkToggleButton), so has_frame only applies
+   * to the plain-button items */
   gtk_widget_set_hexpand(item, TRUE);
   gtk_widget_set_halign(item, GTK_ALIGN_FILL);
   gtk_widget_set_focus_on_click(item, TRUE);
@@ -5316,15 +5324,17 @@ void dt_gui_menu_append(GtkWidget *menu, GtkWidget *item)
   dt_gui_menu_insert(menu, item, -1);
 }
 
-// insert at a box index (GTK3 gtk_menu_shell_insert semantics): pos <= 0
-// prepends, pos >= child count appends, anything else inserts before the
-// current child at that index
+// insert at a box index (GTK3 gtk_menu_shell_insert semantics): pos < 0
+// appends, pos == 0 prepends, anything else inserts before the child
+// currently at that index
 void dt_gui_menu_insert(GtkWidget *menu, GtkWidget *item, gint pos)
 {
   g_return_if_fail(GTK_IS_WIDGET(menu));
   g_return_if_fail(GTK_IS_WIDGET(item));
   GtkWidget *box = _dt_gui_menu_get_box(menu);
-  if(pos <= 0)
+  if(pos < 0)
+    gtk_box_append(GTK_BOX(box), item);
+  else if(pos == 0)
     gtk_box_prepend(GTK_BOX(box), item);
   else
   {
@@ -5382,10 +5392,22 @@ static GtkWidget *_dt_gui_menu_get_root(GtkWidget *menu)
   {
     GtkWidget *box = _dt_gui_menu_get_box(menu);
     if(!box) break; // not one of ours
-    GtkWidget *parent = gtk_widget_get_parent(box);   // the contents node
-    parent = parent ? gtk_widget_get_parent(parent) : NULL;
-    if(GTK_IS_POPOVER(parent) && _dt_gui_menu_get_box(parent))
-      menu = parent; // @menu is a submenu inside @parent's box
+    /* a submenu popover is parented into the host menu's box (see
+     * _dt_gui_menu_attach_submenu); the box's own parent chain is
+     * box -> contents -> the host menu popover.  The root menu is
+     * parented to its anchor (a panel or window), so the climb stops
+     * there.  Walking the box's parent chain instead of the popover's
+     * would loop: a popover's box is always nested in the popover
+     * itself (contents node). */
+    GtkWidget *parent = gtk_widget_get_parent(menu);
+    GtkWidget *host = NULL;
+    if(parent)
+    {
+      host = gtk_widget_get_parent(parent);
+      host = host ? gtk_widget_get_parent(host) : NULL;
+    }
+    if(GTK_IS_POPOVER(host) && _dt_gui_menu_get_box(host))
+      menu = host; // @menu is a submenu inside @host's box
     else
       break;
   }
@@ -5398,9 +5420,12 @@ static GtkWidget *_dt_gui_menu_get_root(GtkWidget *menu)
 // deactivate->unref).  The close handler runs AFTER the item's own handlers
 // (g_signal_connect_after): the emission holds a ref on the item, so the
 // menu can die mid-emission without a use-after-free in the item handler.
-static void _dt_gui_menu_item_close(GtkWidget *menu, gpointer user_data)
+static void _dt_gui_menu_item_close(GtkWidget *item, gpointer user_data)
 {
-  (void)user_data;
+  (void)item;
+  // g_signal_connect_after(item, "clicked", ...) delivers (item, menu):
+  // the root menu to close is the user_data passed at connect time
+  GtkWidget *menu = user_data;
   gtk_popover_popdown(GTK_POPOVER(_dt_gui_menu_get_root(menu)));
 }
 
@@ -5408,17 +5433,37 @@ static void _dt_gui_menu_item_connect_close(GtkWidget *menu, GtkWidget *item)
 {
   // submenu items toggle their own popover and keep the menu open
   if(g_object_get_data(G_OBJECT(item), DT_GUI_MENU_ITEM_SUBMENU)) return;
+  // plain items close the menu on click (one-shot); check/radio items are
+  // not GtkButtons in GTK4, so they never reach here and the menu stays
+  // open for multi-select popups (GTK3 parity)
   if(!GTK_IS_BUTTON(item)) return;
   g_signal_connect_after(item, "clicked",
                          G_CALLBACK(_dt_gui_menu_item_close), menu);
 }
 
+/* one-shot menu teardown, deferred: "closed" fires inside
+ * gtk_popover_popdown() -> gtk_widget_set_visible(FALSE) -> hide, and
+ * popdown's cascade_popdown() re-touches the popover after the emission.
+ * Unparenting from the handler would drop the last ref and finalize the
+ * popover mid-popdown (use-after-free); an idle runs after popdown
+ * returned, when unparenting (and the finalize it triggers) is safe.  The
+ * menu was sunk at popup time (see dt_gui_menu_popup), so this unref
+ * always finalizes it once no anchor owns it anymore. */
+static gboolean _dt_gui_menu_closed_idle(gpointer user_data)
+{
+  GtkWidget *menu = user_data;
+  // the anchor may have died since: then GTK already unparented the
+  // popover and only our idle ref keeps it alive
+  if(gtk_widget_get_parent(menu))
+    gtk_widget_unparent(menu);
+  g_object_unref(menu);
+  return G_SOURCE_REMOVE;
+}
+
 static void _dt_gui_menu_closed(GtkPopover *menu, gpointer user_data)
 {
   (void)user_data;
-  // one-shot menu: unparenting finalizes the popover (nobody else refs),
-  // whose GtkBox.dispose unparents the items and any submenu popovers
-  gtk_widget_unparent(GTK_WIDGET(menu));
+  g_idle_add(_dt_gui_menu_closed_idle, g_object_ref(GTK_WIDGET(menu)));
 }
 
 GtkWidget *dt_gui_menu_item_new(const gchar *label)
@@ -5513,13 +5558,20 @@ static void _dt_gui_menu_item_submenu_clicked(GtkButton *button,
 void dt_gui_menu_item_set_active(GtkWidget *item, gboolean active)
 {
   g_return_if_fail(GTK_IS_WIDGET(item));
-  if(GTK_IS_TOGGLE_BUTTON(item))
+  /* GtkCheckButton is NOT a GtkToggleButton in GTK4: check items (the
+   * only toggling menu item type dt_gui_menu_* produces) need the check
+   * API, so GTK_IS_TOGGLE_BUTTON alone silently no-op'd them */
+  if(GTK_IS_CHECK_BUTTON(item))
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(item), active);
+  else if(GTK_IS_TOGGLE_BUTTON(item))
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(item), active);
 }
 
 gboolean dt_gui_menu_item_get_active(GtkWidget *item)
 {
   g_return_val_if_fail(GTK_IS_WIDGET(item), FALSE);
+  if(GTK_IS_CHECK_BUTTON(item))
+    return gtk_check_button_get_active(GTK_CHECK_BUTTON(item));
   if(GTK_IS_TOGGLE_BUTTON(item))
     return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(item));
   return FALSE;
@@ -5541,8 +5593,22 @@ void dt_gui_menu_popup(GtkWidget *menu, GtkWidget *anchor)
   g_return_if_fail(GTK_IS_POPOVER(menu));
   if(anchor)
   {
-    dt_gui_popover_attach(menu, anchor);
+    /* plain set_parent, NOT dt_gui_popover_attach(): the attach helper's
+     * anchor-destroy hook holds a reference on the popover, which would
+     * keep the dead one-shot menu tree alive (finalize deferred until the
+     * anchor dies) and leak one tree per menu open.  One-shot menus own
+     * their lifetime through the "closed"->unparent hook below; an anchor
+     * destroyed mid-popup unparents the popover with it (GtkWindow.dispose
+     * unparents its child). */
+    gtk_widget_set_parent(menu, anchor);
     gtk_popover_set_position(GTK_POPOVER(menu), GTK_POS_BOTTOM);
+  }
+  else
+  {
+    /* never parented: sink the floating ref from gtk_popover_new() so the
+     * closed-idle's unref finalizes the menu instead of leaving a
+     * floating leak */
+    g_object_ref_sink(menu);
   }
   // one-shot: the menu unparents itself when it closes (see the comment
   // above _dt_gui_menu_closed); submenu popdown hooks were connected
@@ -5576,7 +5642,11 @@ void dt_gui_container_destroy_children(GtkWidget *container)
   while(child)
   {
     GtkWidget *next = gtk_widget_get_next_sibling(child);
-    gtk_widget_destroy(child);
+    // unparent drops the container's ref and finalizes the child when
+    // nobody else refs it (dispose runs as part of finalize); running
+    // g_object_run_dispose() on a PARENTED child is a GTK4 bug (critical
+    // + dangling children-list link)
+    gtk_widget_unparent(child);
     child = next;
   }
 #else

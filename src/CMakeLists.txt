@@ -1098,6 +1098,14 @@ if(BUILD_TESTING)
   add_subdirectory(tests)
 endif(BUILD_TESTING)
 
+# GTK4 port behavior-verification suite (agent-docs/TEST.md): g_test-based
+# UI tests for the port's event wiring / widget ownership / menu machinery.
+# Deliberately independent of BUILD_TESTING -- it is the port's workbench
+# and must run on any GTK4 build.
+if(USE_GTK4)
+  add_subdirectory(tests/gtk4)
+endif(USE_GTK4)
+
 #
 # build darktable executable
 #
