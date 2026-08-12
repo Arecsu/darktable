@@ -202,6 +202,18 @@ void dt_bauhaus_widget_set_show_extended_label(GtkWidget *widget,
 // Used by callers that want the popup without sending the widget a synthetic
 // button press (which a gesture-based widget cannot handle cleanly)
 void dt_bauhaus_widget_show_popup(GtkWidget *widget);
+// popup handler cores (plain signatures).  The popup's gesture/motion
+// wrappers extract GTK event state and call these; tests drive them
+// directly, because synthetic signal emission does not populate
+// gtk_gesture_single_get_current_button() or the controller's current
+// event.  Coordinates are in _window_motion_handle()'s frame: GTK4
+// surface-relative, GTK3 root.
+void dt_bauhaus_popup_motion(gdouble root_x, gdouble root_y,
+                             GdkModifierType state);
+void dt_bauhaus_popup_button_press(guint button, GdkModifierType state,
+                                   gdouble root_x, gdouble root_y,
+                                   guint time);
+void dt_bauhaus_popup_button_release(guint button);
 void dt_bauhaus_widget_set_module(GtkWidget *widget,
                                   dt_action_t *module);
 gpointer dt_bauhaus_widget_get_module(GtkWidget *widget);

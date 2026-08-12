@@ -27,6 +27,7 @@ void dt_test_harness_register(void);
 void dt_test_menu_register(void);
 void dt_test_container_register(void);
 void dt_test_controller_register(void);
+void dt_test_bauhaus_register(void);
 
 /* g_test_skip() when the process has no display.  Widget construction and
  * controller/gesture signal emission work without one, but realize/show/

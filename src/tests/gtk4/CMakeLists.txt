@@ -13,6 +13,7 @@ add_executable(darktable-test-gtk4
   test_menu.c
   test_container.c
   test_controller.c
+  test_bauhaus.c
 )
 
 set_target_properties(darktable-test-gtk4 PROPERTIES LINKER_LANGUAGE C)

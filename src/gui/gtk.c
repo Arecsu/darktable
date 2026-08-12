@@ -2789,6 +2789,17 @@ GtkWidget *dt_ui_main_window(const dt_ui_t *ui)
   return ui->main_window;
 }
 
+struct dt_ui_t *dt_ui_new(GtkWidget *main_window)
+{
+  /* bare ui container: zeroed dt_ui_t with only main_window set, no panels
+   * built.  The app builds the real tree in dt_gui_gtk_init(); tests use
+   * this to satisfy the few helpers that read darktable.gui->ui (bauhaus
+   * theme load and popup transient) without constructing the whole UI. */
+  struct dt_ui_t *ui = g_malloc0(sizeof(dt_ui_t));
+  ui->main_window = main_window;
+  return ui;
+}
+
 static GtkWidget *_ui_init_panel_container_top(GtkWidget *container)
 {
   GtkWidget *w = gtk_box_new(GTK_ORIENTATION_VERTICAL, DT_UI_PANEL_MODULE_SPACING);

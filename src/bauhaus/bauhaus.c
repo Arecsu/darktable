@@ -727,12 +727,11 @@ static void _window_motion_handler(GtkEventControllerMotion *controller,
   // the popup window is a toplevel, but take root coordinates anyway to stay
   // in the same coordinate space as the old GdkEvent handler (GTK4 falls
   // back to surface-relative coordinates, see dt_gui_get_event_coords())
-  gdouble root_x = 0.0, root_y = 0.0;
+  gdouble root_x = x, root_y = y;
   GdkEvent *event = dt_gui_get_current_event(GTK_EVENT_CONTROLLER(controller));
   if(event) dt_gui_get_event_coords(event, &root_x, &root_y);
-  _window_motion_handle(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller)),
-                        root_x, root_y,
-                        dt_gui_get_current_event_state(GTK_EVENT_CONTROLLER(controller)));
+  dt_bauhaus_popup_motion(root_x, root_y,
+                          dt_gui_get_current_event_state(GTK_EVENT_CONTROLLER(controller)));
 #if !GTK_CHECK_VERSION(4, 0, 0)
   if(event) gdk_event_free(event);
 #endif
@@ -745,14 +744,82 @@ static void _popup_leave_cb(GtkEventControllerMotion *controller,
   gtk_widget_set_state_flags(widget, GTK_STATE_FLAG_NORMAL, TRUE);
 }
 
+/* ---- popup handler cores (plain signatures) ------------------------------
+ * The gesture/motion wrappers extract GTK event state and call these.  They
+ * are public so the test suite can drive the popup with synthetic values:
+ * synthetic signal emission does not populate
+ * gtk_gesture_single_get_current_button() or the current event, so a
+ * handler that reads them would see garbage (see agent-docs/TEST.md).
+ * Coordinates are in the frame _window_motion_handle() expects: GTK4
+ * surface-relative, GTK3 root. */
+
+void dt_bauhaus_popup_motion(gdouble root_x,
+                             gdouble root_y,
+                             GdkModifierType state)
+{
+  dt_bauhaus_t *bh = darktable.bauhaus;
+  if(!bh->current) return;
+  _window_motion_handle(bh->popup.area, root_x, root_y, state);
+}
+
+void dt_bauhaus_popup_button_press(guint button,
+                                   GdkModifierType state,
+                                   gdouble root_x,
+                                   gdouble root_y,
+                                   guint time)
+{
+  dt_bauhaus_t *bh = darktable.bauhaus;
+  dt_bauhaus_widget_t *w = bh->current;
+  if(!w) return;
+
+  // reject clicks that come from outside the popup area window: GTK4 removed
+  // gtk_grab_add(), pointer events are only delivered inside the popup's own
+  // surface, so there is nothing foreign to reject (the GTK3 window check
+  // lives in the gesture wrapper below).
+  if(button == GDK_BUTTON_PRIMARY)
+  {
+    // only accept left mouse click
+    gtk_widget_set_state_flags(GTK_WIDGET(w),
+                               GTK_STATE_FLAG_FOCUSED, FALSE);
+
+    if(w->type == DT_BAUHAUS_COMBOBOX
+       && !dt_gui_long_click(time, bh->opentime))
+    {
+      // counts as double click, reset:
+      if(!(dt_modifier_is(state, GDK_CONTROL_MASK) && w->field
+          && dt_gui_presets_autoapply_for_module((dt_iop_module_t *)w->module,
+                                                 GTK_WIDGET(w))))
+        dt_bauhaus_widget_reset(GTK_WIDGET(w));
+    }
+
+    bh->change_active = TRUE;
+    _window_motion_handle(bh->popup.area, root_x, root_y,
+                          state | GDK_BUTTON1_MASK);
+  }
+  else if(button == GDK_BUTTON_MIDDLE && w->type == DT_BAUHAUS_SLIDER)
+    _slider_zoom_range(w, 0);
+  else
+    _popup_reject();
+}
+
+void dt_bauhaus_popup_button_release(guint button)
+{
+  dt_bauhaus_t *bh = darktable.bauhaus;
+  if(bh->change_active && button != GDK_BUTTON_MIDDLE)
+    _popup_hide();
+}
+
 static void _popup_button_release_cb(GtkGestureSingle *gesture,
                                        gint n_press,
                                        gdouble x,
                                        gdouble y,
                                        gpointer user_data)
 {
-  if(darktable.bauhaus->change_active && gtk_gesture_single_get_current_button(gesture) != GDK_BUTTON_MIDDLE)
-    _popup_hide();
+  (void)n_press;
+  (void)x;
+  (void)y;
+  (void)user_data;
+  dt_bauhaus_popup_button_release(gtk_gesture_single_get_current_button(gesture));
 }
 
 static void _popup_button_press_cb(GtkGestureSingle *gesture,
@@ -761,21 +828,13 @@ static void _popup_button_press_cb(GtkGestureSingle *gesture,
                                      gdouble y,
                                      gpointer user_data)
 {
-  dt_bauhaus_t *bh = darktable.bauhaus;
-  dt_bauhaus_widget_t *w = bh->current;
-  const guint button = gtk_gesture_single_get_current_button(gesture);
-
+  (void)n_press;
+  (void)user_data;
+#if !GTK_CHECK_VERSION(4, 0, 0)
   // reject clicks that come from outside the popup area window.  Under GTK3
   // the popup holds a grab (gtk_grab_add() in _window_show), so foreign
   // clicks still arrive at this gesture and the window comparison rejects
-  // them.  GTK4 removed gtk_grab_add(): pointer events are only delivered
-  // inside the popup's own surface, so there is nothing foreign to reject --
-  // and gtk_widget_get_surface() is not public API; the naive
-  // gtk_native_get_surface(gtk_widget_get_native()) replacement would always
-  // return the event's own surface and never fire.
-#if GTK_CHECK_VERSION(4, 0, 0)
-  /* GTK4: no foreign clicks to reject (see above). */
-#else
+  // them.
   const GdkEvent *cur_event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), NULL);
   if(cur_event
      && dt_gdk_event_get_window(cur_event) != gtk_widget_get_window(dt_gui_get_widget(gesture)))
@@ -785,41 +844,19 @@ static void _popup_button_press_cb(GtkGestureSingle *gesture,
   }
 #endif
 
-  if(button == GDK_BUTTON_PRIMARY)
+  const guint button = gtk_gesture_single_get_current_button(gesture);
+  GdkModifierType state = 0;
+  gdouble root_x = x, root_y = y; /* gesture coords are surface-relative on GTK4 */
+  guint time = 0;
+  const GdkEvent *last = gtk_gesture_get_last_event(GTK_GESTURE(gesture), NULL);
+  if(last)
   {
-    // only accept left mouse click
-    gtk_widget_set_state_flags(GTK_WIDGET(w),
-                               GTK_STATE_FLAG_FOCUSED, FALSE);
-
-    if(w->type == DT_BAUHAUS_COMBOBOX
-       && !dt_gui_long_click(gdk_event_get_time(gtk_gesture_get_last_event(GTK_GESTURE(gesture), NULL)), bh->opentime))
-    {
-      // counts as double click, reset:
-      const GdkModifierType state =
-        dt_gui_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
-      if(!(dt_modifier_is(state, GDK_CONTROL_MASK) && w->field
-          && dt_gui_presets_autoapply_for_module((dt_iop_module_t *)w->module,
-                                                 GTK_WIDGET(w))))
-        dt_bauhaus_widget_reset(GTK_WIDGET(w));
-    }
-
-    bh->change_active = TRUE;
-    GtkWidget *w_current = dt_gui_get_widget(gesture);
-    const GdkEvent *current_event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), NULL);
-    if(current_event)
-    {
-      GdkModifierType motion_state = dt_gdk_event_get_state(current_event);
-      motion_state |= GDK_BUTTON1_MASK;
-      _window_motion_handle(w_current,
-                                dt_gdk_event_get_root_x(current_event),
-                                dt_gdk_event_get_root_y(current_event),
-                                motion_state);
-    }
+    state = dt_gdk_event_get_state(last);
+    root_x = dt_gdk_event_get_root_x(last);
+    root_y = dt_gdk_event_get_root_y(last);
+    time = gdk_event_get_time((GdkEvent *)last);
   }
-  else if(button == GDK_BUTTON_MIDDLE && w->type == DT_BAUHAUS_SLIDER)
-    _slider_zoom_range(w, 0);
-  else
-    _popup_reject();
+  dt_bauhaus_popup_button_press(button, state, root_x, root_y, time);
 }
 
 static void _window_show(GtkWidget *w, gpointer user_data)
@@ -2721,6 +2758,10 @@ static gboolean _popup_draw(GtkWidget *widget,
   dt_bauhaus_t *bh = darktable.bauhaus;
   dt_bauhaus_popup_t *pop = &bh->popup;
   dt_bauhaus_widget_t *w = bh->current;
+
+  // a draw can be queued right before the popup hides (drag -> release);
+  // with current cleared the old drawing has nothing to draw
+  if(!w) return TRUE;
 
   // dimensions of the popup
   const int width = gtk_widget_get_allocated_width(widget);

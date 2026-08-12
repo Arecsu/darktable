@@ -488,6 +488,9 @@ GtkWidget *dt_ui_center_base(const struct dt_ui_t *ui);
 GtkWidget *dt_ui_snapshot(const struct dt_ui_t *ui);
 /** \brief get the main window widget */
 GtkWidget *dt_ui_main_window(const struct dt_ui_t *ui);
+/** \brief allocate a bare ui container with main_window set (tests /
+ * embedding; the app builds the real tree via dt_gui_gtk_init) */
+struct dt_ui_t *dt_ui_new(GtkWidget *main_window);
 /** \brief get the thumb table */
 struct dt_thumbtable_t *dt_ui_thumbtable(const struct dt_ui_t *ui);
 /** \brief get the log message widget */
