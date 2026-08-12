@@ -314,6 +314,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK4 REQUIRED gtk4>=4.10)
 add_definitions("-DGDK_VERSION_MIN_REQUIRED=GDK_VERSION_4_10")
 include_directories(SYSTEM ${GTK4_INCLUDE_DIRS})
+list(APPEND LIBS ${GTK4_LDFLAGS})
 list(APPEND LIBS ${GTK4_LIBRARIES})
 
 # Check for libxml2 / broken cmake module can't be included in the foreach() below

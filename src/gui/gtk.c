@@ -73,7 +73,7 @@
 #ifdef MAC_INTEGRATION
 #include <gtkosxapplication.h>
 #endif
-#ifdef GDK_WINDOWING_QUARTZ
+#if defined(GDK_WINDOWING_QUARTZ) || defined(GDK_WINDOWING_MACOS)
 #include "osx/osx.h"
 #endif
 #ifdef _WIN32
@@ -318,12 +318,17 @@ static gchar *_panels_get_panel_path(const dt_ui_panel_t panel,
 static gboolean _panel_is_visible(const dt_ui_panel_t panel)
 {
   gchar *key = _panels_get_view_path("panel_collaps_state");
+  if(!key)
+    return FALSE; // view manager not initialized yet (e.g. click during splash)
   if(dt_conf_get_int(key))
   {
     g_free(key);
     return FALSE;
   }
+  g_free(key);
   key = _panels_get_panel_path(panel, "_visible");
+  if(!key)
+    return FALSE;
   const gboolean ret = dt_conf_get_bool(key);
   g_free(key);
   return ret;
@@ -466,6 +471,12 @@ static void _borders_button_pressed(GtkGestureSingle *gesture,
                                      gdouble y,
                                      gpointer user_data)
 {
+  /* GTK4 port: clicks on the border while the splash screen is up must be
+   * ignored — the view manager (and the panel config keys derived from it)
+   * do not exist yet.  Same guard as _handle_panel_widths(). */
+  if(!g_atomic_int_get(&darktable.gui_running))
+    return;
+
   _panel_toggle(GPOINTER_TO_INT(user_data), darktable.gui->ui);
 }
 
@@ -1013,6 +1024,7 @@ out:
 #if !GTK_CHECK_VERSION(4, 0, 0)
   gdk_event_free(event);
 #endif
+  (void)event;
 }
 
 #if !GTK_CHECK_VERSION(4, 0, 0)
@@ -1480,6 +1492,7 @@ static const char* _get_source_name(const int pos)
   return SOURCE_NAMES[pos];
 }
 
+#ifndef __APPLE__
 static void _open_url_done(GObject *source, GAsyncResult *res, gpointer user_data)
 {
   GtkUriLauncher *launcher = GTK_URI_LAUNCHER(source);
@@ -1497,6 +1510,7 @@ static void _open_url_done(GObject *source, GAsyncResult *res, gpointer user_dat
   }
   g_object_unref(launcher);
 }
+#endif
 
 void dt_open_url(const char* url)
 {
@@ -2277,10 +2291,8 @@ static void _init_main_table(GtkWidget *container)
   /* initialize right panel */
   _ui_init_panel_right(darktable.gui->ui, container);
 
-  gtk_window_present(GTK_WINDOW(darktable.gui->ui->main_window));
-
-   dt_action_define(&darktable.control->actions_focus, NULL,
-                    N_("tabs"), NULL, &_action_def_focus_tabs);
+  dt_action_define(&darktable.control->actions_focus, NULL,
+                   N_("tabs"), NULL, &_action_def_focus_tabs);
 }
 
 void dt_ui_container_swap_left_right(struct dt_ui_t *ui,

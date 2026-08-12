@@ -107,6 +107,7 @@ void dt_view_manager_cleanup(dt_view_manager_t *vm)
 
 const dt_view_t *dt_view_manager_get_current_view(const dt_view_manager_t *vm)
 {
+  if(!vm) return NULL;
   return vm->current_view;
 }
 
@@ -208,6 +209,7 @@ static void _show_hide_toolbox_widget(GtkWidget *widget,
 gboolean dt_view_manager_switch(dt_view_manager_t *vm,
                                 const char *view_name)
 {
+  if(!vm) return FALSE;
   gboolean switching_to_none = *view_name == '\0';
   dt_view_t *new_view = NULL;
 
@@ -232,6 +234,7 @@ gboolean dt_view_manager_switch(dt_view_manager_t *vm,
 gboolean dt_view_manager_switch_by_view(dt_view_manager_t *vm,
                                         const dt_view_t *nv)
 {
+  if(!vm) return FALSE;
   dt_view_t *old_view = vm->current_view;
   dt_view_t *new_view = (dt_view_t *)nv; // views belong to us, we can de-const them :-)
 
@@ -472,7 +475,7 @@ gboolean dt_view_manager_switch_by_view(dt_view_manager_t *vm,
 
 const char *dt_view_manager_name(const dt_view_manager_t *vm)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
     return "";
   if(vm->current_view->name)
     return vm->current_view->name(vm->current_view);
@@ -487,7 +490,7 @@ void dt_view_manager_expose(dt_view_manager_t *vm,
                             const int32_t pointerx,
                             const int32_t pointery)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
   {
     dt_gui_gtk_set_source_rgb(cr, DT_GUI_COLOR_BG);
     cairo_paint(cr);
@@ -533,7 +536,7 @@ void dt_view_manager_expose(dt_view_manager_t *vm,
 
 void dt_view_manager_reset(dt_view_manager_t *vm)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
     return;
   if(vm->current_view->reset)
     vm->current_view->reset(vm->current_view);
@@ -541,7 +544,7 @@ void dt_view_manager_reset(dt_view_manager_t *vm)
 
 void dt_view_manager_mouse_leave(dt_view_manager_t *vm)
 {
-  if(!vm->current_view) return;
+  if(!vm || !vm->current_view) return;
   dt_view_t *v = vm->current_view;
 
   /* lets check if any plugins want to handle mouse move */
@@ -565,7 +568,7 @@ void dt_view_manager_mouse_leave(dt_view_manager_t *vm)
 
 void dt_view_manager_mouse_enter(dt_view_manager_t *vm)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
     return;
   if(vm->current_view->mouse_enter)
     vm->current_view->mouse_enter(vm->current_view);
@@ -577,7 +580,7 @@ void dt_view_manager_mouse_moved(dt_view_manager_t *vm,
                                  const double pressure,
                                  const int which)
 {
-  if(!vm->current_view) return;
+  if(!vm || !vm->current_view) return;
   dt_view_t *v = vm->current_view;
 
   /* lets check if any plugins want to handle mouse move */
@@ -605,7 +608,7 @@ int dt_view_manager_button_released(dt_view_manager_t *vm,
                                     const int which,
                                     const uint32_t state)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
     return 0;
   dt_view_t *v = vm->current_view;
 
@@ -640,7 +643,7 @@ int dt_view_manager_button_pressed(dt_view_manager_t *vm,
                                    const int type,
                                    const uint32_t state)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
     return 0;
   dt_view_t *v = vm->current_view;
 
@@ -688,7 +691,7 @@ void dt_view_manager_scrolled(dt_view_manager_t *vm,
                               const int up,
                               const int state)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
     return;
   if(vm->current_view->scrolled)
     vm->current_view->scrolled(vm->current_view, x, y, up, state);
@@ -701,7 +704,7 @@ gboolean dt_view_manager_gesture_pan(dt_view_manager_t *vm,
                                      const double dy,
                                      const int state)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
   {
     return FALSE;
   }
@@ -724,7 +727,7 @@ gboolean dt_view_manager_gesture_pinch(dt_view_manager_t *vm,
                                        const double scale,
                                        const int state)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
   {
     return FALSE;
   }
@@ -742,7 +745,7 @@ void dt_view_manager_scrollbar_changed(dt_view_manager_t *vm,
                                        const double x,
                                        const double y)
 {
-  if(!vm->current_view)
+  if(!vm || !vm->current_view)
     return;
   if(vm->current_view->scrollbar_changed)
     vm->current_view->scrollbar_changed(vm->current_view, x, y);
@@ -1367,7 +1370,7 @@ dt_imgid_t dt_view_lighttable_get_culling_selection(dt_view_manager_t *vm)
 
 gboolean dt_view_lighttable_preview_state(dt_view_manager_t *vm)
 {
-  if(vm->proxy.lighttable.module)
+  if(vm && vm->proxy.lighttable.module)
     return vm->proxy.lighttable.get_preview_state(vm->proxy.lighttable.view);
   else
     return FALSE;
@@ -1379,7 +1382,7 @@ void dt_view_lighttable_set_preview_state(dt_view_manager_t *vm,
                                           const gboolean focus,
                                           const dt_lighttable_culling_restriction_t restriction)
 {
-  if(vm->proxy.lighttable.module)
+  if(vm && vm->proxy.lighttable.module)
     vm->proxy.lighttable.set_preview_state(vm->proxy.lighttable.view, state, sticky, focus, restriction);
 }
 

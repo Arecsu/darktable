@@ -41,6 +41,13 @@ static inline char *_conf_get_var(const char *name)
 {
   char *str;
 
+  /* GTK4 port: NULL names (e.g. panel keys derived from a not-yet-existing
+   * view manager during splash) must behave like a missing key.  Homebrew
+   * glib is built with G_DISABLE_CHECKS, so g_hash_table_lookup()'s own
+   * key!=NULL guard is compiled out and a NULL key would segfault in
+   * g_str_hash().  An empty value keeps every caller's dereference safe. */
+  if(!name) return (char *)"";
+
   dt_pthread_mutex_lock(&darktable.conf->mutex);
 
   str = (char *)g_hash_table_lookup(darktable.conf->override_entries, name);
@@ -73,6 +80,9 @@ fin:
  * return 1 if key/value is still the one passed on commandline. */
 static int _conf_set_if_not_overridden(const char *name, char *str)
 {
+  /* GTK4 port: NULL name -> no-op (return 1 so the caller frees str). */
+  if(!name) return 1;
+
   dt_pthread_mutex_lock(&darktable.conf->mutex);
 
   char *over = (char *)g_hash_table_lookup(darktable.conf->override_entries, name);
@@ -595,6 +605,10 @@ void dt_conf_init(dt_conf_t *cf,
 /** check if key exists, return 1 if lookup succeeded, 0 if failed..*/
 gboolean dt_conf_key_exists(const char *key)
 {
+  /* GTK4 port: NULL key -> does not exist (see _conf_get_var). */
+  if(!key)
+    return FALSE;
+
   dt_pthread_mutex_lock(&darktable.conf->mutex);
   const gboolean res = (g_hash_table_lookup(darktable.conf->table, key) != NULL)
                   || (g_hash_table_lookup(darktable.conf->override_entries, key) != NULL);
@@ -605,6 +619,10 @@ gboolean dt_conf_key_exists(const char *key)
 /** remove key from conf */
 void dt_conf_remove_key(const char *key)
 {
+  /* GTK4 port: NULL key -> no-op (see _conf_get_var). */
+  if(!key)
+    return;
+
   dt_pthread_mutex_lock(&darktable.conf->mutex);
   g_hash_table_remove(darktable.conf->table, key);
   dt_pthread_mutex_unlock(&darktable.conf->mutex);
@@ -661,6 +679,10 @@ dt_confgen_type_t dt_confgen_type(const char *name)
 gboolean dt_confgen_value_exists(const char *name,
                                  const dt_confgen_value_kind_t kind)
 {
+  /* GTK4 port: NULL name -> missing key (see _conf_get_var). */
+  if(!name)
+    return FALSE;
+
   const dt_confgen_value_t *item = g_hash_table_lookup(darktable.conf->x_confgen, name);
   if(item == NULL)
     return FALSE;
@@ -682,6 +704,10 @@ gboolean dt_confgen_value_exists(const char *name,
 const char *dt_confgen_get(const char *name,
                            const dt_confgen_value_kind_t kind)
 {
+  /* GTK4 port: NULL name -> no entry (see _conf_get_var). */
+  if(!name)
+    return NULL;
+
   const dt_confgen_value_t *item = g_hash_table_lookup(darktable.conf->x_confgen, name);
 
   if(item)

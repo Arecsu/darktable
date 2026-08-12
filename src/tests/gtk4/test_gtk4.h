@@ -30,6 +30,8 @@ void dt_test_controller_register(void);
 void dt_test_bauhaus_register(void);
 void dt_test_iopheader_register(void);
 void dt_test_gesture_register(void);
+void dt_test_panel_register(void);
+void dt_test_view_register(void);
 
 /* g_test_skip() when the process has no display.  Widget construction and
  * controller/gesture signal emission work without one, but realize/show/
