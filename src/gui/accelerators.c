@@ -2373,12 +2373,24 @@ static gboolean _action_find_and_expand(GtkTreeModel *model,
   return FALSE;
 }
 
-/* The treeview's internal bubble-phase GtkGestureClick does NOT process
- * clicks: the pre-migration button-press-event handler consumed the events
- * (return TRUE), which suppressed the internal gesture; the gesture
- * controller replacement must do the same, otherwise the two gestures
- * fight over row selection and expansion.  The sequence is claimed at
- * "pressed" time (dt_gui_gesture_claim_pressed), see A2.10. */
+/* The treeview's internal click gesture (gtktreeview.c: BUBBLE phase, no
+ * explicit phase set) must NOT process clicks: the pre-migration
+ * button-press-event handler consumed the events (return TRUE), which
+ * suppressed the internal gesture; the controller replacement must do the
+ * same, otherwise the two handlers fight over row selection and
+ * expansion.  The claim at "pressed" time (dt_gui_gesture_claim_pressed,
+ * A2.10) achieves this here even though it cannot reach same-widget
+ * gestures: once the claim sets OUR capture-phase gesture's sequence
+ * state to CLAIMED, gtk_gesture_handle_event() returns TRUE for the
+ * press, _gtk_widget_captured_event() reports the event handled and
+ * gtk_propagate_event() breaks the capture walk -- which SKIPS the
+ * bubble phase entirely, so the internal BUBBLE gesture never sees the
+ * press or the release (Session 14, verified against gtkwidget.c /
+ * gtkgesture.c / gtktreeview.c).  This is why the button sites need the
+ * extra dt_gui_consume_pointer() controller instead: GtkButton's
+ * internal gesture is CAPTURE-phase on the button itself, so it runs in
+ * the same controller dispatch loop as our claim gesture, which a
+ * gesture's TRUE return cannot break. */
 
 static void _action_view_click_cb(GtkGestureSingle *gesture, int n_press, double x, double y, GtkTreeStore *model_data)
 {

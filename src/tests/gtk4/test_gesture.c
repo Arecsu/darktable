@@ -20,8 +20,10 @@
  * the capture-phase "pressed"-time claim (dt_gui_gesture_claim_pressed),
  * the any-button (button=0) requirement that kept right/middle clicks
  * alive after GtkGestureMultiPress became GtkGestureClick, the
- * DT_ACTION_GESTURE_KEY shortcut seam, and the cancel → released
- * re-emission.  All headless: widget construction + signal emission need
+ * DT_ACTION_GESTURE_KEY shortcut seam, the cancel → released
+ * re-emission, and (Session 14) the dt_gui_consume_pointer() controller
+ * that makes the claim actually suppress GtkButton's own "clicked" on
+ * real clicks.  All headless: widget construction + signal emission need
  * no display (see agent-docs/TEST.md).  Gesture *sequence state* (what
  * gtk_gesture_single_get_current_sequence() reports) is not populated by
  * synthetic emission, so the claim itself is asserted as a safe no-op --
@@ -29,14 +31,18 @@
  *
  * togglebutton-capture-claim locks the REAL widget topology the port
  * produces today (verified against /tmp/gtk4 sources + a controller-dump
- * probe, Session 13): BOTH capture-phase GtkGestureClicks are on the
- * BUTTON, ours FIRST (gtk_widget_add_controller PREPENDS), the button's
- * internal one GDK_BUTTON_PRIMARY-only.  The claim's suppression of the
- * button's own "clicked" does NOT work with this ordering (the claim
- * cannot reach a same-widget gesture that hasn't processed the press
- * yet) -- the fix (attach the claim gesture to the button's CHILD in
- * capture phase, so the button's gesture has the point when the claim
- * cancels it) must UPDATE these assertions. */
+ * probe, Session 13/14): on the BUTTON, in controller-list order, a
+ * CAPTURE GtkGestureClick of ours (any button, first), a CAPTURE
+ * GtkEventControllerLegacy (the consume controller -- a NON-gesture, the
+ * only kind whose TRUE return breaks gtk_widget_run_controllers()'s
+ * dispatch loop, so the button's own CAPTURE GtkGestureClick
+ * (GDK_BUTTON_PRIMARY-only, last) never processes press/release and
+ * never emits "clicked").  The claim's suppression-by-sequence-state is
+ * impossible against a same-widget CAPTURE gesture; the legacy
+ * controller is what does the job.  The treeview site works without it
+ * because the treeview's internal gesture is BUBBLE: our capture claim's
+ * TRUE return stops the capture walk and skips the bubble phase
+ * (treeview-internal-bubble locks that topology). */
 
 #include "test_gtk4.h"
 
@@ -126,27 +132,32 @@ static void test_togglebutton_capture_claim(void)
                                          G_CALLBACK(_toggle_pressed), FALSE, 0, 0, NULL, NULL);
   g_assert_nonnull(w);
 
-  /* The button carries TWO CAPTURE-phase GtkGestureClick controllers:
-   * GtkButton's own (created in gtk_button_init, GDK_BUTTON_PRIMARY-only)
-   * and ours (added afterwards, any button).  Both on the BUTTON, both
-   * CAPTURE -- the "bubble-phase internal gesture" the A2.10 comment was
-   * written against is a GTK3 memory.  gtk_widget_add_controller()
-   * PREPENDS, so our gesture sits BEFORE the button's in the controller
-   * list and dispatches FIRST (Session 13: this is exactly why the
-   * claim-at-pressed cannot suppress the button's own "clicked" -- the
-   * claim reaches only gestures that already have the sequence's point,
-   * and the button's gesture processes the press after ours). */
+  /* The button carries THREE CAPTURE-phase controllers (Session 14
+   * topology, verified against /tmp/gtk4 sources): in controller-list
+   * order (head = dispatches first, gtk_widget_add_controller PREPENDS):
+   *   1. ours: a GtkGestureClick, any button (0), the claim + the user
+   *      callback on "pressed", stored under DT_ACTION_GESTURE_KEY,
+   *   2. a GtkEventControllerLegacy (dt_gui_consume_pointer): a NON-
+   *      gesture whose TRUE return breaks the dispatch loop, so the
+   *      button's own gesture never processes press/release,
+   *   3. GtkButton's internal GtkGestureClick (created in gtk_button_init,
+   *      GDK_BUTTON_PRIMARY-only) -- it must be LAST. */
   GtkGesture *ours = NULL;
   GtkGesture *button_gesture = NULL;
-  guint ours_index = G_MAXUINT, button_index = G_MAXUINT;
+  GtkEventController *consume = NULL;
+  guint ours_index = G_MAXUINT, consume_index = G_MAXUINT, button_index = G_MAXUINT;
   GListModel *controllers = gtk_widget_observe_controllers(w);
   const guint n = g_list_model_get_n_items(controllers);
   for(guint i = 0; i < n; i++)
   {
     gpointer c = g_list_model_get_item(controllers, i);
-    if(GTK_IS_GESTURE_CLICK(c)
-       && gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(c))
-            == GTK_PHASE_CAPTURE)
+    if(gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(c))
+         != GTK_PHASE_CAPTURE)
+    {
+      g_object_unref(c);
+      continue;
+    }
+    if(GTK_IS_GESTURE_CLICK(c))
     {
       if(gtk_gesture_single_get_button(GTK_GESTURE_SINGLE(c)) == 0)
       {
@@ -160,21 +171,31 @@ static void test_togglebutton_capture_claim(void)
       }
       continue; /* refs kept: unref below */
     }
+    if(GTK_IS_EVENT_CONTROLLER_LEGACY(c))
+    {
+      consume = GTK_EVENT_CONTROLLER(c); /* keep the item ref */
+      consume_index = i;
+      continue;
+    }
     g_object_unref(c);
   }
   g_object_unref(controllers);
 
   g_assert_nonnull(ours);
+  g_assert_nonnull(consume);
   g_assert_nonnull(button_gesture);
-  /* ours dispatches BEFORE the button's internal gesture (prepend order).
-   * Locked here because it is the current-broken-state's defining detail:
-   * with this ordering the claim cannot reach the button's gesture (no
-   * point yet), so GtkButton still emits "clicked" and toggles behind
-   * darktable's callback.  The fix moves our gesture onto the button's
-   * CHILD (capture phase), where the button's gesture has already
-   * processed the press when the claim cancels it -- then this order
-   * assertion inverts (ours lives on a different widget entirely). */
-  g_assert_cmpuint(ours_index, <, button_index);
+  /* ours dispatches FIRST, then the consume controller, then the button's
+   * internal gesture.  This ordering is the fix: the claim gesture runs
+   * the user callback, the legacy controller's TRUE return then breaks
+   * gtk_widget_run_controllers()'s loop (non-gestures are the only
+   * controllers that break it) before the internal gesture runs. */
+  g_assert_cmpuint(ours_index, <, consume_index);
+  g_assert_cmpuint(consume_index, <, button_index);
+  /* the consume controller must NOT be a gesture -- a gesture's TRUE
+   * return does not break the same-widget dispatch loop (only non-gesture
+   * controllers do), which is exactly why the claim alone could never
+   * suppress GtkButton's internal gesture */
+  g_assert_false(GTK_IS_GESTURE(consume));
   /* ours listens to ANY button (the old button-press-event handlers
    * reacted to every button; GtkGestureSingle's default primary-button
    * filter would silently drop right/middle clicks) and is stored under
@@ -192,6 +213,13 @@ static void test_togglebutton_capture_claim(void)
   g_signal_emit_by_name(G_OBJECT(ours), "pressed", 1, (gdouble)3.0, (gdouble)4.0, NULL);
   g_assert_cmpint(_toggle_presses, ==, 1);
 
+  /* synthetic "event" with a NULL event: the consume handler must be
+   * connected and survive (returns FALSE, no crash) -- real GdkEvents
+   * cannot be constructed headlessly (Session 10), so this is the wiring
+   * seam we can lock; the TRUE-return loop-break on real presses is
+   * verified in the app (see TODO.md user checks) */
+  g_signal_emit_by_name(G_OBJECT(consume), "event", NULL);
+
   /* the widget action was registered on the module (dt_action_define_iop
    * appended the referral to widget_list) */
   g_assert_nonnull(module->widget_list);
@@ -199,11 +227,78 @@ static void test_togglebutton_capture_claim(void)
   g_assert_true((GtkWidget *)referral->target == w);
 
   g_object_unref(ours);
+  g_object_unref(consume);
   g_object_unref(button_gesture);
   gtk_widget_destroy(w);
   g_slist_free_full(module->widget_list, g_free);
   g_free(module);
 }
+
+/* The treeview site (accelerators.c _shortcuts_prefs) needs NO consume
+ * controller: GtkTreeView's internal click gesture is BUBBLE-phase (no
+ * explicit phase set, gtktreeview.c), so a CAPTURE claim gesture on the
+ * treeview itself -- whose handle_event returns TRUE once the claim sets
+ * its state to CLAIMED -- stops the capture walk and SKIPS the bubble
+ * phase (gtk_propagate_event: if (handled_event) break), so the internal
+ * gesture never processes press/release.  This locks that load-bearing
+ * topology: internal BUBBLE, ours CAPTURE, ours first. */
+static void test_treeview_internal_bubble(void)
+{
+  GtkWidget *view = gtk_tree_view_new();
+  g_assert_nonnull(view);
+
+  GtkGesture *internal = NULL;
+  guint internal_index = G_MAXUINT;
+  GListModel *controllers = gtk_widget_observe_controllers(view);
+  const guint n = g_list_model_get_n_items(controllers);
+  for(guint i = 0; i < n; i++)
+  {
+    gpointer c = g_list_model_get_item(controllers, i);
+    if(GTK_IS_GESTURE_CLICK(c)
+       && gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(c))
+            == GTK_PHASE_BUBBLE)
+    {
+      internal = c;
+      internal_index = i;
+      break; /* ref kept: unref below */
+    }
+    g_object_unref(c);
+  }
+  g_object_unref(controllers);
+
+  g_assert_nonnull(internal);
+  g_assert_cmpuint(gtk_gesture_single_get_button(GTK_GESTURE_SINGLE(internal)), ==, 0);
+
+  /* our capture claim gesture, added last -> prepended -> dispatches
+   * first; a capture controller always runs before the internal BUBBLE
+   * one, so the claim's TRUE return skips the bubble phase */
+  GtkGesture *ours = gtk_gesture_click_new();
+  gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(ours), GTK_PHASE_CAPTURE);
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(ours), 0);
+  g_signal_connect(ours, "pressed", G_CALLBACK(dt_gui_gesture_claim_pressed), NULL);
+  dt_gui_add_controller(view, ours);
+
+  guint ours_index = G_MAXUINT;
+  controllers = gtk_widget_observe_controllers(view);
+  const guint n2 = g_list_model_get_n_items(controllers);
+  for(guint i = 0; i < n2; i++)
+  {
+    gpointer c = g_list_model_get_item(controllers, i);
+    if(c == ours)
+    {
+      ours_index = i;
+      g_object_unref(c);
+      break;
+    }
+    g_object_unref(c);
+  }
+  g_object_unref(controllers);
+  g_assert_cmpuint(ours_index, <, internal_index);
+
+  g_object_unref(internal);
+  gtk_widget_destroy(view);
+}
+
 
 static void test_claim_pressed_null_sequence(void)
 {
@@ -263,6 +358,7 @@ void dt_test_gesture_register(void)
 {
   g_test_add_func("/gtk4/gesture/claim-pressed-null-sequence", test_claim_pressed_null_sequence);
   g_test_add_func("/gtk4/gesture/togglebutton-capture-claim", test_togglebutton_capture_claim);
+  g_test_add_func("/gtk4/gesture/treeview-internal-bubble", test_treeview_internal_bubble);
   g_test_add_func("/gtk4/gesture/click-secondary-key", test_click_secondary_key);
   g_test_add_func("/gtk4/gesture/cancel-reemits-released", test_cancel_reemits_released);
 }

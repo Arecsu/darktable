@@ -5974,6 +5974,61 @@ void dt_gui_gesture_claim_pressed(GtkGestureSingle *gesture,
     gtk_gesture_set_sequence_state(GTK_GESTURE(gesture), sequence, GTK_EVENT_SEQUENCE_CLAIMED);
 }
 
+/* consume handler for dt_gui_consume_pointer(): return TRUE only for the
+ * events the suppressed internal gesture would process (pointer presses /
+ * releases and their touch equivalents), so motion/scroll/key events keep
+ * flowing to the rest of the widget's controllers.  A NULL event is a
+ * synthetic-emission safety (tests), never happens on real input. */
+static gboolean _consume_pointer_event(GtkEventControllerLegacy *controller,
+                                       GdkEvent *event,
+                                       gpointer user_data)
+{
+  (void)controller;
+  (void)user_data;
+  if(!event) return FALSE;
+  switch(gdk_event_get_event_type(event))
+  {
+    case GDK_BUTTON_PRESS:
+    case GDK_BUTTON_RELEASE:
+    case GDK_TOUCH_BEGIN:
+    case GDK_TOUCH_END:
+    case GDK_TOUCH_CANCEL:
+      return TRUE;
+    default:
+      return FALSE;
+  }
+}
+
+void dt_gui_consume_pointer(GtkWidget *widget)
+{
+  /* GTK3 consumed a togglebutton's clicks by returning TRUE from a
+   * button-press-event handler, which starved the widget's internal
+   * handling (the toggle).  GTK4 has no widget-class button-press handler
+   * to return TRUE from -- GtkButton's internal GtkGestureClick is
+   * CAPTURE-phase and lives on the button itself, so a same-widget claim
+   * gesture cannot reach it either (the claim only touches gestures that
+   * already hold the sequence's point, and the internal one processes the
+   * press after ours -- see the A2.10 analysis in SESSIONS.md Session 13).
+   * The GTK3-equivalent consumption is a CAPTURE-phase NON-gesture
+   * controller returning TRUE: gtk_widget_run_controllers() breaks its
+   * dispatch loop only for non-gesture controllers (gtkwidget.c), so the
+   * button's internal gesture never sees the press/release and never
+   * emits "clicked" -- darktable's callback (connected to the claim
+   * gesture's "pressed") fully controls the toggle state.
+   *
+   * Add the legacy controller BEFORE the claim gesture: gtk_widget_add_
+   * controller() PREPENDS, so the gesture (added afterwards) dispatches
+   * first and runs the user callback; the legacy controller then breaks
+   * the loop before the internal gesture runs.  Covers the whole button
+   * allocation (including the CSS-margin ring around the drawing-area
+   * child, which a child-attached gesture would miss -- the canvas is a
+   * 0x0 layout dummy in module headers, see #button-canvas margins). */
+  GtkEventController *controller = gtk_event_controller_legacy_new();
+  gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+  dt_gui_add_controller(widget, controller);
+  g_signal_connect(controller, "event", G_CALLBACK(_consume_pointer_event), NULL);
+}
+
 GtkGesture *(dt_gui_connect_drag)(GtkWidget *widget,
                                   GCallback drag_begin,
                                   GCallback drag_end,

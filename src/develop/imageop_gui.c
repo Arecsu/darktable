@@ -241,49 +241,44 @@ GtkWidget *dt_bauhaus_toggle_from_params(dt_iop_module_t *self, const char *para
   return toggle;
 }
 
-/* Claim the event sequence in CAPTURE phase so the togglebutton's
- * internal GtkGestureClick does NOT process the release (which is what
- * makes GtkButton emit "clicked" and toggle the button state behind our
- * callback, conflicting with callbacks that implement radio-button
- * behaviour by explicitly managing all toggle states).
+/* Suppress the togglebutton's own "clicked"/toggle on real clicks: the
+ * internal GtkGestureClick would emit "clicked" and flip the button state
+ * behind our callback, conflicting with callbacks that implement
+ * radio-button behaviour by explicitly managing all toggle states.
  *
- * GTK4 reality (verified against /tmp/gtk4 sources, Session 13):
- * GtkButton's internal gesture is CAPTURE-phase too (gtkbutton.c), and
- * gtk_widget_add_controller() PREPENDS, so OUR gesture dispatches BEFORE
- * it.  A claim can only reach gestures that already have the sequence's
- * point (gtk_gesture_set_sequence_state() fails on point-less gestures,
- * and the cancel/deny walk no-ops on them), so with the gesture on the
- * button itself the claim does NOT suppress the internal gesture: it
- * processes press+release with state NONE and GtkButton emits "clicked"
- * and toggles behind our callback.
+ * GTK4 reality (verified against /tmp/gtk4 sources, Session 13+14):
+ * GtkButton's internal gesture is CAPTURE-phase on the button itself
+ * (gtkbutton.c), and a same-widget claim gesture cannot reach it -- the
+ * claim only touches gestures that already hold the sequence's point
+ * (gtk_gesture_set_sequence_state() fails on point-less gestures), and
+ * gtk_widget_add_controller() PREPENDS so ours dispatches first, before
+ * the internal one has processed the press.  Session 13's proposed
+ * canvas-attach fix was measured and rejected: the dtgtk canvas is a
+ * layout dummy whose CSS margin (#button-canvas) insets it 5px (12px in
+ * module headers -- where it is 0x0), so a child-attached gesture would
+ * miss most of the button.  The working mechanism is dt_gui_consume_
+ * pointer(): a CAPTURE-phase NON-gesture controller (GtkEventController-
+ * Legacy) returning TRUE breaks gtk_widget_run_controllers()'s dispatch
+ * loop (it only breaks for non-gesture controllers), so the internal
+ * gesture never processes press/release and never emits "clicked".
  *
- * TODO P3 (Session 13 finding): attach this gesture to the button's
- * CHILD (the dtgtk canvas) instead, still CAPTURE phase: capture runs
- * top-down, so the button's gesture processes the press first and HAS
- * the point when our claim cancels it (gtk_gesture_set_sequence_state
- * propagation -> _gtk_widget_cancel_or_deny_sequence, capture emitter
- * => cancel) -> click_gesture_cancel_cb -> gtk_button_do_release(FALSE)
- * -> no "clicked", button_down reset.  Same handler wiring, coordinates
- * unchanged (the canvas fills the button).  Update test_gesture.c's
- * togglebutton-capture-claim when done.
- *
- * The claim runs at "pressed" time (dt_gui_gesture_claim_pressed), not
- * in "begin": a begin-time claim has the same point-ordering problem and
- * would steal the sequence from parent/child controllers earlier than
- * necessary (A2.10). */
+ * The claim gesture is still needed: it carries the user callback, the
+ * any-button (0) filter (right/middle clicks, like the old GTK3
+ * button-press-event handlers) and the DT_ACTION_GESTURE_KEY shortcut
+ * routing.  It dispatches first (added after the legacy controller) and
+ * runs the callback; the claim at "pressed" time (A2.10) is inert here
+ * but harmless. */
 GtkWidget *dt_iop_togglebutton_new(dt_iop_module_t *self, const char *section, const gchar *label, const gchar *ctrl_label,
                                    GCallback callback, gboolean local, guint accel_key, GdkModifierType mods,
                                    DTGTKCairoPaintIconFunc paint, GtkWidget *box)
 {
   GtkWidget *w = dtgtk_togglebutton_new(paint, 0, NULL);
   {
-#if GTK_CHECK_VERSION(4, 0, 0)
     // GtkGestureMultiPress was renamed to GtkGestureClick; it no longer
     // takes the widget at creation (dt_gui_add_controller attaches it).
     GtkGesture *gesture = gtk_gesture_click_new();
-#else
-    GtkGesture *gesture = gtk_gesture_multi_press_new(w);
-#endif
+    /* added BEFORE the gesture so the gesture dispatches first (prepend) */
+    dt_gui_consume_pointer(w);
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
                                                GTK_PHASE_CAPTURE);
     dt_gui_add_controller(w, gesture);

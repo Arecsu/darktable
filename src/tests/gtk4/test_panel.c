@@ -35,10 +35,16 @@
 #include "control/conf.h"
 #include "gui/gtk.h"
 
-/* minimal conf context: real hash tables + mutex, empty of entries. */
+/* minimal conf context: real hash tables + mutex, empty of entries.  The
+ * bauhaus/iopheader/gesture fixtures also build a conf and never tear it
+ * down, and the whole suite runs in ONE process, so start from a fresh
+ * empty conf regardless of what came before (tear down first, don't
+ * assert NULL). */
+static void _test_conf_down(void);
 static void _test_conf_up(void)
 {
-  g_assert_null(darktable.conf);
+  if(darktable.conf)
+    _test_conf_down();
   darktable.conf = g_malloc0(sizeof(dt_conf_t));
   dt_pthread_mutex_init(&darktable.conf->mutex, NULL);
   darktable.conf->table = g_hash_table_new(g_str_hash, g_str_equal);

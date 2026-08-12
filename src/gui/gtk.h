@@ -842,6 +842,20 @@ void dt_gui_gesture_claim_pressed(GtkGestureSingle *gesture,
                                   double y,
                                   gpointer user_data);
 
+/* Make pointer press/release events at @widget stop before the rest of its
+ * own controllers run (GTK3's button-press-event-returning-TRUE equivalent).
+ * Needed for GtkToggleButton: the button's internal GtkGestureClick is
+ * CAPTURE-phase on the button itself, so a same-widget claim gesture can
+ * never reach it (the claim touches only gestures that already hold the
+ * sequence's point -- see dt_gui_gesture_claim_pressed); the way to keep it
+ * from emitting "clicked"/toggling behind darktable's callback is to break
+ * the controller dispatch loop with a CAPTURE-phase NON-gesture controller
+ * returning TRUE (gtk_widget_run_controllers() only breaks for non-gesture
+ * controllers).  Add this BEFORE the claim gesture: gtk_widget_add_controller()
+ * PREPENDS, so the gesture added afterwards dispatches first and runs the
+ * user callback; the legacy controller then eats the press/release. */
+void dt_gui_consume_pointer(GtkWidget *widget);
+
 /* GTK3 "draw" signal shim.  GTK4 removed the per-widget "draw" signal;
  * GtkDrawingArea-derived widgets draw via gtk_drawing_area_set_draw_func()
  * instead.  For GtkDrawingArea widgets this installs the GTK3-style callback

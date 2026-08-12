@@ -518,13 +518,16 @@ static GtkWidget *_color_picker_new(dt_iop_module_t *module,
     // as dt_iop_togglebutton_new) so the picker callback fully controls
     // the button state on real clicks.
     //
-    // Session 13 finding: with the gesture on the BUTTON itself the claim
-    // does NOT reach the button's internal gesture (gtk_widget_add_
+    // Session 13/14 finding: with only the gesture on the BUTTON the
+    // claim does NOT reach the button's internal gesture (gtk_widget_add_
     // controller prepends, so ours dispatches first and the claim can
-    // only touch gestures that already have the sequence's point).  Same
-    // TODO P3 fix as dt_iop_togglebutton_new: attach to the button's
-    // child instead, then the claim CANCELS the internal gesture (it has
-    // the point) and "clicked" never fires.
+    // only touch gestures that already have the sequence's point).  The
+    // canvas-attach alternative was measured and rejected (the dtgtk
+    // canvas is a 0x0 layout dummy in module headers, see #button-canvas
+    // margins).  The working mechanism is dt_gui_consume_pointer(): a
+    // CAPTURE-phase NON-gesture controller (GtkEventControllerLegacy)
+    // returning TRUE breaks the controller dispatch loop, so the internal
+    // gesture never processes press/release and "clicked" never fires.
     //
     // Shortcuts (dt_action_def_color_picker, see above) and programmatic
     // activation (dt_iop_color_picker_toggle, e.g. temperature.c "spot"
@@ -537,6 +540,8 @@ static GtkWidget *_color_picker_new(dt_iop_module_t *module,
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
                                                GTK_PHASE_CAPTURE);
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
+    /* added BEFORE the gesture so the gesture dispatches first (prepend) */
+    dt_gui_consume_pointer(button);
     dt_gui_add_controller(button, gesture);
     g_signal_connect(gesture, "pressed", G_CALLBACK(dt_gui_gesture_claim_pressed), NULL);
     g_signal_connect_data(gesture, "pressed",
