@@ -110,29 +110,6 @@ typedef enum dt_gui_view_switch_t
 const char *_ui_panel_config_names[]
     = { "header", "toolbar_top", "toolbar_bottom", "left", "right", "bottom" };
 
-typedef struct dt_ui_t
-{
-  /* container widgets */
-  GtkWidget *containers[DT_UI_CONTAINER_SIZE];
-
-  /* panel widgets */
-  GtkWidget *panels[DT_UI_PANEL_SIZE];
-
-  /* center widget */
-  GtkWidget *center;
-  GtkWidget *center_base;
-  GtkWidget *snapshot;
-
-  /* main widget */
-  GtkWidget *main_window;
-
-  /* thumb table */
-  dt_thumbtable_t *thumbtable;
-
-  /* log msg and toast labels */
-  GtkWidget *log_msg, *toast_msg;
-} dt_ui_t;
-
 /* initialize the whole left panel */
 static void _ui_init_panel_left(struct dt_ui_t *ui, GtkWidget *container);
 /* initialize the whole right panel */

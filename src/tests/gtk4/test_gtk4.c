@@ -38,6 +38,7 @@ int main(int argc, char **argv)
   dt_test_container_register();
   dt_test_controller_register();
   dt_test_bauhaus_register();
+  dt_test_iopheader_register();
 
   return g_test_run();
 }

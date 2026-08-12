@@ -433,6 +433,35 @@ typedef enum dt_ui_border_t
   DT_UI_BORDER_SIZE
 } dt_ui_border_t;
 
+typedef struct dt_ui_t dt_ui_t;
+
+/* the ui widget tree: container/panel slots the views and modules are
+ * added to.  Public so tests can build a ui with its own containers
+ * (dt_ui_new() only sets main_window); the app fills every slot in
+ * dt_gui_gtk_init(). */
+struct dt_ui_t
+{
+  /* container widgets */
+  GtkWidget *containers[DT_UI_CONTAINER_SIZE];
+
+  /* panel widgets */
+  GtkWidget *panels[DT_UI_PANEL_SIZE];
+
+  /* center widget */
+  GtkWidget *center;
+  GtkWidget *center_base;
+  GtkWidget *snapshot;
+
+  /* main widget */
+  GtkWidget *main_window;
+
+  /* thumb table */
+  struct dt_thumbtable_t *thumbtable;
+
+  /* log msg and toast labels */
+  GtkWidget *log_msg, *toast_msg;
+};
+
 /** \brief swap the container in the left and right panels */
 void dt_ui_container_swap_left_right(struct dt_ui_t *ui,
                                      gboolean swap);
