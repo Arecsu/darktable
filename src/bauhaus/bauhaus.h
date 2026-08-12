@@ -134,6 +134,10 @@ typedef struct dt_bauhaus_t
   GtkStyleContext *check_context;
 #if GTK_CHECK_VERSION(4, 0, 0)
   GtkWidget *check_widget;              // hidden real check button backing check_context
+  // hidden label with the .dt_bauhaus class backing pango_font_desc, so Cairo
+  // text keeps using the theme font even though GTK4 dropped style-context
+  // font lookups
+  GtkWidget *font_probe;
 #endif
   float check_size;                      // side of a toggle's tick box
   GtkBorder check_margin;                // space the css keeps around it

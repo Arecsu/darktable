@@ -159,7 +159,6 @@ void gui_init(dt_lib_module_t *self)
 
     cairo_t *cr = cairo_create(d->image);
     cairo_rectangle(cr, 0, 0, width, height);
-    cairo_scale(cr, darktable.gui->dpi_factor, darktable.gui->dpi_factor);
     cairo_set_source_surface(cr, surface, 0, 0);
     cairo_fill(cr);
     cairo_destroy(cr);

@@ -484,7 +484,7 @@ static GdkPixbuf *_view_map_images_count(const int nb_images,
 
   dt_gui_gtk_set_source_rgb(cr, same_loc ? DT_GUI_COLOR_MAP_COUNT_SAME_LOC
                                          : DT_GUI_COLOR_MAP_COUNT_DIFF_LOC);
-  cairo_set_font_size(cr, 12 * (1 + (darktable.gui->dpi_factor - 1) / 2));
+  cairo_set_font_size(cr, 12);
   cairo_text_extents_t te;
   cairo_text_extents(cr, text, &te);
   *count_width = te.width + 4 * te.x_bearing;

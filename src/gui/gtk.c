@@ -1972,6 +1972,75 @@ int dt_gui_gtk_init(dt_gui_gtk_t *gui)
   return 0;
 }
 
+// TEMP-DEBUG: DT_SHOT=<file> — render the main window to a PNG, then quit.
+static gboolean dt_gui_screenshot_tmp(gpointer user_data)
+{
+  GMainLoop *loop = user_data;
+  const char *out = g_getenv("DT_SHOT");
+  GtkWidget *win = dt_ui_main_window(darktable.gui->ui);
+  if(!gtk_widget_get_mapped(win))
+  {
+    g_print("DT_SHOT: window not mapped yet, retrying in 1 s\n");
+    g_timeout_add(1000, dt_gui_screenshot_tmp, loop);
+    return G_SOURCE_REMOVE;
+  }
+  int w = gtk_widget_get_width(win), h = gtk_widget_get_height(win);
+  if(g_getenv("DT_TREE"))
+  {
+    // TEMP-DEBUG: dump the widget tree with sizes
+    gpointer stack[512];
+    int sp = 0;
+    stack[sp++] = win;
+    g_object_ref(win);
+    int depth[512] = {0};
+    while(sp > 0)
+    {
+      GtkWidget *n = stack[--sp];
+      g_object_unref(n);
+      if(!GTK_IS_WIDGET(n)) continue;
+      const int d = depth[sp];
+      const char *name = gtk_widget_get_name(n);
+      const char *css = gtk_widget_get_css_name(n);
+      gchar *cls = g_strjoinv(",", gtk_widget_get_css_classes(n));
+      int nat_h = -1, nat_w = -1;
+      if(GTK_IS_WIDGET(n) && gtk_widget_get_visible(n))
+      {
+        gtk_widget_measure(n, GTK_ORIENTATION_VERTICAL, -1, &nat_h, NULL, NULL, NULL);
+        gtk_widget_measure(n, GTK_ORIENTATION_HORIZONTAL, -1, &nat_w, NULL, NULL, NULL);
+      }
+      const gboolean vx = gtk_widget_compute_expand(n, GTK_ORIENTATION_VERTICAL);
+      const gboolean hx = gtk_widget_compute_expand(n, GTK_ORIENTATION_HORIZONTAL);
+      g_print("%*s[%dpx natH=%d natW=%d vex=%d hex=%d] %s %s%s%s%s\n",
+              d, "", gtk_widget_get_height(n), nat_h, nat_w, vx, hx, css,
+              name && *name ? name : "", *cls ? "/" : "", cls,
+              gtk_widget_get_visible(n) ? "" : "(hidden)");
+      g_free(cls);
+      for(GtkWidget *c = gtk_widget_get_first_child(n); c; c = gtk_widget_get_next_sibling(c))
+      {
+        g_object_ref(c);
+        stack[sp++] = c;
+        depth[sp] = d + 1;
+      }
+    }
+  }
+  GdkPaintable *p = gtk_widget_paintable_new(win);
+  GtkSnapshot *snap = gtk_snapshot_new();
+  gdk_paintable_snapshot(GDK_PAINTABLE(p), snap, w, h);
+  GskRenderNode *node = gtk_snapshot_free_to_node(snap);
+  cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+  cairo_t *cr = cairo_create(surf);
+  gsk_render_node_draw(node, cr);
+  cairo_destroy(cr);
+  cairo_surface_flush(surf);
+  cairo_status_t st = cairo_surface_write_to_png(surf, out);
+  g_print("DT_SHOT: wrote %s (%dx%d) status=%d\n", out, w, h, st);
+  gsk_render_node_unref(node);
+  cairo_surface_destroy(surf);
+  g_object_unref(p);
+  g_main_loop_quit(loop);
+  return G_SOURCE_REMOVE;
+}
+
 void dt_gui_gtk_run(dt_gui_gtk_t *gui)
 {
   GtkWidget *widget = dt_ui_center(darktable.gui->ui);
@@ -1995,6 +2064,9 @@ void dt_gui_gtk_run(dt_gui_gtk_t *gui)
   {
     g_atomic_int_set(&darktable.gui_running, 1);
     gui->main_loop = g_main_loop_new(NULL, FALSE);
+    // TEMP-DEBUG: DT_SHOT=<file> renders the main window to a PNG after 4 s
+    if(g_getenv("DT_SHOT"))
+      g_timeout_add(4000, dt_gui_screenshot_tmp, gui->main_loop);
     g_main_loop_run(gui->main_loop);
     g_main_loop_unref(gui->main_loop);
     gui->main_loop = NULL;
@@ -2065,8 +2137,13 @@ void dt_configure_ppd_dpi(dt_gui_gtk_t *gui)
 
   gui->ppd = gui->ppd_thb = dt_get_system_gui_ppd(widget);
   gui->filter_image = CAIRO_FILTER_GOOD;
+  /* GTK4: CSS pixels are the native coordinate space and GTK scales them to
+   * device pixels from the monitor scale factor, so there is no darktable
+   * side DPI factor (DT_PIXEL_APPLY_DPI is the identity).  The dpi
+   * (96 * scale) is kept for the pango text path, which needs a resolution
+   * matching GTK's own pango context setting
+   * (gtk_widget_update_pango_context: -gtk-dpi = 96 * scale). */
   gui->dpi = dt_get_screen_resolution(widget);
-  gui->dpi_factor = gui->dpi / DT_UI_DEFAULT_DPI_RESOLUTION;
 }
 
 static void _ui_log_button_press_event(GtkGestureSingle *gesture,
@@ -2323,13 +2400,18 @@ void dt_ui_container_add_widget(const dt_ui_t *ui,
       break;
 
     /* if box is center we want it to fill as much as it can */
+    /* NOTE: only the box's own main axis expands.  GTK3's pack_start(w, TRUE,
+     * TRUE) set the child's expand in the box's orientation only, and that
+     * was per-box (it never touched the widget-level vexpand).  A hexpand or
+     * vexpand set here is a widget property that GtkBox::compute_expand ORs
+     * into the box itself, so a spurious vexpand on a child of a horizontal
+     * container would propagate up and inflate the whole toolbar/panel row. */
     case DT_UI_CONTAINER_PANEL_TOP_CENTER:
     case DT_UI_CONTAINER_PANEL_CENTER_TOP_LEFT:
     case DT_UI_CONTAINER_PANEL_CENTER_TOP_CENTER:
     case DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_CENTER:
     case DT_UI_CONTAINER_PANEL_BOTTOM:
       gtk_widget_set_hexpand(w, TRUE);
-      gtk_widget_set_vexpand(w, TRUE);
       gtk_box_append(GTK_BOX(ui->containers[c]), w);
       break;
 
@@ -2567,7 +2649,7 @@ static void _handle_panel_widths(const dt_ui_panel_t p)
 
   // check if the center column is allowed to shrink by required_width
   const int min_center_width =
-    darktable.gui->dpi_factor * dt_conf_get_int("min_center_width");
+    dt_conf_get_int("min_center_width");
 
   if(center_col_w - required_width < min_center_width)
   {
@@ -2576,7 +2658,7 @@ static void _handle_panel_widths(const dt_ui_panel_t p)
     int shrink_width = -1 * (center_col_w - required_width - min_center_width);
 
     const int min_panel_width =
-      darktable.gui->dpi_factor * dt_conf_get_int("min_panel_width");
+      dt_conf_get_int("min_panel_width");
     const int other_panel_width = gtk_widget_get_allocated_width(darktable.gui->ui->panels[other_panel]);
 
     // first shrink the other panel, respecting the min_panel_width
@@ -3166,10 +3248,10 @@ static void _panel_set_side_panel_width(GtkWidget *widget, const dt_ui_panel_t p
   const int app_window_w = gtk_widget_get_width(main_window);
 
   const int min_center_w =
-    darktable.gui->dpi_factor * dt_conf_get_int("min_center_width");
+    dt_conf_get_int("min_center_width");
 
   int max_w =
-    darktable.gui->dpi_factor * dt_conf_get_int("max_panel_width");
+    dt_conf_get_int("max_panel_width");
   int used_w = min_center_w;
 
   // Constraint: window width - center min - other side panel (if visible) - borders
@@ -3186,7 +3268,7 @@ static void _panel_set_side_panel_width(GtkWidget *widget, const dt_ui_panel_t p
 
   int sx = panel_drag_start_size;
   sx = CLAMP((int)(sx + delta_x),
-             darktable.gui->dpi_factor * dt_conf_get_int("min_panel_width"),
+             dt_conf_get_int("min_panel_width"),
              max_w);
   dt_ui_panel_set_size(darktable.gui->ui, panel, sx);
 }
@@ -3218,8 +3300,8 @@ static void _panel_handle_motion_callback(GtkEventControllerMotion *controller,
       const gint sy = gtk_widget_get_allocated_height(widget);
       int sx = panel_drag_start_size;
       sx = CLAMP((sy + darktable.gui->widgets.panel_handle_y - y),
-                 darktable.gui->dpi_factor * dt_conf_get_int("min_panel_height"),
-                 darktable.gui->dpi_factor * dt_conf_get_int("max_panel_height"));
+                 dt_conf_get_int("min_panel_height"),
+                 dt_conf_get_int("max_panel_height"));
       dt_ui_panel_set_size(darktable.gui->ui, DT_UI_PANEL_BOTTOM, sx);
       gtk_widget_set_size_request(widget, -1, sx);
     }
@@ -3331,7 +3413,9 @@ static void _ui_init_panel_top(dt_ui_t *ui,
   ui->containers[DT_UI_CONTAINER_PANEL_TOP_CENTER] =
     gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_hexpand(ui->containers[DT_UI_CONTAINER_PANEL_TOP_CENTER], TRUE);
-  gtk_widget_set_vexpand(ui->containers[DT_UI_CONTAINER_PANEL_TOP_CENTER], TRUE);
+  /* NOTE: no vexpand — GTK3's pack_start(expand=TRUE, fill=TRUE) only spread
+   * horizontally (this box is horizontal); a vexpand here would propagate up
+   * via GtkBox::compute_expand and inflate the whole top row. */
   gtk_box_append(GTK_BOX(widget), ui->containers[DT_UI_CONTAINER_PANEL_TOP_CENTER]);
 
   /* add container for top right */
@@ -3354,6 +3438,14 @@ static void _ui_init_panel_bottom(dt_ui_t *ui,
   // gtk_widget_set_hexpand(GTK_WIDGET(widget), TRUE);
   // gtk_widget_set_vexpand(GTK_WIDGET(widget), TRUE);
   gtk_widget_set_name(widget, "bottom");
+  /* The panel's height is user-set (resize handle / conf size_request), and
+   * the row must not grow with the window.  GTK4's GtkBox/GtkGrid
+   * compute_expand ORs the whole subtree's expand recursively, so the
+   * timeline module's vexpand (its strip fills the panel) would otherwise
+   * propagate up through the overlay and make this grid row claim every
+   * leftover pixel.  Setting the panel's own vexpand explicitly (FALSE)
+   * shields the grid: the explicit value wins over the class vfunc. */
+  gtk_widget_set_vexpand(widget, FALSE);
   _ui_init_bottom_panel_size(widget);
 
   GtkWidget *over = gtk_overlay_new();
@@ -3378,7 +3470,9 @@ static void _ui_init_panel_bottom(dt_ui_t *ui,
   ui->containers[DT_UI_CONTAINER_PANEL_BOTTOM] =
     gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_hexpand(ui->containers[DT_UI_CONTAINER_PANEL_BOTTOM], TRUE);
-  gtk_widget_set_vexpand(ui->containers[DT_UI_CONTAINER_PANEL_BOTTOM], TRUE);
+  /* NOTE: no vexpand, same reason as the top panel: pack_start(TRUE, TRUE)
+   * was horizontal-only in GTK3; vexpand here would inflate the bottom row
+   * and grow the filmstrip past its user-set size. */
   gtk_box_append(GTK_BOX(widget), ui->containers[DT_UI_CONTAINER_PANEL_BOTTOM]);
   gtk_widget_show(widget);
 }
@@ -3400,7 +3494,8 @@ static void _ui_init_panel_center_top(dt_ui_t *ui,
   ui->containers[DT_UI_CONTAINER_PANEL_CENTER_TOP_LEFT] =
     gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_hexpand(ui->containers[DT_UI_CONTAINER_PANEL_CENTER_TOP_LEFT], TRUE);
-  gtk_widget_set_vexpand(ui->containers[DT_UI_CONTAINER_PANEL_CENTER_TOP_LEFT], TRUE);
+  /* NOTE: no vexpand — GTK3 pack_start(TRUE, TRUE) was horizontal-only; a
+   * vexpand here propagates via compute_expand and inflates the toolbar. */
   gtk_box_append(GTK_BOX(widget), ui->containers[DT_UI_CONTAINER_PANEL_CENTER_TOP_LEFT]);
 
   /* add container for center top center */
@@ -3435,7 +3530,7 @@ static void _ui_init_panel_center_bottom(dt_ui_t *ui,
   ui->containers[DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_LEFT] =
     gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_hexpand(ui->containers[DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_LEFT], TRUE);
-  gtk_widget_set_vexpand(ui->containers[DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_LEFT], TRUE);
+  /* NOTE: no vexpand (see center top left) */
   gtk_box_append(GTK_BOX(widget), ui->containers[DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_LEFT]);
 
   /* adding the center box */
@@ -3447,7 +3542,7 @@ static void _ui_init_panel_center_bottom(dt_ui_t *ui,
   ui->containers[DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_RIGHT] =
     gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_hexpand(ui->containers[DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_RIGHT], TRUE);
-  gtk_widget_set_vexpand(ui->containers[DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_RIGHT], TRUE);
+  /* NOTE: no vexpand (see center top left) */
   gtk_box_append(GTK_BOX(widget), ui->containers[DT_UI_CONTAINER_PANEL_CENTER_BOTTOM_RIGHT]);
 
   gtk_box_set_spacing(GTK_BOX(widget), DT_UI_PANEL_MODULE_SPACING);
@@ -6710,11 +6805,10 @@ void dt_gui_dialog_restore_size(GtkDialog *dialog, const char *conf)
   char buf[256];
   const int width = dt_conf_get_int(dt_buf_printf(buf, "ui_last/%s_dialog_width", conf));
   const int height = dt_conf_get_int(dt_buf_printf(buf, "ui_last/%s_dialog_height", conf));
-  const double factor = dt_conf_is_default(buf) ? darktable.gui->dpi_factor : 1.0;
 #if GTK_CHECK_VERSION(4, 0, 0)
-  gtk_window_set_default_size(GTK_WINDOW(dialog), factor * width, factor * height);
+  gtk_window_set_default_size(GTK_WINDOW(dialog), width, height);
 #else
-  gtk_window_resize(GTK_WINDOW(dialog), factor * width, factor * height);
+  gtk_window_resize(GTK_WINDOW(dialog), width, height);
 #endif
 
 #if !GTK_CHECK_VERSION(4, 0, 0)
@@ -6730,7 +6824,30 @@ void dt_gui_dialog_restore_size(GtkDialog *dialog, const char *conf)
 
 PangoFontDescription *dt_gui_get_font(void)
 {
-  return pango_font_description_copy_static(darktable.bauhaus->pango_font_desc);
+  // GTK3: darktable.bauhaus->pango_font_desc was filled by a style-context
+  // "font" lookup for a .dt_bauhaus widget; GTK4's dt_gui_style_context_get
+  // can't resolve fonts (no widget in hand), so dt_bauhaus_load_theme() keeps
+  // the description up to date from a hidden CSS probe widget instead.
+  if(darktable.bauhaus->pango_font_desc)
+    return pango_font_description_copy(darktable.bauhaus->pango_font_desc);
+  // belt and braces: never hand callers a NULL description (pango would fall
+  // back to the system font and draw text larger than the theme's 0.8em/1em)
+  return pango_font_description_new();
+}
+
+// Returns the CSS-computed font of @widget (a new description the caller owns).
+// GTK4 keeps the widget's PangoContext font in sync with its CSS style, so this
+// is the single source of truth for "what font does this widget's text use".
+// Cairo-drawn widgets (bauhaus, thumbnails, overlay labels) must use this
+// instead of pango_cairo_create_layout()'s raw context, which knows nothing
+// about CSS and falls back to the system font.
+PangoFontDescription *dt_gui_widget_get_font(GtkWidget *widget)
+{
+  PangoContext *context = gtk_widget_get_pango_context(widget);
+  const PangoFontDescription *desc = pango_context_get_font_description(context);
+  if(desc)
+    return pango_font_description_copy(desc);
+  return pango_font_description_new();
 }
 
 // clang-format off

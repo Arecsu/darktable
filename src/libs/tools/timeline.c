@@ -958,7 +958,7 @@ static gboolean _lib_timeline_draw_callback(GtkWidget *widget, cairo_t *wcr, dt_
 
       cairo_text_extents_t te;
       dt_gui_gtk_set_source_rgb(cr, DT_GUI_COLOR_TIMELINE_TEXT_FG);
-      cairo_set_font_size(cr, 10 * (1 + (darktable.gui->dpi_factor - 1) / 2));
+      cairo_set_font_size(cr, 10);
       cairo_text_extents(cr, blo->name, &te);
       int bh = allocation.height - te.height - 4;
       cairo_move_to(cr, posx + (wb - te.width) / 2 - te.x_bearing, allocation.height - 2);
@@ -1057,7 +1057,7 @@ static gboolean _lib_timeline_draw_callback(GtkWidget *widget, cairo_t *wcr, dt_
       cairo_stroke(wcr);
       gchar *dte = _time_format_for_ui(tt, strip->precision);
       cairo_text_extents_t te2;
-      cairo_set_font_size(wcr, 10 * darktable.gui->dpi_factor);
+      cairo_set_font_size(wcr, 10);
       cairo_text_extents(wcr, dte, &te2);
       cairo_rectangle(wcr, strip->current_x, 8, te2.width + 4, te2.height + 4);
       dt_gui_gtk_set_source_rgb(wcr, DT_GUI_COLOR_TIMELINE_TEXT_BG);

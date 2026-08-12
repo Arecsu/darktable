@@ -116,7 +116,7 @@ typedef struct dt_dev_viewport_t
   // dimensions of window
   int width, height;
   int32_t border_size;
-  double dpi, dpi_factor, ppd;
+  double dpi, ppd;
 
   gboolean color_assessment;
 

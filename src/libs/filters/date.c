@@ -205,12 +205,12 @@ static void _month_widget_init(dt_lib_filtering_rule_t *rule, const dt_collectio
   if(top)
   {
     gtk_box_append(GTK_BOX(rule->w_special_box_top), month_box);
-    gtk_widget_set_vexpand(month_box, TRUE);
+    gtk_widget_set_hexpand(month_box, TRUE);
   }
   else
   {
     gtk_box_append(GTK_BOX(rule->w_special_box), month_box);
-    gtk_widget_set_vexpand(month_box, TRUE);
+    gtk_widget_set_hexpand(month_box, TRUE);
   }
 }
 

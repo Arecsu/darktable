@@ -29,9 +29,13 @@ G_BEGIN_DECLS
 
 #define DT_GUI_THUMBSIZE_REDUCE 0.7f
 
-/* helper macro that applies the DPI transformation to fixed pixel
- * values. input should be defaulting to 96 DPI */
-#define DT_PIXEL_APPLY_DPI(value) ((value) * darktable.gui->dpi_factor)
+/* helper macro that applies the DPI transformation to fixed pixel values.
+ * GTK4: the coordinate space is CSS pixels and GTK itself scales them to
+ * device pixels from the monitor scale factor, so this is the identity —
+ * any manual multiplier would double-scale on HiDPI displays.  The scale
+ * factor (darktable.gui->ppd) is only used when creating cairo surfaces
+ * (device scale for HiDPI quality), not for layout sizes. */
+#define DT_PIXEL_APPLY_DPI(value) (value)
 
 #define DT_RESIZE_HANDLE_SIZE DT_PIXEL_APPLY_DPI(5)
 
@@ -136,7 +140,7 @@ typedef struct dt_gui_gtk_t
   double overlay_red, overlay_blue, overlay_green, overlay_contrast;
   GtkWidget *focus_peaking_button;
 
-  double dpi, dpi_factor, ppd, ppd_thb;
+  double dpi, ppd, ppd_thb;
   gboolean have_pen_pressure;
 
   int icon_size; // size of top panel icons
@@ -1098,6 +1102,9 @@ void dt_gui_dialog_restore_size(GtkDialog *dialog,
                                 const char *conf);
 
 PangoFontDescription *dt_gui_get_font(void);
+// CSS-computed font of a widget (new copy; see gui/gtk.c for why Cairo
+// drawing must go through this).
+PangoFontDescription *dt_gui_widget_get_font(GtkWidget *widget);
 
 // returns the session type at runtime
 dt_gui_session_type_t dt_gui_get_session_type(void);

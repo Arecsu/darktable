@@ -324,6 +324,7 @@ static int _show_pango_text(dt_bauhaus_widget_t *w,
                             float *width,
                             float *height)
 {
+  (void)context; // GTK4: the widget's own pango context carries the CSS font
   PangoLayout *layout = pango_cairo_create_layout(cr);
 
   if(max_width > 0)
@@ -332,11 +333,7 @@ static int _show_pango_text(dt_bauhaus_widget_t *w,
     pango_layout_set_width(layout, (int)(PANGO_SCALE * max_width + 0.5f));
   }
 
-  PangoFontDescription *font_desc = 0;
-  dt_gui_style_context_get(context,
-                        gtk_widget_get_state_flags(GTK_WIDGET(w)), "font",
-                        &font_desc, NULL);
-
+  PangoFontDescription *font_desc = dt_gui_widget_get_font(GTK_WIDGET(w));
   pango_layout_set_font_description(layout, font_desc);
 
   PangoAttrList *attrlist = pango_attr_list_new();
@@ -1011,9 +1008,23 @@ void dt_bauhaus_load_theme()
   // make sure we release previously loaded font
   if(bh->pango_font_desc)
     pango_font_description_free(bh->pango_font_desc);
-  bh->pango_font_desc = NULL;
+#if GTK_CHECK_VERSION(4, 0, 0)
+  // GTK4 removed style-context font lookups; the widget's PangoContext font
+  // follows its CSS, so a hidden .dt_bauhaus label is our probe for the font
+  // Cairo drawing should use (same class a real bauhaus widget carries).
+  if(!bh->font_probe)
+  {
+    bh->font_probe = gtk_label_new(NULL);
+    gtk_widget_set_visible(bh->font_probe, FALSE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(bh->font_probe),
+                                "dt_bauhaus");
+  }
+  bh->pango_font_desc
+      = dt_gui_widget_get_font(bh->font_probe);
+#else
   dt_gui_style_context_get(ctx, GTK_STATE_FLAG_NORMAL, "font",
                         &bh->pango_font_desc, NULL);
+#endif
 
   cairo_surface_t *cst = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 128, 128);
   cairo_t *cr = cairo_create(cst);
@@ -1186,6 +1197,16 @@ void dt_bauhaus_cleanup()
     g_object_unref(darktable.bauhaus->check_widget);
     darktable.bauhaus->check_widget = NULL;
     darktable.bauhaus->check_context = NULL;
+  }
+  if(darktable.bauhaus->font_probe)
+  {
+    g_object_unref(darktable.bauhaus->font_probe);
+    darktable.bauhaus->font_probe = NULL;
+  }
+  if(darktable.bauhaus->pango_font_desc)
+  {
+    pango_font_description_free(darktable.bauhaus->pango_font_desc);
+    darktable.bauhaus->pango_font_desc = NULL;
   }
 #else
   if(darktable.bauhaus->check_context)
@@ -3237,10 +3258,7 @@ static gint _natural_width(GtkWidget *widget,
   dt_bauhaus_widget_t *w = DT_BAUHAUS_WIDGET(widget);
 
   PangoLayout *layout = gtk_widget_create_pango_layout(widget, NULL);
-  PangoFontDescription *font_desc = 0;
-  dt_gui_style_context_get(gtk_widget_get_style_context(widget),
-                        gtk_widget_get_state_flags(GTK_WIDGET(w)),
-                        "font", &font_desc, NULL);
+  PangoFontDescription *font_desc = dt_gui_widget_get_font(widget);
   pango_layout_set_font_description(layout, font_desc);
   PangoAttrList *attrlist = pango_attr_list_new();
   pango_attr_list_insert(attrlist, pango_attr_font_features_new("tnum"));
@@ -3298,6 +3316,7 @@ static gint _natural_width(GtkWidget *widget,
   }
 
   natural_size += (w->show_quad ? _widget_get_quad_width(w) : 0);
+  pango_font_description_free(font_desc);
   g_object_unref(layout);
 
   return natural_size;

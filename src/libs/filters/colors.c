@@ -380,12 +380,12 @@ static void _colors_widget_init(dt_lib_filtering_rule_t *rule, const dt_collecti
   if(top)
   {
     gtk_box_append(GTK_BOX(rule->w_special_box_top), hbox);
-    gtk_widget_set_vexpand(hbox, TRUE);
+    gtk_widget_set_hexpand(hbox, TRUE);
   }
   else
   {
     gtk_box_append(GTK_BOX(rule->w_special_box), hbox);
-    gtk_widget_set_vexpand(hbox, TRUE);
+    gtk_widget_set_hexpand(hbox, TRUE);
   }
 }
 

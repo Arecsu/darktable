@@ -3114,7 +3114,6 @@ void gui_init(dt_view_t *self)
   dt_develop_t *dev = self->data;
   dev->full.ppd = darktable.gui->ppd;
   dev->full.dpi = darktable.gui->dpi;
-  dev->full.dpi_factor = darktable.gui->dpi_factor;
   dev->full.widget = dt_ui_center(darktable.gui->ui);
 
   dt_action_t *sa = &self->actions, *ac = NULL;
@@ -5035,10 +5034,6 @@ GSList *mouse_actions(const dt_view_t *self)
 // second darkroom window
 //-----------------------------------------------------------
 
-/* helper macro that applies the DPI transformation to fixed pixel values. input should be defaulting to 96
- * DPI */
-#define DT_PIXEL_APPLY_DPI_2ND_WND(dev, value) ((value) * dev->preview2.dpi_factor)
-
 static void _dt_second_window_change_cursor(dt_develop_t *dev,
                                             const gchar *curs)
 {
@@ -5058,14 +5053,6 @@ static void _second_window_configure_ppd_dpi(dt_develop_t *dev)
 
   dev->preview2.ppd = dt_get_system_gui_ppd(widget);
   dev->preview2.dpi = dt_get_screen_resolution(widget);
-
-#ifdef GDK_WINDOWING_QUARTZ
-  dev->preview2.dpi_factor
-      = dev->preview2.dpi / 72; // macOS has a fixed DPI of 72
-#else
-  dev->preview2.dpi_factor
-      = dev->preview2.dpi / 96; // according to man xrandr and the docs of gdk_screen_set_resolution 96 is the default
-#endif
 }
 
 static gboolean _second_window_draw_callback(GtkWidget *widget,
@@ -5103,7 +5090,6 @@ static gboolean _second_window_draw_callback(GtkWidget *widget,
     port->orig_height = dev->preview2.orig_height;
     port->ppd = dev->preview2.ppd;
     port->dpi = dev->preview2.dpi;
-    port->dpi_factor = dev->preview2.dpi_factor;
   }
 
   if(port->pipe && port->pipe->backbuf)  // do we have a preview image?
@@ -5473,7 +5459,6 @@ static void _second_window_configure_callback(GtkWidget *da,
     dt_dev_viewport_t *pinned_port = &pinned_dev->preview2;
     pinned_port->ppd = dev->preview2.ppd;
     pinned_port->dpi = dev->preview2.dpi;
-    pinned_port->dpi_factor = dev->preview2.dpi_factor;
     dt_dev_configure(pinned_port);
   }
 }
@@ -5769,7 +5754,7 @@ static void _darkroom_display_second_window(dt_develop_t *dev)
     // Create the drawing area and add it to the overlay
     dev->preview2.widget = gtk_drawing_area_new();
     gtk_overlay_set_child(GTK_OVERLAY(overlay), dev->preview2.widget);
-    gtk_widget_set_size_request(dev->preview2.widget, DT_PIXEL_APPLY_DPI_2ND_WND(dev, 50), DT_PIXEL_APPLY_DPI_2ND_WND(dev, 200));
+    gtk_widget_set_size_request(dev->preview2.widget, 50, 200);
     gtk_widget_set_hexpand(dev->preview2.widget, TRUE);
     gtk_widget_set_vexpand(dev->preview2.widget, TRUE);
     dt_gui_add_class(dev->preview2.widget, "dt_transparent_background");

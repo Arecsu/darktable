@@ -122,7 +122,6 @@ void dt_dev_init(dt_develop_t *dev,
     {
       dev->full.ppd = darktable.gui->ppd;
       dev->full.dpi = darktable.gui->dpi;
-      dev->full.dpi_factor = darktable.gui->dpi_factor;
       dev->full.widget = dt_ui_center(darktable.gui->ui);
     }
   }
@@ -410,7 +409,6 @@ static dt_develop_t *_alloc_pinned_dev(dt_develop_t *main_dev)
   pinned_dev->preview2.orig_height      = main_dev->preview2.orig_height;
   pinned_dev->preview2.border_size      = main_dev->preview2.border_size;
   pinned_dev->preview2.dpi              = main_dev->preview2.dpi;
-  pinned_dev->preview2.dpi_factor       = main_dev->preview2.dpi_factor;
   pinned_dev->preview2.ppd              = main_dev->preview2.ppd;
   pinned_dev->preview2.color_assessment = main_dev->preview2.color_assessment;
   pinned_dev->preview2.zoom             = main_dev->preview2.zoom;

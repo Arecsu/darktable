@@ -98,7 +98,6 @@ static void _bootstrap(void)
   win = gtk_window_new();
   darktable.gui->ui = dt_ui_new(win);
   darktable.gui->dpi = 96.0;
-  darktable.gui->dpi_factor = 1.0;
   darktable.gui->ppd = 1.0;
   darktable.gui->scroll_mask = GDK_SCROLL_MASK | GDK_SMOOTH_SCROLL_MASK;
 
