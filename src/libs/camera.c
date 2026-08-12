@@ -347,7 +347,7 @@ static void _expose_info_bar(dt_lib_module_t *self,
   PangoFontDescription *desc = dt_gui_get_font();
   pango_font_description_set_weight(desc, PANGO_WEIGHT_BOLD);
   layout = pango_cairo_create_layout(cr);
-  const int fontsize = DT_PIXEL_APPLY_DPI(11.5);
+  const float fontsize = DT_PIXEL_APPLY_DPI(11.5);
   pango_font_description_set_absolute_size(desc, fontsize * PANGO_SCALE);
   pango_layout_set_font_description(layout, desc);
   char model[4096] = { 0 };
