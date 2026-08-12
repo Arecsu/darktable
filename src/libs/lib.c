@@ -1378,6 +1378,11 @@ GtkWidget *dt_lib_gui_get_expander(dt_lib_module_t *module)
   gtk_widget_set_valign(module->preset_label, GTK_ALIGN_BASELINE);
   g_object_set(G_OBJECT(module->preset_label), "xalign", 0.0, (gchar *)0);
   gtk_box_append(GTK_BOX(header), module->preset_label);
+  /* the preset name is the last child of the left (GTK3 pack_start) group:
+   * give it hexpand so the right-side buttons (toolbox/reset/presets, the
+   * GTK3 pack_end group) are pushed to the far right of the header; its
+   * text stays left-aligned (xalign 0.0 above). */
+  gtk_widget_set_hexpand(module->preset_label, TRUE);
 
   /* add preset button if module has implementation */
   module->presets_button = dtgtk_button_new_full(dtgtk_cairo_paint_presets, 0, NULL,

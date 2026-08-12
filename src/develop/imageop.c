@@ -2922,6 +2922,15 @@ static void _header_size_apply(GtkWidget *header, const gint width)
 {
   gchar *config = dt_conf_get_string("darkroom/ui/hide_header_buttons");
 
+  /* always/dim/active have no width-based button reveal: the width-trigger
+   * spacer exists there purely to right-align the end-group buttons (the
+   * GTK3 pack_end() role), so the glide math below must not run. */
+  if(!g_strcmp0(config, "always") || !g_strcmp0(config, "dim") || !g_strcmp0(config, "active"))
+  {
+    g_free(config);
+    return;
+  }
+
   const gint panel_trigger_width = 250;
 
   // children are walked right-to-left (GTK3 iterated the container's child
@@ -3072,34 +3081,33 @@ gboolean dt_iop_show_hide_header_buttons(dt_iop_module_t *module,
   }
   if(GTK_IS_DRAWING_AREA(button))
   {
-    // temporarily or permanently (de)activate width trigger widget
-    if(dynamic)
-      gtk_widget_set_visible(button, !show_buttons && !always_hide);
-    else
-      gtk_widget_destroy(button);
+    // the width-trigger spacer exists.  dynamic modes (glide & co): it is
+    // the reveal's measuring stick, hidden while the end-group buttons are
+    // shown on hover so the reveal stops running; always/dim/active: keep
+    // it visible -- it draws nothing, and its hexpand is what pushes the
+    // end-group buttons to the far right (GTK3's pack_end did that
+    // structurally, GTK4 has no pack_end).
+    gtk_widget_set_visible(button, dynamic ? (!show_buttons && !always_hide) : TRUE);
   }
   else
   {
-    if(dynamic)
-    {
-      GtkWidget *space = gtk_drawing_area_new();
-      gtk_box_append(GTK_BOX(header), space);
-      /* GTK3 pack_end() put the width trigger at the left of the end-group
-       * buttons (visual: instance, space, multi, ...); keep that order. */
-      if(module->multimenu_button)
-        dt_gui_box_reorder_child_before(GTK_BOX(header), space, module->multimenu_button);
-      gtk_widget_set_hexpand(space, TRUE);
-      gtk_widget_set_vexpand(space, TRUE);
-      gtk_widget_show(space);
-#if GTK_CHECK_VERSION(4, 0, 0)
-      /* GTK4: GtkDrawingArea::resize replaces the GTK3 size-allocate signal. */
-      g_signal_connect(G_OBJECT(space), "resize",
-                       G_CALLBACK(_header_resize_callback), header);
-#else
-      g_signal_connect(G_OBJECT(space), "size-allocate",
-                       G_CALLBACK(_header_size_callback), header);
-#endif
-    }
+    // no spacer yet (first call in any config): create it unconditionally
+    // so the end group is right-aligned in every hide_header_buttons mode.
+    GtkWidget *space = gtk_drawing_area_new();
+    gtk_box_append(GTK_BOX(header), space);
+    /* GTK3 pack_end() put the width trigger at the left of the end-group
+     * buttons (visual: instance, space, multi, ...); keep that order. */
+    if(module->multimenu_button)
+      dt_gui_box_reorder_child_before(GTK_BOX(header), space, module->multimenu_button);
+    gtk_widget_set_hexpand(space, TRUE);
+    // no vexpand: cross-axis fill is the GTK4 box default; a vexpand here
+    // would propagate up the box chain and inflate the header row
+    gtk_widget_show(space);
+    /* GTK4: GtkDrawingArea::resize replaces the GTK3 size-allocate signal.
+     * Connected unconditionally; _header_size_apply() no-ops for
+     * always/dim/active. */
+    g_signal_connect(G_OBJECT(space), "resize",
+                     G_CALLBACK(_header_resize_callback), header);
   }
 
   if(dynamic && !show_buttons && !always_hide)

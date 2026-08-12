@@ -26,12 +26,14 @@
  * header box (first_child/next_sibling == visual order in GTK4) and locks
  * the append order the port now uses:
  *
- *   [off | icon | lab | instance | multi | reset | presets]
+ *   [off | icon | lab | instance | space | multi | reset | presets]
  *
- * plus the dynamic width-trigger insertion ("hide header buttons" configs
- * other than always/dim/active) that must land between the instance name
- * and the multi-instance button (gtk_box_reorder_child_before), and the
- * show/hide button roundtrip.
+ * where `space` is the invisible hexpanding spacer that reproduces GTK3
+ * pack_end()'s structural right-alignment of the end group: it is created
+ * in EVERY hide_header_buttons config (always/dim/active and the dynamic
+ * glide family alike) and must land between the instance name and the
+ * multi-instance button (gtk_box_reorder_child_before).  In dynamic
+ * configs it doubles as the width trigger for the glide reveal.
  *
  * Headless: widget construction + measure need no display (no window is
  * shown, nothing realizes).  The bootstrap mirrors dt_iop_load_module():
@@ -120,17 +122,21 @@ static void test_header_order(void)
   g_assert_nonnull(header);
   g_assert_true(GTK_IS_BOX(header));
 
-  /* the visual order the GTK3 pack_end/pack_start mix produced:
-   * [off | icon | lab | instance | multi | reset | presets] */
-  GtkWidget *children[7] = { NULL };
+  /* the visual order the GTK3 pack_end/pack_start mix produced, plus the
+   * right-align spacer: [off | icon | lab | instance | space | multi |
+   * reset | presets].  The spacer is created unconditionally now, also in
+   * always/dim/active, so the end group hugs the far right in every
+   * config (GTK4 has no pack_end; a hexpanding spacer is the idiomatic
+   * replacement). */
+  GtkWidget *children[8] = { NULL };
   int n = 0;
   for(GtkWidget *c = gtk_widget_get_first_child(header); c;
       c = gtk_widget_get_next_sibling(c))
   {
-    g_assert_cmpint(n, <, 7);
+    g_assert_cmpint(n, <, 8);
     children[n++] = c;
   }
-  g_assert_cmpint(n, ==, 7);
+  g_assert_cmpint(n, ==, 8);
 
   /* off: the module's enable toggle button, leftmost */
   g_assert_true(children[0] == module->off);
@@ -147,16 +153,23 @@ static void test_header_order(void)
   /* instance name */
   g_assert_true(children[3] == module->instance_name);
 
+  /* the right-align spacer: invisible drawing area, hexpanding, between
+   * the instance name and the multi-instance button */
+  g_assert_true(GTK_IS_DRAWING_AREA(children[4]));
+  g_assert_true(gtk_widget_get_hexpand(children[4]));
+  g_assert_false(gtk_widget_get_vexpand(children[4]));
+  g_assert_true(gtk_widget_get_visible(children[4]));
+
   /* the right-side group: multi, reset, presets (GTK3 pack_end visual
    * order, first packed = rightmost) */
-  g_assert_true(children[4] == module->multimenu_button);
-  g_assert_true(children[5] == module->reset_button);
-  g_assert_true(children[6] == module->presets_button);
-  for(int i = 4; i < 7; i++)
+  g_assert_true(children[5] == module->multimenu_button);
+  g_assert_true(children[6] == module->reset_button);
+  g_assert_true(children[7] == module->presets_button);
+  for(int i = 5; i < 8; i++)
     g_assert_true(GTK_IS_BUTTON(children[i]));
 
   /* "always": every child is visible right after construction */
-  for(int i = 0; i < 7; i++)
+  for(int i = 0; i < 8; i++)
     g_assert_true(gtk_widget_get_visible(children[i]));
 
   /* the expander landed in the right-center container */
