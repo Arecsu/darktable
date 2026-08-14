@@ -314,6 +314,14 @@ static float _action_process_button(gpointer target,
 {
   dt_lib_gui_update(g_object_get_data(G_OBJECT(target), "module"));
 
+  dt_print(DT_DEBUG_ALWAYS,
+           "[21837] _action_process_button label=`%s' perform=%d is_sensitive=%d ancestor_win=%d"
+           " self_sensitive=%d effect=%d",
+           GTK_IS_BUTTON(target) ? gtk_button_get_label(GTK_BUTTON(target)) : "?",
+           DT_PERFORM_ACTION(move_size), gtk_widget_is_sensitive(target),
+           gtk_widget_get_ancestor(target, GTK_TYPE_WINDOW) != NULL,
+           gtk_widget_get_sensitive(target), (int)effect);
+
   if(DT_PERFORM_ACTION(move_size)
      && gtk_widget_is_sensitive(target)
      && gtk_widget_get_ancestor(target, GTK_TYPE_WINDOW))
@@ -3794,10 +3802,20 @@ static void _lookup_mapping_widget()
 gboolean dt_action_widget_invisible(GtkWidget *w)
 {
   GtkWidget *p = gtk_widget_get_parent(w);
-  return (!GTK_IS_WIDGET(w) || !gtk_widget_get_visible(w) || (!gtk_widget_get_visible(p)
+  gboolean inv = (!GTK_IS_WIDGET(w) || !gtk_widget_get_visible(w) || (!gtk_widget_get_visible(p)
           && strcmp(gtk_widget_get_name(p), "collapsible")
           && !gtk_style_context_has_class(gtk_widget_get_style_context(p),
                                           "dt_plugin_ui_main")));
+  /* DEBUG: log widget-invisibility verdicts for plain GtkButton widgets so we
+   * can see why Ctrl+A (select all) is being gated. Remove after diagnosis. */
+  if(inv && GTK_IS_BUTTON(w))
+    dt_print(DT_DEBUG_ALWAYS,
+             "[21837] dt_action_widget_invisible=TRUE on button `%s' "
+             "self_visible=%d parent(`%s')_visible=%d parent_has_dt_plugin_ui_main=%d",
+             gtk_button_get_label(GTK_BUTTON(w)), gtk_widget_get_visible(w),
+             gtk_widget_get_name(p), gtk_widget_get_visible(p),
+             gtk_style_context_has_class(gtk_widget_get_style_context(p), "dt_plugin_ui_main"));
+  return inv;
 }
 
 #define ADD_EXPLANATION(cause, effect, extra, ...) if(*fb_log) \
@@ -4101,9 +4119,23 @@ static float _process_action(dt_action_t *action,
   {
     const dt_action_def_t *definition = _action_find_definition(action);
 
+    /* DEBUG: log widget-action dispatch so we can see whether the select-all
+     * (Ctrl+A) action is reaching the gating check and what blocks it. */
+    if(definition && definition->process && action->type >= DT_ACTION_TYPE_WIDGET && !definition->no_widget)
+      dt_print(DT_DEBUG_ALWAYS,
+               "[21837] _process_action widget-action type=%d target_set=%d invisible=%d",
+               (int)action->type, action_target != NULL,
+               action_target ? dt_action_widget_invisible(action_target) : -1);
+
+    /* actions belonging to a lib module (e.g. the selection module's "select
+     * all") are module-level actions: they operate on the whole collection
+     * and must be reachable even while the module's UI is collapsed.  Gating
+     * them on widget visibility makes e.g. Ctrl+A fail until the module has
+     * been expanded once, so exempt lib-owner widget actions here. */
     if(definition && definition->process
         && (action->type < DT_ACTION_TYPE_WIDGET
             || definition->no_widget
+            || (owner && owner->type == DT_ACTION_TYPE_LIB)
             || (action_target && !dt_action_widget_invisible(action_target))))
     {
       if(DT_PERFORM_ACTION(move_size)

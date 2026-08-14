@@ -2068,6 +2068,9 @@ static void _view_map_scroll_cb(GtkEventControllerScroll *controller,
 
   // get the current event for position and modifier state
   GdkEvent *event = dt_gui_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  /* DEBUG: confirm the map scroll controller fires and reaches zoom. */
+  dt_print(DT_DEBUG_ALWAYS, "[21840] _view_map_scroll_cb event=%p dx=%g dy=%g",
+           (void *)event, dx, dy);
   if(!event) return;
   gdouble x, y;
   GdkModifierType state;
@@ -3074,6 +3077,7 @@ static void _drag_and_drop_received(GtkWidget *widget,
   if(selection_data != NULL && target_type == DND_TARGET_IMGID)
   {
     const int imgs_nb = gtk_selection_data_get_length(selection_data) / sizeof(dt_imgid_t);
+    dt_print(DT_DEBUG_ALWAYS, "[21840] _drag_and_drop_received imgs_nb=%d", imgs_nb);
     if(imgs_nb)
     {
       const dt_imgid_t *imgt = (dt_imgid_t *)gtk_selection_data_get_data(selection_data);

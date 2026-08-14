@@ -2487,6 +2487,11 @@ static void _event_dnd_begin(GtkWidget *widget,
   darktable.control->last_clicked_filmstrip_id =
     dt_control_get_mouse_over_id();
   table->drag_list = dt_act_on_get_images(FALSE, TRUE, TRUE);
+  /* DEBUG: check how many images a drag carries and why (multi-selection d&d). */
+  dt_print(DT_DEBUG_ALWAYS,
+           "[21840] _event_dnd_begin drag_list=%d mouseover=%d mouse_inside=%d algo=%d",
+           g_list_length(table->drag_list), darktable.control->last_clicked_filmstrip_id,
+           dt_ui_thumbtable(darktable.gui->ui)->mouse_inside, dt_act_on_get_algorithm());
 
 #ifdef HAVE_MAP
   dt_view_manager_t *vm = darktable.view_manager;
