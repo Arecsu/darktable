@@ -347,9 +347,18 @@ static float _action_process_button(gpointer target,
        * stored-gesture branch above), so on a plain button a right-click
        * shortcut has nothing left to reach and stays a no-op.
        * gtk_widget_activate() is the GTK4-compatible equivalent of the
-       * primary press+release. */
+       * primary press+release.  However it only schedules a click when the
+       * button is realized, so a button in a module that has never been
+       * expanded (and thus never realized) would be a silent no-op (see
+       * #21837: Ctrl+A on a collapsed selection module).  Emit "clicked"
+       * directly in that case so module-level actions stay reachable. */
       if(effect == DT_ACTION_EFFECT_ACTIVATE || effect == DT_ACTION_EFFECT_ACTIVATE_CTRL)
-        gtk_widget_activate(GTK_WIDGET(target));
+      {
+        if(gtk_widget_get_realized(GTK_WIDGET(target)))
+          gtk_widget_activate(GTK_WIDGET(target));
+        else
+          g_signal_emit_by_name(target, "clicked");
+      }
     }
   }
 
@@ -4127,15 +4136,9 @@ static float _process_action(dt_action_t *action,
                (int)action->type, action_target != NULL,
                action_target ? dt_action_widget_invisible(action_target) : -1);
 
-    /* actions belonging to a lib module (e.g. the selection module's "select
-     * all") are module-level actions: they operate on the whole collection
-     * and must be reachable even while the module's UI is collapsed.  Gating
-     * them on widget visibility makes e.g. Ctrl+A fail until the module has
-     * been expanded once, so exempt lib-owner widget actions here. */
     if(definition && definition->process
         && (action->type < DT_ACTION_TYPE_WIDGET
             || definition->no_widget
-            || (owner && owner->type == DT_ACTION_TYPE_LIB)
             || (action_target && !dt_action_widget_invisible(action_target))))
     {
       if(DT_PERFORM_ACTION(move_size)
