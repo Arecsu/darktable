@@ -291,7 +291,15 @@ static float _action_process_toggle(gpointer target,
         case DT_ACTION_EFFECT_ON_CTRL:
         case DT_ACTION_EFFECT_TOGGLE_RIGHT:
         case DT_ACTION_EFFECT_ON_RIGHT:
-          gtk_widget_activate(GTK_WIDGET(target));
+          /* like _action_process_button: gtk_widget_activate() only acts
+           * when the widget is realized, so a toggle in a module that has
+           * never been expanded would be a no-op; emit "clicked" directly
+           * (which GtkToggleButton handles by flipping state + emitting
+           * "toggled") when not realized. */
+          if(gtk_widget_get_realized(GTK_WIDGET(target)))
+            gtk_widget_activate(GTK_WIDGET(target));
+          else
+            g_signal_emit_by_name(target, "clicked");
           break;
         default:
           break;
