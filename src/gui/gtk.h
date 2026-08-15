@@ -1106,6 +1106,14 @@ PangoFontDescription *dt_gui_get_font(void);
 // drawing must go through this).
 PangoFontDescription *dt_gui_widget_get_font(GtkWidget *widget);
 
+// Map the widget's origin (0,0) into the coordinate space of its native
+// (surface/toplevel).  GTK3's gdk_window_get_origin() took NULL as "the
+// toplevel"; GTK4's gtk_widget_compute_point asserts a non-NULL target, so
+// the native is passed explicitly.  Returns FALSE (and leaves *origin
+// untouched) when the widget has no realized native yet.  This is the
+// one-source-of-truth conversion for surface-relative (pan_x/pan_y) code.
+gboolean dt_gui_widget_get_surface_origin(GtkWidget *widget, graphene_point_t *origin);
+
 // returns the session type at runtime
 dt_gui_session_type_t dt_gui_get_session_type(void);
 

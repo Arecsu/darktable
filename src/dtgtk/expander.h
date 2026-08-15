@@ -50,6 +50,22 @@ void dtgtk_expander_set_drag_hover(GtkDarktableExpander *expander, gboolean allo
 
 GtkWidget *dtgtk_expander_new(GtkWidget *header, GtkWidget *body);
 
+/* GtkDarktableBodyClip: the revealer replacement used as the expander's
+ * frame.  Keeps its child always allocated (cached render node survives
+ * the collapsed state) and animates only the clip + translate -- see the
+ * design notes in expander.c.  API mirrors the GtkRevealer subset the
+ * expander uses, including the child-revealed notification. */
+#define DTGTK_TYPE_BODYCLIP dtgtk_bodyclip_get_type()
+G_DECLARE_FINAL_TYPE(GtkDarktableBodyClip, dtgtk_bodyclip, DTGTK, BODYCLIP, GtkWidget)
+
+GtkWidget *dtgtk_bodyclip_new(void);
+void dtgtk_bodyclip_set_child(GtkDarktableBodyClip *bodyclip, GtkWidget *child);
+GtkWidget *dtgtk_bodyclip_get_child(GtkDarktableBodyClip *bodyclip);
+void dtgtk_bodyclip_set_duration(GtkDarktableBodyClip *bodyclip, guint duration);
+void dtgtk_bodyclip_set_reveal_child(GtkDarktableBodyClip *bodyclip, gboolean reveal);
+gboolean dtgtk_bodyclip_get_reveal_child(GtkDarktableBodyClip *bodyclip);
+gboolean dtgtk_bodyclip_get_child_revealed(GtkDarktableBodyClip *bodyclip);
+
 G_END_DECLS
 
 // clang-format off

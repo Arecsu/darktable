@@ -19,6 +19,7 @@ add_executable(darktable-test-gtk4
   test_gesture.c
   test_panel.c
   test_view.c
+  test_bodyclip.c
 )
 
 set_target_properties(darktable-test-gtk4 PROPERTIES LINKER_LANGUAGE C)

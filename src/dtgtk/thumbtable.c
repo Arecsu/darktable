@@ -226,7 +226,7 @@ static dt_thumbnail_t *_thumb_get_under_mouse(dt_thumbtable_t *table)
   // subtract the widget's origin in surface coords to get widget coords,
   // mirroring the GTK3 window-origin math.
   graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
-  if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+  if(dt_gui_widget_get_surface_origin(table->widget, &origin))
   {
     x = round(table->last_x - origin.x);
     y = round(table->last_y - origin.y);
@@ -884,7 +884,7 @@ static void _zoomable_zoom(dt_thumbtable_t *table,
     // GTK4: last_x/last_y are surface-relative; subtract the widget's origin
     // in surface coords to get widget coords (GTK3 used the window origin).
     graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
-    if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+    if(dt_gui_widget_get_surface_origin(table->widget, &origin))
     {
       x = table->last_x - origin.x;
       y = table->last_y - origin.y;
@@ -1005,7 +1005,7 @@ static void _filemanager_zoom(dt_thumbtable_t *table,
     // GTK4: last_x/last_y are surface-relative; subtract the widget's origin
     // in surface coords to get widget coords (GTK3 used the window origin).
     graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
-    if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+    if(dt_gui_widget_get_surface_origin(table->widget, &origin))
     {
       x = table->last_x - origin.x;
       y = table->last_y - origin.y;

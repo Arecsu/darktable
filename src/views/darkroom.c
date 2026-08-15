@@ -4936,7 +4936,7 @@ gboolean gesture_pinch(dt_view_t *self,
   // offset cancels out when subtracting the widget origin computed the same way
   GtkWidget *center = dt_ui_center(darktable.gui->ui);
   graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
-  if(!gtk_widget_compute_point(center, NULL, &origin, &origin))
+  if(!dt_gui_widget_get_surface_origin(center, &origin))
     origin = GRAPHENE_POINT_INIT(0, 0);
   const float x_local = (float)x - origin.x;
   const float y_local = (float)y - origin.y;

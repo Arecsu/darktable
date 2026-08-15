@@ -1991,12 +1991,10 @@ static gboolean dt_gui_screenshot_tmp(gpointer user_data)
     gpointer stack[512];
     int sp = 0;
     stack[sp++] = win;
-    g_object_ref(win);
     int depth[512] = {0};
     while(sp > 0)
     {
       GtkWidget *n = stack[--sp];
-      g_object_unref(n);
       if(!GTK_IS_WIDGET(n)) continue;
       const int d = depth[sp];
       const char *name = gtk_widget_get_name(n);
@@ -2010,14 +2008,17 @@ static gboolean dt_gui_screenshot_tmp(gpointer user_data)
       }
       const gboolean vx = gtk_widget_compute_expand(n, GTK_ORIENTATION_VERTICAL);
       const gboolean hx = gtk_widget_compute_expand(n, GTK_ORIENTATION_HORIZONTAL);
-      g_print("%*s[%dpx natH=%d natW=%d vex=%d hex=%d] %s %s%s%s%s\n",
-              d, "", gtk_widget_get_height(n), nat_h, nat_w, vx, hx, css,
+      GtkAllocation alloc;
+      gtk_widget_get_allocation(n, &alloc);
+      GtkWidget *parent = gtk_widget_get_parent(n);
+      const char *pname = parent ? gtk_widget_get_css_name(parent) : "-";
+      g_print("%*s[%dpx@y%d natH=%d natW=%d vex=%d hex=%d] %s %s%s%s%s parent=%s\n",
+              d, "", gtk_widget_get_height(n), alloc.y, nat_h, nat_w, vx, hx, css,
               name && *name ? name : "", *cls ? "/" : "", cls,
-              gtk_widget_get_visible(n) ? "" : "(hidden)");
+              gtk_widget_get_visible(n) ? "" : "(hidden)", pname);
       g_free(cls);
       for(GtkWidget *c = gtk_widget_get_first_child(n); c; c = gtk_widget_get_next_sibling(c))
       {
-        g_object_ref(c);
         stack[sp++] = c;
         depth[sp] = d + 1;
       }
@@ -2418,6 +2419,16 @@ void dt_ui_container_add_widget(const dt_ui_t *ui,
     default:
     {
       gtk_box_append(GTK_BOX(ui->containers[c]), w);
+      /* keep the empty "right-click to show/hide modules" drag target
+       * below the modules (GTK3 packed it with pack_end): modules are
+       * appended after it, so move it back to the end on every add. */
+      GtkWidget *empty = g_object_get_data(G_OBJECT(ui->containers[c]), "dt-panel-empty-box");
+      if(empty && gtk_widget_get_parent(empty) == ui->containers[c])
+      {
+        GtkWidget *last = gtk_widget_get_last_child(ui->containers[c]);
+        if(last != empty)
+          gtk_box_reorder_child_after(GTK_BOX(ui->containers[c]), empty, last);
+      }
     }
     break;
   }
@@ -3144,6 +3155,11 @@ static GtkWidget *_ui_init_panel_container_center(GtkWidget *container,
   gtk_widget_set_hexpand(empty, TRUE);
   gtk_widget_set_vexpand(empty, TRUE);
   gtk_box_append(GTK_BOX(box), empty);
+  /* GTK4 has no pack_end(): modules are appended after this empty box, so
+   * keep a handle here and reorder it to the end of the box every time a
+   * module is added (dt_ui_container_add_widget).  Otherwise the expanding
+   * box sits above the modules and pushes them to the bottom of the panel. */
+  g_object_set_data(G_OBJECT(box), "dt-panel-empty-box", empty);
 #if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_drag_dest_set(empty, 0, NULL, 0, GDK_ACTION_COPY);
   g_signal_connect(empty, "drag-motion", G_CALLBACK(_on_drag_motion_drop), GINT_TO_POINTER(FALSE));
@@ -4695,7 +4711,14 @@ static const dt_action_def_t _action_def_focus_tabs
 static void _get_height_if_visible(GtkWidget *w,
                                    gint *height)
 {
-  if(gtk_widget_get_visible(w)) *height = gtk_widget_get_allocated_height(w);
+  if(gtk_widget_get_visible(w))
+  {
+    /* never downgrade to 0: at first map the children have no allocation
+     * yet (map fires before the first size-allocate), and the callers use
+     * the row height as a modulo divisor -- 0 would SIGFPE */
+    const gint h = gtk_widget_get_allocated_height(w);
+    if(h > 0) *height = h;
+  }
 }
 
 static gint _get_container_row_heigth(GtkWidget *w)
@@ -4730,6 +4753,9 @@ static gint _get_container_row_heigth(GtkWidget *w)
         child = gtk_widget_get_next_sibling(child))
       _get_height_if_visible(child, &height);
   }
+
+  /* the row height is used as a modulo divisor by the resize-wrap callers */
+  if(height < 1) height = DT_PIXEL_APPLY_DPI(10);
 
   return height;
 }
@@ -6854,6 +6880,19 @@ PangoFontDescription *dt_gui_widget_get_font(GtkWidget *widget)
   if(desc)
     return pango_font_description_copy(desc);
   return pango_font_description_new();
+}
+
+gboolean dt_gui_widget_get_surface_origin(GtkWidget *widget, graphene_point_t *origin)
+{
+  /* GtkNative is only implemented by widgets (GtkWindow/GtkPopover/...), so
+   * the cast is safe whenever a native exists.  gtk_widget_compute_point()
+   * in GTK4 asserts GTK_IS_WIDGET(target) -- it does NOT accept NULL as the
+   * old gdk_window_get_origin() did (see gtk/gtkwidget.c). */
+  GtkWidget *native = (GtkWidget *)gtk_widget_get_native(widget);
+  if(!native)
+    return FALSE;
+  const graphene_point_t zero = GRAPHENE_POINT_INIT(0, 0);
+  return gtk_widget_compute_point(widget, native, &zero, origin);
 }
 
 // clang-format off

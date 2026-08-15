@@ -2913,7 +2913,7 @@ void gui_update(dt_iop_module_t *self)
     GtkDarktableExpander *exp = DTGTK_EXPANDER(g->cs.expander);
     gtk_widget_set_visible(dtgtk_expander_get_header(exp), !show_sliders);
     gtk_widget_set_name(GTK_WIDGET(g->cs.container), show_sliders ? NULL : "collapsible");
-    gtk_revealer_set_reveal_child(GTK_REVEALER(exp->frame), show_sliders || exp->expanded);
+    dtgtk_bodyclip_set_reveal_child(DTGTK_BODYCLIP(exp->frame), show_sliders || exp->expanded);
   }
 
   // display widgets depending on the selected notebook page

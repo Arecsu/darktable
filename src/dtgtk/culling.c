@@ -156,7 +156,7 @@ static void _thumbs_refocus(dt_culling_t *table)
     int x = -1;
     int y = -1;
     graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
-    if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+    if(dt_gui_widget_get_surface_origin(table->widget, &origin))
     {
       x = round(table->pan_x - origin.x);
       y = round(table->pan_y - origin.y);
@@ -726,7 +726,7 @@ static void _event_scroll(GtkEventControllerScroll *controller,
       // convert surface to culling coordinates (GTK3 used the window origin)
       float x_culling = x_root, y_culling = y_root;
       graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
-      if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+      if(dt_gui_widget_get_surface_origin(table->widget, &origin))
       {
         x_culling = x_root - origin.x;
         y_culling = y_root - origin.y;
@@ -798,7 +798,7 @@ static void _event_scroll(GtkEventControllerScroll *controller,
       // convert surface to culling coordinates (GTK3 used the window origin)
       float x_culling = x_root, y_culling = y_root;
       graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
-      if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+      if(dt_gui_widget_get_surface_origin(table->widget, &origin))
       {
         x_culling = x_root - origin.x;
         y_culling = y_root - origin.y;
@@ -2416,7 +2416,7 @@ gboolean dt_culling_zoom_add(dt_culling_t *table,
   // (GTK4's "root" coords are surface-relative; GTK3 used the window origin).
   float x_culling = x_root, y_culling = y_root;
   graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
-  if(gtk_widget_compute_point(table->widget, NULL, &origin, &origin))
+  if(dt_gui_widget_get_surface_origin(table->widget, &origin))
   {
     x_culling = x_root - origin.x;
     y_culling = y_root - origin.y;

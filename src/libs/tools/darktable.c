@@ -219,8 +219,11 @@ static gboolean _lib_darktable_draw_callback(GtkWidget *widget,
   GdkRGBA *tmpcolor;
   dt_gui_style_context_get(context, state, "color", &tmpcolor, NULL);
 
-  PangoFontDescription *font_desc = NULL;
-  dt_gui_style_context_get(context, state, "font", &font_desc, NULL);
+  /* GTK4's dt_gui_style_context_get cannot resolve "font" (no style lookup
+   * without a widget) and returns NULL -- pango_font_description_set_*
+   * would critical on it.  The widget's pango context carries the resolved
+   * CSS font, so take it from there (dt_gui_widget_get_font, gui/gtk.h). */
+  PangoFontDescription *font_desc = dt_gui_widget_get_font(widget);
 
   /* paint icon image */
   if(d->image)
