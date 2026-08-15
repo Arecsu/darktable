@@ -4194,6 +4194,7 @@ void gui_init(dt_lib_module_t *self)
 
   GtkTreeViewColumn *col = gtk_tree_view_column_new();
   gtk_tree_view_append_column(view, col);
+  gtk_tree_view_column_set_expand(col, TRUE);
   GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
   gtk_tree_view_column_pack_start(col, renderer, TRUE);
   gtk_tree_view_column_set_cell_data_func(col, renderer, tree_count_show, NULL, NULL);

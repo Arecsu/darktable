@@ -2012,8 +2012,9 @@ static gboolean dt_gui_screenshot_tmp(gpointer user_data)
       gtk_widget_get_allocation(n, &alloc);
       GtkWidget *parent = gtk_widget_get_parent(n);
       const char *pname = parent ? gtk_widget_get_css_name(parent) : "-";
-      g_print("%*s[%dpx@y%d natH=%d natW=%d vex=%d hex=%d] %s %s%s%s%s parent=%s\n",
-              d, "", gtk_widget_get_height(n), alloc.y, nat_h, nat_w, vx, hx, css,
+      g_print("%*s[W%dxH%d@(%d,%d) natH=%d natW=%d vex=%d hex=%d halign=%d] %s %s%s%s%s parent=%s\n",
+              d, "", gtk_widget_get_width(n), gtk_widget_get_height(n), alloc.x, alloc.y, nat_h, nat_w, vx, hx,
+              gtk_widget_get_halign(n), css,
               name && *name ? name : "", *cls ? "/" : "", cls,
               gtk_widget_get_visible(n) ? "" : "(hidden)", pname);
       g_free(cls);
@@ -4637,6 +4638,14 @@ GtkWidget *dt_ui_notebook_page(GtkNotebook *notebook,
 #if !GTK_CHECK_VERSION(4, 0, 0)
   gtk_container_child_set(GTK_CONTAINER(notebook), page,
                           "tab-expand", TRUE, "tab-fill", TRUE, NULL);
+#else
+  /* GTK3's "tab-expand"/"tab-fill" child properties moved onto the
+   * GtkNotebookPage object in GTK4 (there is no gtk_notebook_tab_expand()
+   * helper).  Without tab-expand the notebook's tab header hugs the left
+   * and each tab only takes its natural label width instead of sharing the
+   * full header width; tab-fill stretches the label to the whole tab. */
+  g_object_set(gtk_notebook_get_page(notebook, page),
+               "tab-expand", TRUE, "tab-fill", TRUE, NULL);
 #endif
   if(page_num == 1)
   {
@@ -5203,8 +5212,15 @@ GtkWidget *dt_ui_resize_wrap(GtkWidget *w,
     dt_gui_connect_draw(w, _resize_wrap_draw, config_str);
 #endif
     gtk_widget_set_margin_bottom(sw, DT_RESIZE_HANDLE_SIZE);
+    /* GTK4: the wrapper is a HORIZONTAL box, so the scrolled window sits on
+     * the box's MAIN axis, where GtkBox does not auto-fill children that
+     * lack expand (unlike the cross axis, which always fills).  Without an
+     * explicit hexpand a wrapped tree/list would be allocated only its
+     * natural width (a few dozen px) and hug the left edge.  (GTK3
+     * pack_start(..., TRUE, TRUE) expanded on the main axis.) */
     w = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_box_append(GTK_BOX(w), sw);
+    gtk_widget_set_hexpand(sw, TRUE);
   }
 
   gtk_widget_add_events(w, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK

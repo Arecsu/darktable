@@ -1728,6 +1728,7 @@ void gui_init(dt_lib_module_t *self)
 
   column = gtk_tree_view_column_new();
   gtk_tree_view_append_column(GTK_TREE_VIEW(view), column);
+  gtk_tree_view_column_set_expand(column, TRUE);
   renderer = gtk_cell_renderer_text_new();
   gtk_tree_view_column_pack_start(column, renderer, TRUE);
   gtk_tree_view_column_add_attribute(column, renderer, "text", DT_EXPORT_BATCH_COL_NAME);

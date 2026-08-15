@@ -228,6 +228,7 @@ char *dt_lib_export_metadata_configuration_dialog(char *metadata_presets, const 
   g_signal_connect(G_OBJECT(renderer), "edited", G_CALLBACK(_formula_edited), (gpointer)d);
   dt_gui_commit_on_focus_loss(renderer, &active_editable);
   col = gtk_tree_view_column_new_with_attributes(_("formula"), renderer, "text", 2, NULL);
+  gtk_tree_view_column_set_expand(col, TRUE);
   gtk_tree_view_append_column(view, col);
   gtk_widget_set_tooltip_text(GTK_WIDGET(view),
                 _("list of calculated metadata\n"

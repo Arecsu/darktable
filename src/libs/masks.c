@@ -2367,6 +2367,7 @@ void gui_init(dt_lib_module_t *self)
   d->treeview = gtk_tree_view_new();
   GtkTreeViewColumn *col = gtk_tree_view_column_new();
   gtk_tree_view_column_set_title(col, "shapes");
+  gtk_tree_view_column_set_expand(col, TRUE);
   gtk_tree_view_append_column(GTK_TREE_VIEW(d->treeview), col);
 
   GtkCellRenderer *renderer = gtk_cell_renderer_pixbuf_new();

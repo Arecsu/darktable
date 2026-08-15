@@ -120,8 +120,12 @@ void gui_init(dt_imageio_module_format_t *self)
 {
   self->widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
-  gtk_box_append(GTK_BOX(self->widget),
-    dt_ui_label_new(_("do a 1:1 copy of the selected files.\nthe global options below do not apply!")));
+  GtkWidget *label = dt_ui_label_new(_("do a 1:1 copy of the selected files.\nthe global options below do not apply!"));
+  /* GTK4: self->widget is a HORIZONTAL box, so the label sits on the main
+   * axis where it only gets its natural width unless it hexpands (GTK3's
+   * pack_start(..., TRUE, TRUE) expanded it). */
+  gtk_widget_set_hexpand(label, TRUE);
+  gtk_box_append(GTK_BOX(self->widget), label);
 }
 void gui_cleanup(dt_imageio_module_format_t *self)
 {

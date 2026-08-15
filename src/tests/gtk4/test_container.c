@@ -24,6 +24,7 @@
 #include "test_gtk4.h"
 
 #include "gui/gtk.h"
+#include "gui/accelerators.h"
 
 static void test_container_helpers(void)
 {
@@ -111,11 +112,57 @@ static void test_container_reparent(void)
   g_assert_true(gtk_widget_get_parent(kid) == box1);
 }
 
+/* dt_ui_resize_wrap() must hexpand its wrapped scrolled window: the wrapper
+ * is a HORIZONTAL GtkBox, so the scrolled window sits on the box's MAIN axis
+ * where a child without expand keeps only its natural width (a few dozen px)
+ * and hugs the left edge.  GTK3's pack_start(..., TRUE, TRUE) expanded it.
+ * Without this every module list wrapped in resize_wrap (collections, styles,
+ * tagging, masks, metadata, snapshots, ...) rendered at natural width. */
+static void test_resize_wrap_hexpands_scrolled_window(void)
+{
+  GtkWidget *child = gtk_tree_view_new();
+  GtkWidget *wrap = dt_ui_resize_wrap(child, 200, "plugins/test/nonexistent");
+
+  /* the wrapper is a horizontal box holding exactly one child: the
+   * scrolled window wrapping the wrapped widget */
+  g_assert_true(GTK_IS_BOX(wrap));
+  g_assert_cmpint(gtk_orientable_get_orientation(GTK_ORIENTABLE(wrap)), ==,
+                  GTK_ORIENTATION_HORIZONTAL);
+  GtkWidget *sw = gtk_widget_get_first_child(wrap);
+  g_assert_true(GTK_IS_SCROLLED_WINDOW(sw));
+  g_assert_true(gtk_widget_get_next_sibling(sw) == NULL);
+  g_assert_true(gtk_scrolled_window_get_child(GTK_SCROLLED_WINDOW(sw)) == child);
+
+  /* the whole point: the scrolled window fills the module body width */
+  g_assert_true(gtk_widget_get_hexpand(sw));
+}
+
+/* dt_ui_notebook_page() must set tab-expand/tab-fill on the GTK4
+ * GtkNotebookPage object (the tab-expand child property moved there from
+ * GTK3).  Without tab-expand the notebook's tab header hugs the left and
+ * each tab only takes its label width instead of sharing the full header
+ * width (module "actions on selection"). */
+static void test_notebook_tab_expand(void)
+{
+  static struct dt_action_def_t def = { 0 };
+  GtkNotebook *nb = dt_ui_notebook_new(&def);
+  GtkWidget *p1 = dt_ui_notebook_page(nb, "one", NULL);
+  GtkWidget *p2 = dt_ui_notebook_page(nb, "two", NULL);
+
+  gboolean e1, f1, e2, f2;
+  g_object_get(gtk_notebook_get_page(nb, p1), "tab-expand", &e1, "tab-fill", &f1, NULL);
+  g_object_get(gtk_notebook_get_page(nb, p2), "tab-expand", &e2, "tab-fill", &f2, NULL);
+  g_assert_true(e1 && f1);
+  g_assert_true(e2 && f2);
+}
+
 void dt_test_container_register(void)
 {
   g_test_add_func("/gtk4/container/helpers", test_container_helpers);
   g_test_add_func("/gtk4/container/destroy-children", test_container_destroy_children);
   g_test_add_func("/gtk4/container/reparent", test_container_reparent);
+  g_test_add_func("/gtk4/container/resize-wrap-hexpand", test_resize_wrap_hexpands_scrolled_window);
+  g_test_add_func("/gtk4/container/notebook-tab-expand", test_notebook_tab_expand);
 }
 
 // clang-format off

@@ -131,6 +131,11 @@ void gui_init(dt_lib_module_t *self)
   d->tview = gtk_label_new("");
   gtk_label_set_ellipsize(GTK_LABEL(d->tview), PANGO_ELLIPSIZE_MIDDLE);
   gtk_label_set_justify(GTK_LABEL(d->tview), GTK_JUSTIFY_CENTER);
+  /* GTK4: self->widget is a HORIZONTAL box, so the label is on the main
+   * axis where a child only gets its natural width unless it hexpands.
+   * Without this the info line hugs the left at label width (GTK3's
+   * pack_start(..., TRUE, TRUE) expanded it). */
+  gtk_widget_set_hexpand(d->tview, TRUE);
   gtk_box_append(GTK_BOX(self->widget), d->tview);
   gtk_widget_set_name(GTK_WIDGET(d->tview), "image-info");
 
