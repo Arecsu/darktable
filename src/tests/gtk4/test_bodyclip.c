@@ -194,11 +194,66 @@ static void test_bodyclip_reveal_notify(void)
   _unref_floating(bc);
 }
 
+/* the reveal is TOP-anchored in BOTH directions: the child's top edge is
+ * pinned to the bodyclip's own top edge (never pushed above or below it),
+ * and overflow:hidden clips the overhanging child to our growing/shrinking
+ * box.  So expanding reveals the top of the content first and grows
+ * downward, and collapsing hides the top first with the bottom last to
+ * vanish.  A mid-animation child whose top edge sits at or below the
+ * bodyclip's top edge proves the reveal is top -> bottom with no empty gap
+ * (a child pushed below our top would show an empty gap above it; a child
+ * pushed above would reveal bottom-first).
+ * display-gated: needs realize + allocate to read the child transform. */
+static void test_bodyclip_reveal_direction(void)
+{
+  dt_test_require_display();
+
+  /* a tall body so mid-animation gives a clearly partial clip height */
+  GtkWidget *bc = dtgtk_bodyclip_new();
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  for(int i = 0; i < 20; i++)
+    gtk_box_append(GTK_BOX(box), gtk_label_new("module body row"));
+  dtgtk_bodyclip_set_duration(DTGTK_BODYCLIP(bc), 5000); /* long, stay mid-anim */
+  dtgtk_bodyclip_set_reveal_child(DTGTK_BODYCLIP(bc), FALSE);
+  dtgtk_bodyclip_set_child(DTGTK_BODYCLIP(bc), box);
+
+  GtkWidget *win = gtk_window_new();
+  gtk_window_set_default_size(GTK_WINDOW(win), 400, 300);
+  gtk_window_set_child(GTK_WINDOW(win), bc);
+  gtk_widget_show(win);
+  _pump_allocated(box);
+
+  /* body is tall enough for a clearly partial mid-animation clip */
+  int nat = _nat_h(box);
+  g_assert_cmpint(nat, >, 0);
+
+  /* expand, then let a couple frames elapse so it's mid-animation */
+  dtgtk_bodyclip_set_reveal_child(DTGTK_BODYCLIP(bc), TRUE);
+  for(int i = 0; i < 3; i++)
+  {
+    while(g_main_context_iteration(NULL, FALSE))
+      ;
+    g_usleep(15000);
+  }
+
+  /* must still be animating (not yet fully revealed) */
+  g_assert_false(dtgtk_bodyclip_get_child_revealed(DTGTK_BODYCLIP(bc)));
+
+  /* body's top edge must be at or below the bodyclip's top (pushed down),
+   * i.e. top-first.  A bottom-first (regressed) slide would put it above. */
+  graphene_point_t top;
+  g_assert_true(gtk_widget_compute_point(box, bc, &GRAPHENE_POINT_INIT(0, 0), &top));
+  g_assert_cmpfloat(top.y, >=, 0.0f);
+
+  gtk_window_destroy(GTK_WINDOW(win));
+}
+
 void dt_test_bodyclip_register(void)
 {
   g_test_add_func("/gtk4/bodyclip/measure", test_bodyclip_measure);
   g_test_add_func("/gtk4/bodyclip/child-stays-mapped", test_bodyclip_child_stays_mapped);
   g_test_add_func("/gtk4/bodyclip/reveal-notify", test_bodyclip_reveal_notify);
+  g_test_add_func("/gtk4/bodyclip/reveal-direction", test_bodyclip_reveal_direction);
 }
 
 // clang-format off

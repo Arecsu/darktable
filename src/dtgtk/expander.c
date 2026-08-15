@@ -38,17 +38,18 @@
  * behaved the same on GTK3, where every animation frame was re-rasterized.
  *
  * dtgtk_bodyclip keeps its child ALWAYS allocated at full natural size
- * (like GtkRevealer does mid-animation) and only animates the clip + a
- * translate transform.  The body therefore stays mapped and its render
+ * (like GtkRevealer does mid-animation), with its top edge pinned to ours,
+ * and animates only our own allocation box (see measure) + an
+ * overflow:hidden clip.  The body therefore stays mapped and its render
  * node survives the collapsed state: opening/closing becomes pure
- * transform updates -- no re-rasterization.  The body's first render
+ * clip updates -- no re-rasterization.  The body's first render
  * happens once at module build time instead of on every click.
  *
  * The rest matches GtkRevealer: same ease-out-cubic pacing, same
  * child-revealed notification (the scroll-to-module machinery connects to
  * it), overflow is clipped while the child is not fully in place, and
- * gtk_widget_do_pick() honors overflow:hidden + the child transform, so
- * input can never reach the translated-away (invisible) body.
+ * gtk_widget_do_pick() honors overflow:hidden + the clipped region, so
+ * input can never reach the overhanging (invisible) body.
  *
  * Known tradeoffs: collapsed bodies stay rendered (modest VRAM), and
  * keyboard focus traversal still sees a collapsed body's focusable widgets
@@ -83,10 +84,11 @@ static void dtgtk_bodyclip_set_position(GtkDarktableBodyClip *self, double pos)
 {
   self->current_pos = pos;
 
-  /* the child is allocated full-size and translated; while not fully in
-   * place it must be clipped to this widget's (animated) bounds, both for
-   * drawing (gtkwidget.c create_render_node) and for input picking
-   * (gtk_widget_do_pick rejects points outside the box when hidden). */
+  /* the child is allocated full-size with its top aligned to ours; while
+   * not fully in place it must be clipped to this widget's (animated)
+   * bounds, both for drawing (gtkwidget.c create_render_node) and for
+   * input picking (gtk_widget_do_pick rejects points outside the box when
+   * hidden). */
   const gboolean hidden = pos < 1.0;
   if(hidden != (gtk_widget_get_overflow(GTK_WIDGET(self)) == GTK_OVERFLOW_HIDDEN))
     gtk_widget_set_overflow(GTK_WIDGET(self), hidden ? GTK_OVERFLOW_HIDDEN : GTK_OVERFLOW_VISIBLE);
@@ -185,11 +187,16 @@ static void dtgtk_bodyclip_size_allocate(GtkWidget *widget,
     else child_height = MIN(G_MAXINT, (int)floor(height / vscale));
   }
 
-  /* ALWAYS allocate the child at full size: unlike GtkRevealer this keeps
-   * it mapped, so its render node stays cached across collapses.  The
-   * translate slides the body down from the top (slide-down look). */
-  GskTransform *transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(0, height - child_height));
-  gtk_widget_allocate(self->child, width, child_height, -1, transform); /* transfer full */
+  /* ALWAYS allocate the child at full size and ALIGN ITS TOP with our own
+   * top edge (no translate): unlike GtkRevealer this keeps it mapped, so its
+   * render node stays cached across collapses.  Our allocation box is only
+   * pos*child_height tall (see measure) and overflow is set to hidden while
+   * pos<1 (see set_position), so the child's overflow is clipped to OUR
+   * box.  With the child's top pinned to ours, the visible region is always
+   * the TOP [0, height] of the content: expanding reveals top -> middle ->
+   * bottom (no empty gap), collapsing shrinks the box from the bottom so
+   * the top disappears last.  Top-anchored reveal in both directions. */
+  gtk_widget_allocate(self->child, width, child_height, -1, NULL); /* identity transform */
 }
 
 static void dtgtk_bodyclip_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
