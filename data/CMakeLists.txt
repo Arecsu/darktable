@@ -6,7 +6,28 @@ if(USE_OPENCL)
 endif(USE_OPENCL)
 
 FILE(GLOB THEME_FILES "themes/*.css")
-FILE(COPY ${THEME_FILES} DESTINATION "${DARKTABLE_DATADIR}/themes")
+
+# Copy the theme CSS into the build datadir as a BUILD step (not just at
+# configure time).  The old FILE(COPY ...) only ran when CMake re-configured,
+# so editing data/themes/*.css had no effect on the build-tree app until a
+# reconfigure — a confusing footgun for anyone tweaking a theme.  Now each
+# theme file is a build output copied with copy_if_different whenever it
+# changes, so a plain `cmake --build` picks up CSS edits immediately.  The
+# install(FILES ...) below still handles packaging.
+set(_dt_theme_outputs "")
+foreach(_theme ${THEME_FILES})
+  get_filename_component(_theme_name "${_theme}" NAME)
+  add_custom_command(
+    OUTPUT "${DARKTABLE_DATADIR}/themes/${_theme_name}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${DARKTABLE_DATADIR}/themes"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_theme}"
+                                 "${DARKTABLE_DATADIR}/themes/${_theme_name}"
+    DEPENDS "${_theme}"
+    COMMENT "Copying theme ${_theme_name}")
+  list(APPEND _dt_theme_outputs "${DARKTABLE_DATADIR}/themes/${_theme_name}")
+endforeach()
+add_custom_target(dt_theme_files ALL DEPENDS ${_dt_theme_outputs})
+
 install(FILES ${THEME_FILES} DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/darktable/themes COMPONENT DTApplication)
 
 #

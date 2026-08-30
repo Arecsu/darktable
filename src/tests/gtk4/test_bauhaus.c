@@ -106,7 +106,7 @@ static void _bootstrap(void)
 
   dt_bauhaus_init();
   g_assert_nonnull(darktable.bauhaus);
-  g_assert_true(GTK_IS_WINDOW(darktable.bauhaus->popup.window));
+  g_assert_true(GTK_IS_POPOVER(darktable.bauhaus->popup.window));
 }
 
 /* a bare linear slider 0..1 default 0.5, no module attached */

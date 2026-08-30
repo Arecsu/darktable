@@ -174,6 +174,13 @@ static double INNER_PADDING = 4.0;
 // fwd declare
 static void _popup_reject(void);
 static void _popup_hide(void);
+static void _combo_popup_show(dt_bauhaus_widget_t *w);
+static void _combo_popup_close(void);
+static gboolean _combo_popup_cleanup(gpointer user_data);
+static gboolean _combo_pointer_over_list(GtkWidget *list);
+static void _combo_selection_changed(GtkSelectionModel *model, guint position,
+                                     guint n_items, gpointer user_data);
+static void _popup_closed(GtkPopover *popover, gpointer user_data);
 static gboolean _popup_draw(GtkWidget *widget, cairo_t *cr, gpointer user_data);
 static void _window_motion_handle(GtkWidget *widget,
                                     gdouble root_x,
@@ -510,7 +517,7 @@ static void _slider_zoom_range(dt_bauhaus_widget_t *w,
 
   gtk_widget_queue_draw(GTK_WIDGET(w));
   if(bh->current == w)
-    gtk_widget_queue_draw(bh->popup.window);
+    gtk_widget_queue_draw(bh->popup.area);
 }
 
 static void _slider_zoom_toast(dt_bauhaus_widget_t *w)
@@ -569,42 +576,18 @@ static void _window_position(const int offset)
   dt_bauhaus_popup_t *pop = &darktable.bauhaus->popup;
   int height = pop->position.height;
 
-  // On Xwayland gdk_screen_is_composited is TRUE but popups are opaque
-  // So we need to explicitly test for pure wayland
-#ifdef GDK_WINDOWING_WAYLAND
-  if(GDK_IS_WAYLAND_DISPLAY(gtk_widget_get_display(pop->window)))
-  {
-    if(gtk_widget_get_visible(pop->window))
-    {
-      pop->offcut += offset;
-      return;
-    }
-    pop->offcut = -height;
-    height *= 2;
-    // In GTK4 all visuals are RGBA and GdkVisual/GdkScreen no longer exist.
-    // The RGBA visual setup below is only needed on GTK3 Wayland where
-    // gdk_screen_is_composited() returns TRUE but popups would otherwise be
-    // opaque. At switch time the entire Wayland workaround block must be
-    // reworked (GdkWindow -> GdkSurface, gdk_window_resize removed, etc.).
-#if !GTK_CHECK_VERSION(4, 0, 0)
-    dt_gui_add_class(pop->window, "dt_transparent_background");
-    GdkScreen *screen = gtk_widget_get_screen(pop->window);
-    GdkVisual *visual = gdk_screen_get_rgba_visual(screen);
-    gtk_widget_set_visual(pop->window, visual);
-#endif
-  }
-#endif
-
   pop->offset += offset;
 
   if(pop->offcut > 0)
     pop->offcut = MAX(0, pop->offcut + offset);
 
 #if GTK_CHECK_VERSION(4, 0, 0)
-  // TODO P4: popup -> GtkPopover.  GTK4 has no GdkWindow/gdk_window_move_to_rect;
-  // the (undecorated) popup is sized but the compositor places it.
-  gtk_window_set_default_size(GTK_WINDOW(pop->window),
-                              pop->position.width, height - pop->offcut);
+  // The popup is a GtkPopover that hugs its drawing-area child: size the
+  // AREA (not a toplevel) to the requested box.  offcut is the scroll
+  // window for lists taller than the popover can present.  The popover
+  // anchors itself to the source widget, so there is no manual placement.
+  gtk_widget_set_size_request(pop->area, pop->position.width, height - pop->offcut);
+  gtk_widget_queue_resize(pop->area);
 #else
   GdkWindow *window = gtk_widget_get_window(pop->window);
   gdk_window_resize(window, pop->position.width, height - pop->offcut);
@@ -856,15 +839,6 @@ static void _popup_button_press_cb(GtkGestureSingle *gesture,
   dt_bauhaus_popup_button_press(button, state, root_x, root_y, time);
 }
 
-static void _window_show(GtkWidget *w, gpointer user_data)
-{
-#if !GTK_CHECK_VERSION(4, 0, 0)
-  // make sure combo popup handles button release
-  gtk_grab_add(GTK_WIDGET(user_data));
-#endif
-  // grab keyboard focus so the popup receives key events
-  gtk_widget_grab_focus(GTK_WIDGET(user_data));
-}
 
 static void _widget_leave(GtkEventControllerMotion *controller,
                           GtkWidget *widget)
@@ -1124,60 +1098,37 @@ void dt_bauhaus_init()
   bh->combo_introspection = g_hash_table_new(NULL, NULL);
   bh->combo_list = g_hash_table_new(NULL, NULL);
 
-#if GTK_CHECK_VERSION(4, 0, 0)
-  // TODO P4: bauhaus popup -> GtkPopover.  GTK4 removed GTK_WINDOW_POPUP,
-  // gtk_window_set_keep_above()/type_hint and gtk_widget_add_events(); the
-  // popup is a plain undecorated modal toplevel for now.
-  pop->window = gtk_window_new();
-  gtk_window_set_decorated(GTK_WINDOW(pop->window), FALSE);
-  gtk_window_set_modal(GTK_WINDOW(pop->window), TRUE);
-  gtk_window_set_resizable(GTK_WINDOW(pop->window), FALSE);
-#else
-  pop->window = gtk_window_new(GTK_WINDOW_POPUP);
-#ifdef GDK_WINDOWING_QUARTZ
-  dt_osx_disallow_fullscreen(pop->window);
-#endif
-  gtk_widget_set_size_request(pop->window, 1, 1);
-  gtk_window_set_keep_above(GTK_WINDOW(pop->window), TRUE);
-  gtk_window_set_modal(GTK_WINDOW(pop->window), TRUE);
-  gtk_window_set_type_hint(GTK_WINDOW(pop->window),
-                           GDK_WINDOW_TYPE_HINT_POPUP_MENU);
-  gtk_widget_add_events(pop->window, GDK_POINTER_MOTION_MASK);
-#endif
+  // The bauhaus value popup is a GtkPopover, not a toplevel: on GTK4 a
+  // toplevel cannot be positioned near the widget on Wayland (the
+  // compositor centers it) and has no Escape / click-outside dismissal
+  // (grabs are gone).  A popover anchors to the source widget, sizes to
+  // its child, and autohides on outside click and Escape.  It holds a
+  // strong ref (ref_sink) so it survives reparenting across toplevels;
+  // _popup_show parents it to the current anchor's toplevel.
+  pop->window = gtk_popover_new();
+  gtk_popover_set_autohide(GTK_POPOVER(pop->window), TRUE);
+  gtk_popover_set_position(GTK_POPOVER(pop->window), GTK_POS_BOTTOM);
+  gtk_popover_set_has_arrow(GTK_POPOVER(pop->window), FALSE);
+  gtk_widget_add_css_class(pop->window, "dt_bauhaus_popover");
+  g_object_ref_sink(pop->window);
 
   pop->area = gtk_drawing_area_new();
-#if GTK_CHECK_VERSION(4, 0, 0)
-  g_object_set(pop->area, "hexpand", TRUE, "vexpand", TRUE, NULL);
-  gtk_window_set_child(GTK_WINDOW(pop->window), pop->area);
-#else
-  g_object_set(pop->area, "expand", TRUE, NULL);
-  gtk_container_add(GTK_CONTAINER(pop->window), pop->area);
-#endif
   gtk_widget_set_can_focus(pop->area, TRUE);
-#if !GTK_CHECK_VERSION(4, 0, 0)
-  gtk_widget_add_events(pop->area,
-                        GDK_POINTER_MOTION_MASK
-                        | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
-                        | GDK_KEY_PRESS_MASK | GDK_LEAVE_NOTIFY_MASK
-                        | darktable.gui->scroll_mask);
-#endif
+  gtk_widget_set_focusable(pop->area, TRUE);
+  gtk_popover_set_child(GTK_POPOVER(pop->window), pop->area);
 
-  GObject *window = G_OBJECT(pop->window);
-  GObject *area = G_OBJECT(pop->area);
+  // autohide (outside click) and Escape close the popover through GTK, so
+  // clear the current widget whenever the popover closes (also fires on our
+  // own popdown in _popup_hide, which is harmless)
+  g_signal_connect(pop->window, "closed", G_CALLBACK(_popup_closed), NULL);
 
-  gtk_widget_realize(pop->window);
-#if !GTK_CHECK_VERSION(4, 0, 0)
-  g_signal_connect(gtk_widget_get_window(pop->window),
-                   "moved-to-rect", G_CALLBACK(_window_moved_to_rect), NULL);
-#endif
-  g_signal_connect(window, "show", G_CALLBACK(_window_show), area);
-  dt_gui_connect_draw(area, _popup_draw, NULL);
+  dt_gui_connect_draw(pop->area, _popup_draw, NULL);
   dt_gui_connect_motion(pop->window, _window_motion_handler, NULL, NULL, NULL);
-  dt_gui_connect_motion(area, NULL, NULL, _popup_leave_cb, NULL);
-  dt_gui_connect_key(area, _popup_key_press, NULL);
-  dt_gui_connect_click_all(area, _popup_button_press_cb, _popup_button_release_cb, NULL);
-  dt_gui_connect_scroll(area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES
-                                  | GTK_EVENT_CONTROLLER_SCROLL_DISCRETE,
+  dt_gui_connect_motion(pop->area, NULL, NULL, _popup_leave_cb, NULL);
+  dt_gui_connect_key(pop->area, _popup_key_press, NULL);
+  dt_gui_connect_click_all(pop->area, _popup_button_press_cb, _popup_button_release_cb, NULL);
+  dt_gui_connect_scroll(pop->area, GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES
+                                    | GTK_EVENT_CONTROLLER_SCROLL_DISCRETE,
                         _popup_scroll_cb, NULL);
 
   dt_action_define(&darktable.control->actions_focus, NULL, N_("sliders"),
@@ -2226,7 +2177,9 @@ static void _combobox_set(dt_bauhaus_widget_t *w,
   gtk_widget_queue_draw(GTK_WIDGET(w));
 
   dt_bauhaus_t *bh = darktable.bauhaus;
-  if(bh->current == w)
+  // Only the shared cairo popup (sliders) needs the scroll-reposition + draw
+  // here; a combobox open is a GtkListView popup and must not touch it.
+  if(bh->current == w && w->type == DT_BAUHAUS_SLIDER)
   {
     bh->change_active = TRUE;
     float old_mouse_y = bh->mouse_y;
@@ -2234,7 +2187,7 @@ static void _combobox_set(dt_bauhaus_widget_t *w,
                   + fmodf(old_mouse_y - w->top_gap, bh->line_height);
 
     _window_position(bh->mouse_y - old_mouse_y);
-    gtk_widget_queue_draw(bh->popup.window);
+    gtk_widget_queue_draw(bh->popup.area);
   }
 
   if(!DT_IN_GUI_UPDATE() && !mute)
@@ -3353,9 +3306,451 @@ static void _widget_measure(GtkWidget *widget,
   if(natural_baseline) *natural_baseline = -1;
 }
 
+static void _popup_closed(GtkPopover *popover, gpointer user_data)
+{
+  (void)popover;
+  (void)user_data;
+  // the popover closed (autohide, Escape, or our own popdown); the widget
+  // whose popup it was is no longer active
+  darktable.bauhaus->current = NULL;
+}
+
+// the popover's parent toplevel died: unparent it (it survives via the
+// ref_sink taken in dt_bauhaus_init) and forget the tracked toplevel so the
+// next open re-parents to a fresh one (also handles toplevel address reuse)
+static void _dt_popover_toplevel_destroyed(GtkWidget *toplevel, gpointer user_data)
+{
+  GtkWidget *popover = user_data;
+  if(gtk_widget_get_parent(popover) == toplevel)
+    gtk_widget_unparent(popover);
+  g_object_set_data(G_OBJECT(popover), "dt-bauhaus-popover-toplevel", NULL);
+}
+
+/* ================== GTK4 combobox list popup ================== */
+#if GTK_CHECK_VERSION(4, 0, 0)
+
+/* The combobox value popup is a real GtkListView in a GtkPopover (built fresh
+ * per open), NOT the shared cairo popup that sliders use.  GTK then handles
+ * placement (auto-flip to the free space), a height clamp + scrollbar via
+ * GtkScrolledWindow, built-in arrow/Home/End keyboard navigation and its own
+ * popover animation — all the things the old cairo list hand-rolled and got
+ * wrong (no max height, overflow, fragile pointing_to math).
+ *
+ * A tiny GListModel adaptor exposes the widget's GPtrArray of
+ * dt_bauhaus_combobox_entry_t to GtkListView; a GtkCustomFilter + a
+ * GtkSearchEntry give the instant type-to-search on open. */
+
+typedef struct dt_bauhaus_combo_popup_t
+{
+  GtkWidget *popover;
+  GtkWidget *search;   // GtkSearchEntry (NULL until search is wired)
+  GtkWidget *scroll;   // GtkScrolledWindow wrapping the list
+  GtkWidget *list;     // GtkListView
+  GtkSingleSelection *selection;
+  GtkFilterListModel *filter;
+  GtkCustomFilter *filter_obj;
+  char *keys;          // current search text (casefolded), NULL = match all
+  dt_bauhaus_widget_t *w;
+} dt_bauhaus_combo_popup_t;
+
+/* --- GObject item wrapping one combobox entry, + GListModel adaptor ---
+ * GtkSingleSelection/GtkListView g_object_ref()/unref() the model's items, so
+ * the model must hand out real GObjects (not raw entry pointers).  Each item
+ * borrows the owning widget's entry; the entries array is stable for the open
+ * and the whole popup is torn down before the widget can be freed. */
+
+typedef struct _BauhausComboItem
+{
+  GObject parent;
+  const dt_bauhaus_combobox_entry_t *entry;
+} _BauhausComboItem;
+
+typedef struct _BauhausComboItemClass
+{
+  GObjectClass parent_class;
+} _BauhausComboItemClass;
+
+typedef struct _BauhausListModel
+{
+  GObject parent;
+  GPtrArray *entries;   // borrowed from the owning widget; stable during the open
+} _BauhausListModel;
+
+typedef struct _BauhausListModelClass
+{
+  GObjectClass parent_class;
+} _BauhausListModelClass;
+
+static void _bauhaus_list_model_list_model_init(GListModelInterface *iface);
+
+G_DEFINE_TYPE(_BauhausComboItem, _bauhaus_combo_item, G_TYPE_OBJECT)
+G_DEFINE_TYPE_WITH_CODE(_BauhausListModel, _bauhaus_list_model, G_TYPE_OBJECT,
+  G_IMPLEMENT_INTERFACE(G_TYPE_LIST_MODEL, _bauhaus_list_model_list_model_init))
+
+#define BAUHAUS_TYPE_COMBO_ITEM (_bauhaus_combo_item_get_type())
+#define BAUHAUS_TYPE_LIST_MODEL (_bauhaus_list_model_get_type())
+
+static void _bauhaus_combo_item_init(_BauhausComboItem *self)
+{
+  (void)self;
+}
+static void _bauhaus_combo_item_class_init(_BauhausComboItemClass *klass)
+{
+  (void)klass;
+}
+
+static GType _bauhaus_list_model_get_item_type(GListModel *list)
+{
+  (void)list;
+  return BAUHAUS_TYPE_COMBO_ITEM;  // every item is a _BauhausComboItem GObject
+}
+
+static guint _bauhaus_list_model_get_n_items(GListModel *list)
+{
+  _BauhausListModel *self = (_BauhausListModel *)list;
+  return self->entries ? self->entries->len : 0;
+}
+
+static gpointer _bauhaus_list_model_get_item(GListModel *list, guint position)
+{
+  _BauhausListModel *self = (_BauhausListModel *)list;
+  if(!self->entries || position >= self->entries->len) return NULL;
+  _BauhausComboItem *it = g_object_new(BAUHAUS_TYPE_COMBO_ITEM, NULL);
+  it->entry = g_ptr_array_index(self->entries, position);
+  return it;  // full ref; the caller (view/selection) unrefs it
+}
+
+static void _bauhaus_list_model_list_model_init(GListModelInterface *iface)
+{
+  iface->get_item_type = _bauhaus_list_model_get_item_type;
+  iface->get_n_items = _bauhaus_list_model_get_n_items;
+  iface->get_item = _bauhaus_list_model_get_item;
+}
+
+static void _bauhaus_list_model_init(_BauhausListModel *self)
+{
+  (void)self;
+}
+
+static void _bauhaus_list_model_class_init(_BauhausListModelClass *klass)
+{
+  (void)klass;
+}
+
+/* --- row factory --- */
+
+static void _combo_list_setup(GtkListItemFactory *factory,
+                              GtkListItem *item,
+                              gpointer user_data)
+{
+  (void)factory; (void)user_data;
+  GtkWidget *label = gtk_label_new(NULL);
+  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+  gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+  gtk_list_item_set_child(item, label);
+}
+
+static void _combo_list_bind(GtkListItemFactory *factory,
+                             GtkListItem *item,
+                             gpointer user_data)
+{
+  (void)factory; (void)user_data;
+  GtkWidget *label = gtk_list_item_get_child(item);
+  const _BauhausComboItem *it = gtk_list_item_get_item(item);
+  if(!label || !it || !it->entry) return;
+  const dt_bauhaus_combobox_entry_t *entry = it->entry;
+  gtk_label_set_text(GTK_LABEL(label), entry->label);
+  gtk_widget_set_sensitive(label, entry->sensitive);
+  // all rows left-aligned (the old cairo popup honored per-entry ALIGN_RIGHT
+  // so values lined up under the closed widget's value column, but that
+  // reads wrong in a flat list — keep everything to the left)
+  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+}
+
+/* --- search filter --- */
+
+static gboolean _combo_search_match(gpointer item, gpointer user_data)
+{
+  dt_bauhaus_combo_popup_t *cp = user_data;
+  const _BauhausComboItem *it = item;
+  if(!it || !it->entry) return FALSE;
+  const dt_bauhaus_combobox_entry_t *entry = it->entry;
+  if(!cp->keys || !cp->keys[0]) return TRUE;
+  gchar *cf = g_utf8_casefold(entry->label, -1);
+  const gboolean match = strstr(cf, cp->keys) != NULL;
+  g_free(cf);
+  return match;
+}
+
+static void _combo_search_changed(GtkEditable *editable, gpointer user_data)
+{
+  dt_bauhaus_combo_popup_t *cp = user_data;
+  const char *text = gtk_editable_get_text(editable);
+  g_free(cp->keys);
+  cp->keys = (text && text[0]) ? g_utf8_casefold(text, -1) : NULL;
+  gtk_filter_changed(GTK_FILTER(cp->filter_obj), GTK_FILTER_CHANGE_DIFFERENT);
+}
+
+// Enter in the search box commits the current selection (or the first
+// filtered row) and closes, like a native searchable dropdown.
+static void _combo_search_activate(GtkSearchEntry *entry, gpointer user_data)
+{
+  (void)entry;
+  dt_bauhaus_combo_popup_t *cp = user_data;
+  guint pos = gtk_single_selection_get_selected(cp->selection);
+  if(pos == GTK_INVALID_LIST_POSITION)
+  {
+    // nothing selected (filter may have emptied / no click yet): pick row 0
+    const guint n = g_list_model_get_n_items(G_LIST_MODEL(cp->filter));
+    if(n == 0) { _combo_popup_close(); return; }
+    pos = 0;
+  }
+  _combo_selection_changed(GTK_SELECTION_MODEL(cp->selection), pos, 1, cp->w);
+  _combo_popup_close();
+}
+
+// Down/Up while typing should move selection in the list, not the text cursor:
+// hand focus over to the list view so its built-in arrow/Home/End work.
+static gboolean _combo_search_key(GtkEventControllerKey *controller,
+                                  guint keyval, guint keycode,
+                                  GdkModifierType state, gpointer user_data)
+{
+  (void)keycode; (void)state;
+  dt_bauhaus_combo_popup_t *cp = user_data;
+  if(keyval == GDK_KEY_Down || keyval == GDK_KEY_KP_Down
+     || keyval == GDK_KEY_Up || keyval == GDK_KEY_KP_Up
+     || keyval == GDK_KEY_Home || keyval == GDK_KEY_KP_Home
+     || keyval == GDK_KEY_End || keyval == GDK_KEY_KP_End
+     || keyval == GDK_KEY_Page_Down || keyval == GDK_KEY_Page_Up)
+  {
+    if(cp->list) gtk_widget_grab_focus(cp->list);
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/* --- selection --- */
+
+// find the entry's index in the widget's full (unfiltered) entries array
+static int _combo_entry_index(const dt_bauhaus_combobox_data_t *d,
+                              const dt_bauhaus_combobox_entry_t *e)
+{
+  for(int i = 0; i < d->entries->len; i++)
+    if(_combobox_entry(d, i) == e) return i;
+  return -1;
+}
+
+static void _combo_selection_changed(GtkSelectionModel *model,
+                                     guint position,
+                                     guint n_items,
+                                     gpointer user_data)
+{
+  (void)n_items;
+  dt_bauhaus_widget_t *w = user_data;
+  dt_bauhaus_t *bh = darktable.bauhaus;
+  dt_bauhaus_combo_popup_t *cp = bh->combo_popup;
+  if(!cp || !gtk_selection_model_is_selected(model, position)) return;
+  dt_bauhaus_combobox_data_t *d = &w->combobox;
+  _BauhausComboItem *it = g_list_model_get_item(G_LIST_MODEL(cp->filter), position);
+  const dt_bauhaus_combobox_entry_t *e = it ? it->entry : NULL;
+  const int idx = e ? _combo_entry_index(d, e) : -1;
+  g_clear_object(&it);
+  if(idx < 0 || idx == d->active) return;
+  _combobox_set(w, idx, w->combobox.mute_scrolling);
+  // A mouse click on a row (pointer over the list) commits and closes, like
+  // the old popup; keyboard navigation keeps the popup open for paging.
+  // Destroying the popover is deferred to idle so it never happens mid-event
+  // (the Wayland popup-grab hazard the old code dodged).
+  if(cp->list && _combo_pointer_over_list(cp->list))
+    g_idle_add(_combo_popup_cleanup, NULL);
+}
+
+// is the pointer currently over the list view?  (GTK4 has no
+// gtk_widget_get_pointer; query the seat directly.  Used to tell a mouse row
+// click — which should commit+close — apart from keyboard selection.)
+static gboolean _combo_pointer_over_list(GtkWidget *list)
+{
+  GdkDisplay *disp = gtk_widget_get_display(list);
+  if(!disp) return FALSE;
+  GdkSeat *seat = gdk_display_get_default_seat(disp);
+  if(!seat) return FALSE;
+  GdkDevice *ptr = gdk_seat_get_pointer(seat);
+  if(!ptr) return FALSE;
+  gdouble x, y;
+  GdkSurface *surf = gdk_device_get_surface_at_position(ptr, &x, &y);
+  (void)x; (void)y;
+  if(!surf) return FALSE;
+  // the list lives on the popover's surface (its nearest native ancestor)
+  GtkNative *native = gtk_widget_get_native(list);
+  GdkSurface *list_surf = native ? gtk_native_get_surface(native) : NULL;
+  return surf == list_surf;
+}
+
+static gboolean _combo_popup_cleanup(void *unused)
+{
+  (void)unused;
+  _combo_popup_close();
+  return G_SOURCE_REMOVE;
+}
+
+static void _combo_popover_closed(GtkPopover *popover, gpointer user_data)
+{
+  (void)popover; (void)user_data;
+  // GTK closed it (outside click / Escape / our popdown); tear it down.
+  _combo_popup_close();
+}
+
+// The anchor widget died while the popup was open (module reload / view
+// teardown).  dt_gui_popover_attach's own destroy hook unparents the popover,
+// but unparenting does NOT emit "closed", so bh->combo_popup would dangle;
+// clear it here (runs after the attach hook, see dt_gui_popover_attach).
+static void _combo_anchor_destroyed(GtkWidget *widget, gpointer user_data)
+{
+  (void)widget; (void)user_data;
+  dt_bauhaus_t *bh = darktable.bauhaus;
+  dt_bauhaus_combo_popup_t *cp = bh->combo_popup;
+  if(!cp) return;
+  bh->combo_popup = NULL;
+  bh->current = NULL;
+  g_free(cp->keys);
+  g_free(cp);
+}
+
+static void _combo_popup_close(void)
+{
+  dt_bauhaus_t *bh = darktable.bauhaus;
+  dt_bauhaus_combo_popup_t *cp = bh->combo_popup;
+  if(!cp) return;
+  bh->combo_popup = NULL;   // so re-entry (closed signal, idle) is a no-op
+
+  dt_bauhaus_widget_t *w = cp->w;
+  bh->current = NULL;
+  if(w && w->type == DT_BAUHAUS_COMBOBOX
+     && w->combobox.mute_scrolling && bh->change_active)
+    g_signal_emit(G_OBJECT(w), bh->signals[DT_BAUHAUS_VALUE_CHANGED_SIGNAL], 0);
+  bh->change_active = FALSE;
+  _stop_cursor();
+
+  if(cp->popover)
+  {
+    gtk_popover_popdown(GTK_POPOVER(cp->popover));
+    gtk_widget_unparent(cp->popover);  // destroys it (no other refs; "closed" holds one)
+  }
+  g_free(cp->keys);
+  g_free(cp);
+}
+
+static void _combo_popup_show(dt_bauhaus_widget_t *w)
+{
+  dt_bauhaus_t *bh = darktable.bauhaus;
+  dt_bauhaus_combobox_data_t *d = &w->combobox;
+
+  // run the dynamic populate callback, then give up if still empty
+  if(d->populate)
+  {
+    dt_iop_module_t *module = (dt_iop_module_t *)(w->module);
+    d->populate(GTK_WIDGET(w), &module);
+  }
+  if(!d->entries || !d->entries->len) return;
+
+  if(bh->combo_popup) _combo_popup_close();
+  if(bh->current) _popup_hide();
+
+  bh->current = w;
+  bh->keys_cnt = 0;
+  bh->change_active = FALSE;
+  bh->mouse_line_distance = 0.0f;
+  _stop_cursor();
+  _request_focus(w);
+
+  dt_bauhaus_combo_popup_t *cp = g_new0(dt_bauhaus_combo_popup_t, 1);
+  cp->w = w;
+  cp->keys = NULL;
+  bh->combo_popup = cp;
+
+  // model over the widget's entries (borrowed; stable for this open)
+  _BauhausListModel *model = g_object_new(_bauhaus_list_model_get_type(), NULL);
+  model->entries = d->entries;
+  // gtk_filter_list_model_new() CONSUMES the ref on @model, so the filter
+  // model owns it after this (do NOT g_object_unref(model) here).
+  cp->filter_obj = gtk_custom_filter_new(_combo_search_match, cp, NULL);
+  cp->filter = gtk_filter_list_model_new(G_LIST_MODEL(model), GTK_FILTER(cp->filter_obj));
+  cp->selection = gtk_single_selection_new(G_LIST_MODEL(cp->filter));
+  g_signal_connect(cp->selection, "selection-changed",
+                   G_CALLBACK(_combo_selection_changed), w);
+
+  // popover — let GTK place it (auto-flip), no pointing_to math
+  cp->popover = gtk_popover_new();
+  gtk_popover_set_autohide(GTK_POPOVER(cp->popover), TRUE);
+  gtk_popover_set_has_arrow(GTK_POPOVER(cp->popover), TRUE);
+  gtk_popover_set_position(GTK_POPOVER(cp->popover), GTK_POS_BOTTOM);
+  // distinct CSS class so we can restore a proper popover look (darktable's
+  // global `popover` rule strips the shadow and uses the window's own
+  // background, so the dropdown bleeds into the main window)
+  gtk_widget_add_css_class(cp->popover, "dt_bauhaus_combobox_popover");
+  g_signal_connect(cp->popover, "closed", G_CALLBACK(_combo_popover_closed), NULL);
+
+  // vertical box: search entry on top, scrolled list below
+  GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  cp->search = gtk_search_entry_new();
+  gtk_widget_add_css_class(cp->search, "dt_bauhaus_combobox_search");
+  g_signal_connect(cp->search, "search-changed", G_CALLBACK(_combo_search_changed), cp);
+  g_signal_connect(cp->search, "activate", G_CALLBACK(_combo_search_activate), cp);
+  dt_gui_connect_key(cp->search, _combo_search_key, cp);
+  gtk_box_append(GTK_BOX(vbox), cp->search);
+
+  GtkListItemFactory *factory = gtk_signal_list_item_factory_new();
+  g_signal_connect(factory, "setup", G_CALLBACK(_combo_list_setup), NULL);
+  g_signal_connect(factory, "bind", G_CALLBACK(_combo_list_bind), NULL);
+  cp->list = gtk_list_view_new(GTK_SELECTION_MODEL(cp->selection),
+                               GTK_LIST_ITEM_FACTORY(factory));
+  gtk_widget_add_css_class(cp->list, "dt_bauhaus_combobox_list");
+
+  cp->scroll = gtk_scrolled_window_new();
+  gtk_scrolled_window_set_has_frame(GTK_SCROLLED_WINDOW(cp->scroll), FALSE);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(cp->scroll),
+                                 GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_overlay_scrolling(GTK_SCROLLED_WINDOW(cp->scroll), TRUE);
+  // hug the list's own height (so small lists are compact, with no dead space
+  // between/under rows), capped at max_content_height for long lists
+  gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(cp->scroll), TRUE);
+  gtk_scrolled_window_set_max_content_height(GTK_SCROLLED_WINDOW(cp->scroll),
+                                             (gint)(12 * bh->line_height));
+  gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(cp->scroll), 0);
+  // (the over-scroll "overshoot" rubber band is killed in darktable.css via
+  // .dt_bauhaus_combobox_popover overshoot{min-height:0;...})
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(cp->scroll), cp->list);
+  gtk_box_append(GTK_BOX(vbox), cp->scroll);
+  gtk_popover_set_child(GTK_POPOVER(cp->popover), vbox);
+
+  // make the list at least as wide as the closed widget's content
+  const gint natural_w = _natural_width(GTK_WIDGET(w), TRUE);
+  gtk_widget_set_size_request(cp->list, natural_w, -1);
+
+  // parent the popover to the anchor widget (its toplevel/auto-flip etc. are GTK's job)
+  dt_gui_popover_attach(cp->popover, GTK_WIDGET(w));
+  // clear the live popup if the anchor is destroyed mid-popup (see handler)
+  g_signal_connect(GTK_WIDGET(w), "destroy", G_CALLBACK(_combo_anchor_destroyed), NULL);
+
+  // select the current active row (unfiltered index == filtered index on first open)
+  gtk_single_selection_set_selected(cp->selection,
+                                    d->active >= 0 ? (guint)d->active
+                                                   : GTK_INVALID_LIST_POSITION);
+
+  gtk_popover_popup(GTK_POPOVER(cp->popover));
+  gtk_widget_grab_focus(cp->search);
+}
+
+#endif /* GTK_CHECK_VERSION(4, 0, 0) */
+
 static void _popup_hide()
 {
   dt_bauhaus_t *bh = darktable.bauhaus;
+  if(bh->combo_popup)
+  {
+    _combo_popup_close();
+    return;
+  }
   dt_bauhaus_popup_t *pop = &bh->popup;
   dt_bauhaus_widget_t *w = bh->current;
 
@@ -3366,11 +3761,12 @@ static void _popup_hide()
        && bh->change_active)
       g_signal_emit(G_OBJECT(w), bh->signals[DT_BAUHAUS_VALUE_CHANGED_SIGNAL], 0);
 
-    // GTK4 has no grabs: the popup is a modal toplevel, foreign clicks
-    // never reach the popup's gesture
-    gtk_widget_hide(pop->window);
-    g_signal_handlers_disconnect_by_func(pop->window,
-                                         G_CALLBACK(dt_shortcut_dispatcher), NULL);
+    // pop the popover down but keep it PARENTED to the toplevel: destroying
+    // it (unparent) while inside a click-release would kill its surface and
+    // gesture mid-event and leave the Wayland popup grab stuck (whole app
+    // unclickable).  dt_gui_popover_attach's destroy hook unparents it when
+    // the toplevel dies, and it survives via the ref_sink from init.
+    gtk_popover_popdown(GTK_POPOVER(pop->window));
     bh->current = NULL;
   }
   _stop_cursor();
@@ -3385,6 +3781,16 @@ static void _popup_show(GtkWidget *widget)
   // a toggle has two states and both are visible on the widget itself,
   // so there is nothing a popup could offer
   if(w->type == DT_BAUHAUS_TOGGLE) return;
+
+  // comboboxes get a real GTK4 list popup (own popover + GtkListView), not
+  // the shared cairo popup that sliders use
+#if GTK_CHECK_VERSION(4, 0, 0)
+  if(w->type == DT_BAUHAUS_COMBOBOX)
+  {
+    _combo_popup_show(w);
+    return;
+  }
+#endif
 
   if(bh->current) _popup_hide();
   bh->current = w;
@@ -3411,30 +3817,10 @@ static void _popup_show(GtkWidget *widget)
   GdkRectangle *p = &pop->position;
   gtk_widget_get_allocation(widget, p);
   const int ht = p->height;
-#if GTK_CHECK_VERSION(4, 0, 0)
-  // TODO P4: popup -> GtkPopover.  GTK4 removed GdkWindow/gdk_window_get_origin
-  // and gdk_window_get_device_position; keep the widget-relative allocation
-  // and let the (undecorated) popup land at a default position for now.
-  gint px = 0, py = 0;
-  (void)px;
-  (void)py;
-#else
-  gint px, py;
-  // gtk_widget_get_toplevel doesn't work for popovers on wayland
-  GdkWindow *main_window = gtk_widget_get_window(dt_ui_main_window(darktable.gui->ui));
-  GdkWindow *top = main_window;
-  GdkWindow *widget_window = gtk_widget_get_window(widget);
-  if(widget_window)
-  {
-    top = gdk_window_get_toplevel(widget_window);
-    gdk_window_get_origin(top, &px, &py);
-    gdk_window_get_origin(widget_window, &p->x, &p->y);
-    p->x -= px;
-    p->y -= py;
-  }
-#endif
 
-  const int right_of_w = p->x + p->width - w->margin.right - w->padding.right;
+  // width: the widget's content width, at least the natural width.  The
+  // GtkPopover anchors itself to @widget, so there is no manual x/y
+  // placement and no pointer-relative recentering to do here.
   if(p->width == 1)
   {
     if(dt_ui_panel_ancestor(darktable.gui->ui, DT_UI_PANEL_RIGHT, widget))
@@ -3457,27 +3843,6 @@ static void _popup_show(GtkWidget *widget)
   const gint natural_w = _natural_width(widget, TRUE);
   if(p->width < natural_w)
     p->width = natural_w;
-
-  GdkDevice *pointer =
-    gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default()));
-#if !GTK_CHECK_VERSION(4, 0, 0)
-  gdk_window_get_device_position(top, pointer, &px, &py, NULL);
-#endif
-  (void)pointer;
-
-  if(px > p->x + p->width  || px < p->x)
-  {
-    p->x = px - (p->width - _widget_get_quad_width(w)) / 2;
-    p->y = py - bh->line_height / 2;
-  }
-  else
-  {
-    p->x = right_of_w - p->width;
-    if(py < p->y || py > p->y + p->height)
-    {
-      p->y = py - bh->line_height / 2;
-    }
-  }
 
   switch(bh->current->type)
   {
@@ -3511,32 +3876,75 @@ static void _popup_show(GtkWidget *widget)
       break;
   }
 
-  // by default, we want the popup to be exactly at the position of the widget content
-  p->x += w->margin.left + w->padding.left;
-  p->y += w->margin.top + w->padding.top;
-
-  // and now we extent the popup to take account of its own padding
-  p->x -= pop->padding.left;
-  p->y -= pop->padding.top;
+  // the popover places the box; only the width/height matter, zero x/y
+  p->x = 0;
+  p->y = 0;
   p->width += pop->padding.left + pop->padding.right;
   p->height += pop->padding.top + pop->padding.bottom;
   pop->offcut = 0;
 
-#if GTK_CHECK_VERSION(4, 0, 0)
-  // TODO P4: no gtk_tooltip_trigger_tooltip_query()/GtkWidget::event
-  // forwarding on GTK4; the popup is a transient of the main window.
-  gtk_window_set_transient_for(GTK_WINDOW(pop->window),
-                               GTK_WINDOW(dt_ui_main_window(darktable.gui->ui)));
-#else
-  gtk_tooltip_trigger_tooltip_query(gdk_display_get_default());
-  if(top == main_window)
-    g_signal_connect(pop->window, "event", G_CALLBACK(dt_shortcut_dispatcher), NULL);
+  // parent the shared popover to the anchor's TOPLEVEL (a toplevel unparents
+  // its children on destroy, and it survives via the ref_sink taken in
+  // dt_bauhaus_init) and point it at the widget's bounds so it anchors to
+  // the widget (GTK4 popovers have no relative_to; pointing_to is the rect
+  // in the parent's coordinate space).
+  // Anchor the popover so the SELECTED row lands under the (stationary)
+  // cursor, matching the GTK3 popup: the popup's top is shifted UP by the
+  // selected row's pixel offset (offset = active * line_height), so that
+  // row shows exactly where the closed widget (and the cursor hovering it)
+  // was — no jump, no flash.  GtkPopover has no pixel-offset knob, so we
+  // encode it in pointing_to (the rect in the toplevel's space): with
+  // GTK_POS_BOTTOM, popover_top == rect_bottom.  All paddings come from the
+  // live CSS (the area's popup padding cancels out of this; only the
+  // popover's own theme padding around its content offsets it), so styling
+  // changes shift the popup automatically.
+  // parent the shared popover to the anchor's TOPLEVEL and anchor it to the
+  // widget's bounds (GTK4 popovers have no relative_to; pointing_to is the
+  // rect in the parent's coordinate space).  Explicitly track/reparent: the
+  // popover persists across opens and outlives any single toplevel (ref_sink),
+  // and a destroy hook unparents it cleanly when its toplevel dies (data is
+  // cleared there, so a recycled toplevel address is treated as new).  We do
+  // NOT unparent on close (see _popup_hide) to avoid killing the popover's
+  // surface/gesture mid-event.
+  GtkWidget *toplevel = GTK_WIDGET(gtk_widget_get_root(widget));
+  GtkWidget *cur = g_object_get_data(G_OBJECT(pop->window), "dt-bauhaus-popover-toplevel");
+  if(toplevel && cur != toplevel)
+  {
+    if(gtk_widget_get_parent(pop->window))
+      gtk_widget_unparent(pop->window);
+    if(cur)
+      g_signal_handlers_disconnect_by_func(cur, _dt_popover_toplevel_destroyed, pop->window);
+    g_object_set_data(G_OBJECT(pop->window), "dt-bauhaus-popover-toplevel", toplevel);
+    g_signal_connect(toplevel, "destroy", G_CALLBACK(_dt_popover_toplevel_destroyed), pop->window);
+    gtk_widget_set_parent(pop->window, toplevel);
+  }
+  graphene_rect_t grect;
+  if(toplevel && gtk_widget_compute_bounds(widget, toplevel, &grect))
+  {
+    GtkBorder pop_pad = { 0, 0, 0, 0 };
+    gtk_style_context_get_padding(gtk_widget_get_style_context(pop->window),
+                                  gtk_widget_get_state_flags(pop->window),
+                                  &pop_pad);
+    // Place the popover so the SELECTED row lands under the (stationary)
+    // cursor, matching GTK3 (no jump, no flash): the popup's top is shifted
+    // up by the selected row's pixel offset.  pop->chrome is the measured
+    // rect->area-top offset (GTK pointing gap + popover padding), seeded
+    // until the first layout measures it, so the math is robust to CSS and
+    // theme changes.
+    const gint chrome = pop->chrome ? pop->chrome : 12;
+    const gint target = (gint)grect.origin.y + (gint)grect.size.height / 2;
+    const gint aligned_y = target - chrome - (gint)pop_pad.top
+                           - w->top_gap - pop->offset
+                           - (gint)bh->line_height / 2;
+    pop->last_rect_y = aligned_y;
+    const GdkRectangle rect = { (int)grect.origin.x, aligned_y,
+                                (int)grect.size.width, 1 };
+    gtk_popover_set_pointing_to(GTK_POPOVER(pop->window), &rect);
+  }
+  gtk_popover_set_position(GTK_POPOVER(pop->window), GTK_POS_BOTTOM);
 
-  gtk_window_set_attached_to(GTK_WINDOW(pop->window), widget);
-  gdk_window_set_transient_for(gtk_widget_get_window(pop->window), top);
-#endif
   _window_position(0);
-  gtk_widget_show_all(pop->window);
+  gtk_popover_popup(GTK_POPOVER(pop->window));
   gtk_widget_grab_focus(pop->area);
 }
 

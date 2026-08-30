@@ -98,19 +98,36 @@ typedef enum dt_bauhaus_marker_shape_t
 
 typedef struct dt_bauhaus_popup_t
 {
-  GtkWidget *window;
+  GtkWidget *window;   // the value popup: a GtkPopover on GTK4 (anchors to
+                       // the source widget, autohides on outside click / Escape)
   GtkWidget *area;
   GtkBorder padding;     // padding of the popup. updated in show function
   GdkRectangle position;
   int offset;
   int offcut;
   float oldpos;   // slider value before entering finetune mode (normalized)
+  /* GTK4 popover placement: measured once, reused.  The pointing rect we set
+   * does not land the drawing area at the same y as the rect: GTK adds a
+   * pointing gap + the popover's (CSS) content inset before the area.  We
+   * measure chrome = area_top_in_root - rect_y on the first layout and reuse
+   * it so the selected-row-under-cursor math stays correct across themes and
+   * CSS changes (no hardcoded px). */
+  gint chrome;
+  gint last_rect_y;
 } dt_bauhaus_popup_t;
+
+/* GTK4 combobox value popup: a fresh GtkPopover holding a GtkListView (+ an
+ * optional search box) built per open, NULL when closed.  Sliders keep using
+ * the shared dt_bauhaus_popup above; comboboxes use this instead so GTK can
+ * place the popover (auto-flip), clamp its height and scroll the list — the
+ * old cairo-drawn popup had no max height and fought GtkPopover's placement. */
+typedef struct dt_bauhaus_combo_popup_t dt_bauhaus_combo_popup_t;
 
 typedef struct dt_bauhaus_t
 {
   dt_bauhaus_widget_t *current;
   dt_bauhaus_popup_t popup;
+  dt_bauhaus_combo_popup_t *combo_popup;  /* GTK4 only, NULL when closed */
 
   // the widget that has the mouse over it
   GtkWidget *hovered;

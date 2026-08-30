@@ -897,6 +897,145 @@ menuitem check:selected
   padding-right: 0.42em;
 }
 
+/* the bauhaus value popup is a GtkPopover wrapping the .dt_bauhaus_popup
+   drawing area.  Strip the popover's own chrome (padding/margin/arrow) so the
+   area fills the surface exactly: GTK's default popover inset (padding +
+   arrow) would add white space around the menu and shift its placement, and
+   we need the geometry to line up with the widget. */
+.dt_bauhaus_popover
+{
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.dt_bauhaus_popover > arrow
+{
+  min-width: 0;
+  min-height: 0;
+  background: none;
+  border: none;
+}
+
+/* GTK4 combobox list popup (a GtkListView in a GtkPopover, bauhaus.c).
+   darktable's global `popover` rule below drops the shadow and paints the
+   window's own @tooltip_bg_color background (== the main-window bg), so the
+   dropdown bleeds into the UI.  Restore a proper, lifted popover: opaque box,
+   rounded corners, drop shadow (GtkPopover reads box-shadow from its
+   `contents` node), row hover/selection, and a fade-in on open. */
+.dt_bauhaus_combobox_popover
+{
+  padding: 0;
+  background-color: transparent;  /* the `contents` node carries the box */
+  /* edge-hint color + length for the over/under-scroll fades.  The color is
+     darker than the popover background (@grey_25) so it reads against it;
+     the length is how much of the (engine-sized) edge band the fade covers —
+     smaller = subtler hint.  Tweak both here. */
+  --dt-bauhaus-edge-hint: @grey_15;
+  --dt-bauhaus-edge-length: 30%;
+}
+
+.dt_bauhaus_combobox_popover > contents
+{
+  background-color: @grey_25;        /* lighter than the @grey_15 window */
+  border-radius: 0.6em;
+  /*box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.5);*/
+  /*box-shadow: 0 0 1px rgba(0, 0, 0, 0.5);*/
+  animation: dt-combo-popover-in 0.14s ease-out;
+  border: 1px solid @grey_25;
+}
+
+/* GTK4's GtkPopover has no built-in animation (the fade you see on GNOME is
+   the Wayland compositor, not GTK), so fade + slide the contents in.  The
+   contents node carries the box, so animating opacity + transform here gives
+   a smooth "rises into place" feel.  Tweak the distance/duration to taste. */
+@keyframes dt-combo-popover-in
+{
+  from { opacity: 0; transform: translate(0, -8px); }
+  to   { opacity: 1; transform: translate(0, 0); }
+}
+
+.dt_bauhaus_combobox_popover > arrow
+{
+  background-color: @grey_25;
+  border-radius: 0.2em;
+}
+
+.dt_bauhaus_combobox_popover .dt_bauhaus_combobox_search
+{
+  margin: 0.5em 0.5em 0.15em 0.5em;
+}
+
+.dt_bauhaus_combobox_popover .dt_bauhaus_combobox_list
+{
+  /*margin: 0.1em 0.5em 0.5em 0.5em;*/
+  margin: 0em;
+}
+
+.dt_bauhaus_combobox_list row
+{
+  padding: 0.28em 0.55em;
+  border-radius: 0.35em;
+}
+
+.dt_bauhaus_combobox_list row:hover
+{
+  background-color: @grey_30;
+}
+
+.dt_bauhaus_combobox_list row:selected
+{
+  background-color: @grey_40;
+}
+
+/* Over/under-scroll edge hints.  darktable's global `*` reset blanks these
+   (background-image:none, min-size:0), so restore a simple dark→transparent
+   fade here.  The color comes from --dt-bauhaus-edge-hint (set on the
+   popover above); each direction fades from that color at the outer edge
+   toward the list.  Swap the gradient stops / direction by hand to taste. */
+
+.dt_bauhaus_combobox_popover overshoot,
+.dt_bauhaus_combobox_popover undershoot
+{
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  background-repeat: no-repeat;
+}
+
+.dt_bauhaus_combobox_popover overshoot.top,
+.dt_bauhaus_combobox_popover undershoot.top
+{
+  background-image: linear-gradient(to bottom, var(--dt-bauhaus-edge-hint), transparent);
+  background-size: 100% var(--dt-bauhaus-edge-length);
+  background-position: top;
+}
+
+.dt_bauhaus_combobox_popover overshoot.bottom,
+.dt_bauhaus_combobox_popover undershoot.bottom
+{
+  background-image: linear-gradient(to top, var(--dt-bauhaus-edge-hint), transparent);
+  background-size: 100% var(--dt-bauhaus-edge-length);
+  background-position: bottom;
+}
+
+.dt_bauhaus_combobox_popover overshoot.left,
+.dt_bauhaus_combobox_popover undershoot.left
+{
+  background-image: linear-gradient(to right, var(--dt-bauhaus-edge-hint), transparent);
+  background-size: var(--dt-bauhaus-edge-length) 100%;
+  background-position: left;
+}
+
+.dt_bauhaus_combobox_popover overshoot.right,
+.dt_bauhaus_combobox_popover undershoot.right
+{
+  background-image: linear-gradient(to left, var(--dt-bauhaus-edge-hint), transparent);
+  background-size: var(--dt-bauhaus-edge-length) 100%;
+  background-position: right;
+}
+
 /* ??? workaround a wayland issue where the sub-menu in the presets
    closing when close to the right border of the screen. */
 menuitem *
